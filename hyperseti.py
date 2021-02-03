@@ -291,11 +291,11 @@ def merge_hits(hitlist):
         p0 = p.iloc[0]
 
         # Find channels and driftrates within tolerances
-        q = f"""(abs(driftrate_idx - {p0['driftrate_idx']}) <= boxcar_size  |
-                abs(driftrate_idx - {p0['driftrate_idx']}) <= {p0['boxcar_size']})
+        q = f"""(abs(driftrate_idx - {p0['driftrate_idx']}) <= boxcar_size + 1  |
+                abs(driftrate_idx - {p0['driftrate_idx']}) <= {p0['boxcar_size']} + 1)
                 & 
-                (abs(channel_idx - {p0['channel_idx']}) <= {p0['boxcar_size']} | 
-                abs(channel_idx - {p0['channel_idx']}) <= boxcar_size)"""
+                (abs(channel_idx - {p0['channel_idx']}) <= {p0['boxcar_size']} + 1| 
+                abs(channel_idx - {p0['channel_idx']}) <= boxcar_size + 1)"""
         q = q.replace('\n', '') # Query must be one line
         pq = p.query(q)
         tophit = pq.sort_values("snr", ascending=False).iloc[0]
@@ -339,10 +339,10 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
         # Noise increases by sqrt(N_timesteps * boxcar_size)
         _threshold = threshold * np.sqrt(N_timesteps * boxcar_size)
         _peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_fdistance=min_fdistance, min_ddistance=min_ddistance)
-        _peaks['snr'] /= np.sqrt(N_timesteps * boxcar_size)
         
-        # Join to list
-        peaks = pd.concat((peaks, _peaks), ignore_index=True)
+        if _peaks is not None:
+            _peaks['snr'] /= np.sqrt(N_timesteps * boxcar_size)
+            peaks = pd.concat((peaks, _peaks), ignore_index=True)
             
     if merge_boxcar_trials:
         peaks = merge_hits(peaks)
@@ -377,11 +377,11 @@ class H5Reader(object):
             md['sidx'] = ii
             yield md
 
-    def read_data(self, md):
+    def read_data(self, gulp_md):
         t0 = time.time()
-        ii = md['sidx']
+        ii = gulp_md['sidx']
         with h5py.File(self.fn, mode='r') as h:
-            d = h['data'][:, 0, md['i0']:md['i1']]
+            d = h['data'][:, 0, gulp_md['i0']:gulp_md['i1']]
         t1 = time.time()
         logger.info(f"## Subband {ii+1}/{self.n_sub} read: {(t1-t0)*1e3:2.2f}ms ##")
         return d
