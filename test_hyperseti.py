@@ -174,6 +174,7 @@ def test_hitsearch():
     print(hits)
     
     print("--- run merge_hits --- ")
+    print(hits.dtypes)
     merged_hits = merge_hits(hits)
     assert len(merged_hits == 1)
     print(merged_hits)

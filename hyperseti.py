@@ -252,25 +252,27 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
     t1 = time.time()
     logger.info(f"Peak find time: {(t1-t0)*1e3:2.2f}ms")
     
-    
-    driftrate_peaks = drift_trials[dcoords]
-    frequency_peaks = metadata['fch1'] + metadata['df'] * fcoords
-    
+    if len(fcoords) > 0:
+        driftrate_peaks = drift_trials[dcoords]
+        frequency_peaks = metadata['fch1'] + metadata['df'] * fcoords
 
-    results = {
-        'driftrate': driftrate_peaks,
-        'f_start': frequency_peaks,
-        'snr': intensity,
-        'driftrate_idx': dcoords,
-        'channel_idx': fcoords
-    }
-    
-    # Append numerical metadata keys
-    for key, val in metadata.items():
-        if isinstance(val, (int, float)):
-            results[key] = val
-    
-    return pd.DataFrame(results)
+
+        results = {
+            'driftrate': driftrate_peaks,
+            'f_start': frequency_peaks,
+            'snr': intensity,
+            'driftrate_idx': dcoords,
+            'channel_idx': fcoords
+        }
+
+        # Append numerical metadata keys
+        for key, val in metadata.items():
+            if isinstance(val, (int, float)):
+                results[key] = val
+
+        return pd.DataFrame(results)
+    else:
+        return None
     
 def merge_hits(hitlist):
     """ Group hits corresponding to different boxcar widths and return hit with max SNR 
@@ -318,26 +320,29 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     if apply_normalization:
         data = normalize(data, return_space='gpu')
     
-    dedopp, metadata = dedoppler(data, metadata, boxcar_size=1, boxcar_mode='sum', 
-                                 max_dd=max_dd, min_dd=min_dd)
-    peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_fdistance=min_fdistance, min_ddistance=min_ddistance)
-    peaks['snr'] /= np.sqrt(N_timesteps)
+    # Create empty dataframe
+    peaks = pd.DataFrame({'driftrate': pd.Series([], dtype='float64'),
+                          'f_start': pd.Series([], dtype='float64'),
+                          'snr': pd.Series([], dtype='float64'),
+                          'driftrate_idx': pd.Series([], dtype='int'),
+                          'channel_idx': pd.Series([], dtype='int'),
+                          'boxcar_size': pd.Series([], dtype='int'),
+                         })
     
-    if n_boxcar > 1:
-        boxcar_trials = map(int, 2**np.arange(1, n_boxcar))
-        for boxcar_size in boxcar_trials:
-            logger.info(f"--- Boxcar size: {boxcar_size} ---")
-            dedopp, metadata = dedoppler(data, metadata, boxcar_size=boxcar_size,  boxcar_mode='sum',
-                                         max_dd=max_dd, min_dd=min_dd)
-            
-            # Adjust SNR threshold to take into account boxcar size and dedoppler sum
-            # Noise increases by sqrt(N_timesteps * boxcar_size)
-            _threshold = threshold * np.sqrt(N_timesteps * boxcar_size)
-            _peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_fdistance=min_fdistance, min_ddistance=min_ddistance)
-            _peaks['snr'] /= np.sqrt(N_timesteps * boxcar_size)
-            
-            # Join to list
-            peaks = pd.concat((peaks, _peaks), ignore_index=True)
+    boxcar_trials = map(int, 2**np.arange(0, n_boxcar))
+    for boxcar_size in boxcar_trials:
+        logger.info(f"--- Boxcar size: {boxcar_size} ---")
+        dedopp, metadata = dedoppler(data, metadata, boxcar_size=boxcar_size,  boxcar_mode='sum',
+                                     max_dd=max_dd, min_dd=min_dd)
+        
+        # Adjust SNR threshold to take into account boxcar size and dedoppler sum
+        # Noise increases by sqrt(N_timesteps * boxcar_size)
+        _threshold = threshold * np.sqrt(N_timesteps * boxcar_size)
+        _peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_fdistance=min_fdistance, min_ddistance=min_ddistance)
+        _peaks['snr'] /= np.sqrt(N_timesteps * boxcar_size)
+        
+        # Join to list
+        peaks = pd.concat((peaks, _peaks), ignore_index=True)
             
     if merge_boxcar_trials:
         peaks = merge_hits(peaks)
