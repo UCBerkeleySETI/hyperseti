@@ -84,7 +84,7 @@ def normalize(data, return_space='cpu'):
     
     # Normalise
     t0 = time.time()
-    d_median = cp.median(d_gpu)
+    d_median = cp.mean(d_gpu)
     d_std  = cp.std(d_gpu)
     d_gpu = (d_gpu - d_median) / d_std
     t1 = time.time()
@@ -368,7 +368,7 @@ class H5Reader(object):
             }
             self.dshape = h['data'].shape
             
-        self.gulp_size = 2**19
+        self.gulp_size = gulp_size
         self.n_sub = self.dshape[2] // gulp_size
     
     def read_data_plan(self):
@@ -394,7 +394,7 @@ def search_subband_dask(md, h5):
     d_gulp = h5.read_data(md)
     try:
         dd, dedopp, peaks = run_pipeline(d_gulp, md, max_dd=1.0, min_dd=None, 
-                                         threshold=50, min_fdistance=1000, min_ddistance=None, 
+                                         threshold=100, min_fdistance=1000, min_ddistance=None, 
                                          n_boxcar=5, merge_boxcar_trials=True, apply_normalization=True)
         if not peaks.empty:
             peaks['channel_idx'] += md['i0']
@@ -420,6 +420,27 @@ def find_et(filename, filename_out='hits.csv', n_parallel=1, gulp_size=2**19):
     t1 = time.time()
     print(f"## N_PARALLEL {n_parallel} TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
     return dframe
+    
+def find_et_serial(filename, filename_out='hits.csv', n_parallel=1, gulp_size=2**19):
+    peaks = create_empty_hits_table()
+    h5 = H5Reader(filename, gulp_size=gulp_size)   
+
+    t0 = time.time()
+    gulp_plan = h5.read_data_plan()
+    out = []
+    for gulp_md in gulp_plan:
+        d = h5.read_data(gulp_md)
+        dedopp, metadata, hits = run_pipeline(d, h5.metadata, max_dd=1.0, apply_normalization=True, 
+                                              threshold=100, min_fdistance=100, n_boxcar=5, merge_boxcar_trials=True)
+        out.append(hits)
+        logger.info(f"{len(hits)} hits found")
+              
+    dframe = pd.concat(out)
+    dframe.to_csv(filename_out)
+    t1 = time.time()
+    print(f"## TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
+    return dframe
+
     
 if __name__ == "__main__":
     fn = '/datax/collate_mb/PKS_0262_2018-02-21T17:00/blc01/guppi_58171_08035_757812_G26.37-1.21_0001.0000.hires.hdf'
