@@ -308,6 +308,17 @@ def merge_hits(hitlist):
     
     return pd.DataFrame(hits)
 
+def create_empty_hits_table():
+    # Create empty dataframe
+    peaks = pd.DataFrame({'driftrate': pd.Series([], dtype='float64'),
+                          'f_start': pd.Series([], dtype='float64'),
+                          'snr': pd.Series([], dtype='float64'),
+                          'driftrate_idx': pd.Series([], dtype='int'),
+                          'channel_idx': pd.Series([], dtype='int'),
+                          'boxcar_size': pd.Series([], dtype='int'),
+                         })
+    return peaks
+
 def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistance=None, 
                  min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True, apply_normalization=False):
     """ Run pipeline """
@@ -320,14 +331,7 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     if apply_normalization:
         data = normalize(data, return_space='gpu')
     
-    # Create empty dataframe
-    peaks = pd.DataFrame({'driftrate': pd.Series([], dtype='float64'),
-                          'f_start': pd.Series([], dtype='float64'),
-                          'snr': pd.Series([], dtype='float64'),
-                          'driftrate_idx': pd.Series([], dtype='int'),
-                          'channel_idx': pd.Series([], dtype='int'),
-                          'boxcar_size': pd.Series([], dtype='int'),
-                         })
+    peaks = create_empty_hits_table()
     
     boxcar_trials = map(int, 2**np.arange(0, n_boxcar))
     for boxcar_size in boxcar_trials:
@@ -388,11 +392,16 @@ class H5Reader(object):
 
 def search_subband_dask(md, h5):
     d_gulp = h5.read_data(md)
-    dd, dedopp, peaks = run_pipeline(d_gulp, md, max_dd=1.0, min_dd=None, 
-                                     threshold=50, min_fdistance=100, min_ddistance=None, 
-                                     n_boxcar=5, merge_boxcar_trials=True)
-    if not peaks.empty:
-        peaks['channel_idx'] += md['i0']
+    try:
+        dd, dedopp, peaks = run_pipeline(d_gulp, md, max_dd=1.0, min_dd=None, 
+                                         threshold=50, min_fdistance=1000, min_ddistance=None, 
+                                         n_boxcar=5, merge_boxcar_trials=True, apply_normalization=True)
+        if not peaks.empty:
+            peaks['channel_idx'] += md['i0']
+    except:
+        logger.critical(f"ERROR on subband {md['sidx']}")
+        peaks = create_empty_hits_table()
+        
     return [peaks,]
 
 def find_et(filename, filename_out='hits.csv', n_parallel=1, gulp_size=2**19):
