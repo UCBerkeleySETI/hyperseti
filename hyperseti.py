@@ -13,7 +13,7 @@ from astropy import units as u
 import setigen as stg
 import matplotlib.pyplot as plt
 
-from cupyimg.skimage.feature import peak_local_max
+from cupyimg.skimage.feature.peak import _prominent_peaks as prominent_peaks
 from cupyx.scipy.ndimage import uniform_filter1d
 
 import hdf5plugin
@@ -214,8 +214,8 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     else:
         return dedopp_gpu, metadata
 
-def hitsearch(dedopp, metadata, threshold=10, min_distance=100):
-    """ Search for hits using peak_local_max method 
+def hitsearch_pp(dedopp, metadata, threshold=10, min_xdistance=None, min_ydistance=None):
+    """ Search for hits using _prominent_peaks method in cupyimg.skimage
     
     Args:
         dedopp (np.array): Dedoppler search array of shape (N_trial, N_chan)
@@ -235,6 +235,12 @@ def hitsearch(dedopp, metadata, threshold=10, min_distance=100):
     
     drift_trials = metadata['drift_trials']
     
+    if min_xdistance is None:
+        min_xdistance = metadata['boxcar_size'] * 2
+    
+    if min_ydistance is None:
+        min_ydistance = len(drift_trials) // 4
+    
     # Unfortunately we need a CPU copy of the dedoppler for peak finding
     # This means lots of copying back and forth, so potential bottleneck
     if isinstance(dedopp, np.ndarray):
@@ -246,22 +252,23 @@ def hitsearch(dedopp, metadata, threshold=10, min_distance=100):
     dedopp_gpu = cp.asarray(dedopp.astype('float32'))
     
     t0 = time.time()
-    peaks = peak_local_max(dedopp_gpu, min_distance=min_distance, threshold_abs=threshold)
+    intensity, xcoords, ycoords = prominent_peaks(dedopp_gpu, min_xdistance=min_xdistance, min_ydistance=min_ydistance, threshold=threshold)
+    # copy results over to CPU space
+    intensity, xcoords, ycoords = cp.asnumpy(intensity), cp.asnumpy(xcoords), cp.asnumpy(ycoords)
     t1 = time.time()
     logger.info(f"Peak find time: {(t1-t0)*1e3:2.2f}ms")
-    peaks = cp.asnumpy(peaks)
     
     
-    driftrate_peaks = drift_trials[peaks[:, 0]]
-    frequency_peaks = metadata['fch1'] + metadata['df'] * peaks[:, 1]
+    driftrate_peaks = drift_trials[ycoords]
+    frequency_peaks = metadata['fch1'] + metadata['df'] * xcoords
     
 
     results = {
         'driftrate': driftrate_peaks,
         'f_start': frequency_peaks,
-        'snr': dedopp_cpu[peaks[:, 0], peaks[:, 1]],
-        'driftrate_idx': peaks[:, 0],
-        'channel_idx': peaks[:, 1]
+        'snr': intensity,
+        'driftrate_idx': ycoords,
+        'channel_idx': xcoords
     }
     
     # Append numerical metadata keys
