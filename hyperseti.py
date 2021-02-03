@@ -1,17 +1,12 @@
 import cupy as cp
 import numpy as np
-import pylab as plt
 import time
 import pandas as pd
 import logging
 import os
 
-import dask.bag as db
-from dask.diagnostics import ProgressBar
-
 from astropy import units as u
 import setigen as stg
-import matplotlib.pyplot as plt
 
 from cupyimg.skimage.feature.peak import _prominent_peaks as prominent_peaks
 from cupyx.scipy.ndimage import uniform_filter1d
@@ -22,6 +17,8 @@ from copy import deepcopy
 
 from multiprocessing.pool import ThreadPool
 import dask
+import dask.bag as db
+from dask.diagnostics import ProgressBar
 
 # Max threads setup 
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
@@ -214,7 +211,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     else:
         return dedopp_gpu, metadata
 
-def hitsearch_pp(dedopp, metadata, threshold=10, min_xdistance=None, min_ydistance=None):
+def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=None):
     """ Search for hits using _prominent_peaks method in cupyimg.skimage
     
     Args:
@@ -222,7 +219,8 @@ def hitsearch_pp(dedopp, metadata, threshold=10, min_xdistance=None, min_ydistan
         drift_trials (np.array): List of dedoppler trials corresponding to dedopp N_trial axis
         metadata (dict): Dictionary of metadata needed to convert from indexes to frequencies etc
         threshold (float): Threshold value (absolute) above which a peak can be considered
-        min_distance (int): Minimum distance in pixels to nearest peak
+        min_fdistance (int): Minimum distance in pixels to nearest peak along frequency axis
+        min_ddistance (int): Minimum distance in pixels to nearest peak along doppler axis
     
     Returns:
         results (pd.DataFrame): Pandas dataframe of results, with columns 
@@ -235,11 +233,11 @@ def hitsearch_pp(dedopp, metadata, threshold=10, min_xdistance=None, min_ydistan
     
     drift_trials = metadata['drift_trials']
     
-    if min_xdistance is None:
-        min_xdistance = metadata['boxcar_size'] * 2
+    if min_fdistance is None:
+        min_fdistance = metadata['boxcar_size'] * 2
     
-    if min_ydistance is None:
-        min_ydistance = len(drift_trials) // 4
+    if min_ddistance is None:
+        min_ddistance = len(drift_trials) // 4
     
     # Unfortunately we need a CPU copy of the dedoppler for peak finding
     # This means lots of copying back and forth, so potential bottleneck
@@ -252,23 +250,23 @@ def hitsearch_pp(dedopp, metadata, threshold=10, min_xdistance=None, min_ydistan
     dedopp_gpu = cp.asarray(dedopp.astype('float32'))
     
     t0 = time.time()
-    intensity, xcoords, ycoords = prominent_peaks(dedopp_gpu, min_xdistance=min_xdistance, min_ydistance=min_ydistance, threshold=threshold)
+    intensity, fcoords, dcoords = prominent_peaks(dedopp_gpu, min_xdistance=min_fdistance, min_ydistance=min_ddistance, threshold=threshold)
     # copy results over to CPU space
-    intensity, xcoords, ycoords = cp.asnumpy(intensity), cp.asnumpy(xcoords), cp.asnumpy(ycoords)
+    intensity, fcoords, dcoords = cp.asnumpy(intensity), cp.asnumpy(fcoords), cp.asnumpy(dcoords)
     t1 = time.time()
     logger.info(f"Peak find time: {(t1-t0)*1e3:2.2f}ms")
     
     
-    driftrate_peaks = drift_trials[ycoords]
-    frequency_peaks = metadata['fch1'] + metadata['df'] * xcoords
+    driftrate_peaks = drift_trials[dcoords]
+    frequency_peaks = metadata['fch1'] + metadata['df'] * fcoords
     
 
     results = {
         'driftrate': driftrate_peaks,
         'f_start': frequency_peaks,
         'snr': intensity,
-        'driftrate_idx': ycoords,
-        'channel_idx': xcoords
+        'driftrate_idx': dcoords,
+        'channel_idx': fcoords
     }
     
     # Append numerical metadata keys
@@ -312,8 +310,8 @@ def merge_hits(hitlist):
     
     return pd.DataFrame(hits)
 
-def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_distance=100, 
-                 n_boxcar=6, merge_boxcar_trials=True):
+def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistance=None, 
+                 min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True):
     """ Run pipeline """
     
     t0 = time.time()
@@ -321,7 +319,7 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_distance
     _threshold = threshold * np.sqrt(N_timesteps)
     dedopp, metadata = dedoppler(data, metadata, boxcar_size=1, boxcar_mode='sum', 
                                  max_dd=max_dd, min_dd=min_dd, apply_normalization=False)
-    peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_distance=min_distance)
+    peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_fdistance=min_fdistance, min_ddistance=min_ddistance)
     peaks['snr'] /= np.sqrt(N_timesteps)
     
     if n_boxcar > 1:
@@ -334,7 +332,7 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_distance
             # Adjust SNR threshold to take into account boxcar size and dedoppler sum
             # Noise increases by sqrt(N_timesteps * boxcar_size)
             _threshold = threshold * np.sqrt(N_timesteps * boxcar_size)
-            _peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_distance=min_distance)
+            _peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_fdistance=min_fdistance, min_ddistance=min_ddistance)
             _peaks['snr'] /= np.sqrt(N_timesteps * boxcar_size)
             
             # Join to list
@@ -376,7 +374,7 @@ class H5Reader(object):
     def read_data(self, md):
         t0 = time.time()
         ii = md['sidx']
-        with h5py.File(fn, mode='r') as h:
+        with h5py.File(self.fn, mode='r') as h:
             d = h['data'][:, 0, md['i0']:md['i1']]
         t1 = time.time()
         logger.info(f"## Subband {ii+1}/{self.n_sub} read: {(t1-t0)*1e3:2.2f}ms ##")
@@ -384,13 +382,30 @@ class H5Reader(object):
 
 def search_subband_dask(md, h5):
     d_gulp = h5.read_data(md)
-    dd, dedopp, peaks = run_pipeline(d_gulp, md, 
-                                        max_dd=0.5, min_dd=None, min_distance=20, 
-                                        threshold=20, n_boxcar=2)
+    dd, dedopp, peaks = run_pipeline(d_gulp, md, max_dd=1.0, min_dd=None, 
+                                     threshold=50, min_fdistance=100, min_ddistance=None, 
+                                     n_boxcar=5, merge_boxcar_trials=True)
     if not peaks.empty:
         peaks['channel_idx'] += md['i0']
     return [peaks,]
 
+def find_et(filename, filename_out='hits.csv', n_parallel=1, gulp_size=2**19):
+    
+    h5 = H5Reader(filename, gulp_size=gulp_size)   
+    
+    dask.config.set(pool=ThreadPool(n_parallel))
+    t0 = time.time()
+    b = db.from_sequence(h5.read_data_plan())
+    with ProgressBar():
+        logger.setLevel(logging.CRITICAL)
+        out = b.map(search_subband_dask, h5).compute()
+
+    dframe = pd.concat([o[0] for o in out])
+    dframe.to_csv(filename_out)
+    t1 = time.time()
+    print(f"## N_PARALLEL {n_parallel} TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
+    return dframe
+    
 if __name__ == "__main__":
     fn = '/datax/collate_mb/PKS_0262_2018-02-21T17:00/blc01/guppi_58171_08035_757812_G26.37-1.21_0001.0000.hires.hdf'
     h5 = H5Reader(fn, gulp_size=2**20)
