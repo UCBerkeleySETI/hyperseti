@@ -97,10 +97,45 @@ def normalize(data, return_space='cpu'):
         return cp.asnumpy(d_gpu)
     else:
         return d_gpu
+
+def apply_boxcar(data, boxcar_size, axis=1, mode='mean', return_space='cpu'):
+    """ Apply moving boxcar filter and renormalise by sqrt(boxcar_size)
     
+    Boxcar applies a moving MEAN to the data. 
+    Optionally apply sqrt(N) factor to keep stdev of gaussian noise constant.
     
-def dedoppler(data, metadata, max_dd, min_dd=None, 
-              apply_preprocessing=False, apply_postprocessing=True, return_space='cpu'):
+    Args:
+        data (np/cp.array): Data to apply boxcar to
+        boxcar_size (int): Size of boxcar filter
+        mode (str): Choose one of 'mean', 'mode', 'gaussian'
+                    Where gaussian multiplies by sqrt(N) to maintain
+                    stdev of Gaussian noise
+        return_space ('cpu' or 'gpu'): Return in CPU or GPU space
+    
+    Returns: 
+        data (np/cp.array): Data after boxcar filtering.
+    """
+    if mode not in ('sum', 'mean', 'gaussian'):
+        raise RuntimeError("Unknown mode. Only modes sum, mean or gaussian supported.")
+    t0 = time.time()
+    # Move to GPU as required, and multiply by sqrt(boxcar_size)
+    # This keeps stdev noise the same instead of decreasing by sqrt(N)
+    data = cp.asarray(data.astype('float32'))
+    data = uniform_filter1d(data, size=boxcar_size, axis=axis)
+    if mode == 'gaussian':
+        data *= np.sqrt(boxcar_size)
+    elif mode == 'sum':
+        data *= boxcar_size
+    t1 = time.time()
+    logger.info(f"Filter time: {(t1-t0)*1e3:2.2f}ms")
+    
+    if return_space == 'cpu':
+        return cp.asnumpy(data)
+    else:
+        return data
+    
+def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
+              boxcar_mode='sum', apply_normalization=False, return_space='cpu'):
     """ Apply brute-force dedoppler kernel to data
     
     Args:
@@ -109,8 +144,9 @@ def dedoppler(data, metadata, max_dd, min_dd=None,
                          (frequency and time resolution)
         max_dd (float): Maximum doppler drift in Hz/s to search out to
         min_dd (float): Minimum doppler drift to search
-        apply_preprocessing (bool): Apply preprocessing to normalise data. Default False
-        apply_postprocessing (bool): Apply postprocessing to normalise data. Default True
+        
+        apply_normalization (bool): Apply preprocessing to normalise data. Default False
+        boxcar_mode (str): Boxcar mode to apply. mean/sum/gaussian.
         return_space ('cpu' or 'gpu'): Returns array in CPU or GPU space
     
     Returns:
@@ -131,7 +167,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None,
     if N_dopp_upper > N_dopp_lower:
         dd_shifts      = np.arange(N_dopp_lower, N_dopp_upper + 1, dtype='int32')
     else:
-        dd_shifts      = np.arange(N_dopp_upper, N_dopp_lower + 1, dtype='int32')
+        dd_shifts      = np.arange(N_dopp_upper, N_dopp_lower + 1, dtype='int32')[::-1]
         
     dd_shifts_gpu  = cp.asarray(dd_shifts)
     N_dopp = len(dd_shifts)
@@ -139,9 +175,14 @@ def dedoppler(data, metadata, max_dd, min_dd=None,
     # Copy data over to GPU
     d_gpu = cp.asarray(data.astype('float32'))
     
-    if apply_preprocessing:
+    # Apply preprocessing normalization
+    if apply_normalization:
         d_gpu = normalize(d_gpu, return_space='gpu')
-
+    
+    # Apply boxcar filter
+    if boxcar_size > 1:
+        d_gpu = apply_boxcar(d_gpu, boxcar_size, mode='sum', return_space='gpu')
+    
     # Allocate GPU memory for dedoppler data
     dedopp_gpu = cp.zeros((N_dopp, N_chan), dtype=cp.float32)
     
@@ -155,9 +196,6 @@ def dedoppler(data, metadata, max_dd, min_dd=None,
     logger.debug("Kernel shape (grid, block)", (F_grid, N_dopp), (F_block,))
     dedoppler_kernel((F_grid, N_dopp), (F_block,), 
                      (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time)) # grid, block and arguments
-    
-    if apply_postprocessing:
-        dedopp_gpu = normalize(dedopp_gpu, return_space='gpu')
         
     t1 = time.time()
     logger.info(f"Kernel time: {(t1-t0)*1e3:2.2f}ms")
@@ -165,15 +203,18 @@ def dedoppler(data, metadata, max_dd, min_dd=None,
     # Compute drift rate values in Hz/s corresponding to dedopp axis=0
     dd_vals = dd_shifts * delta_dd
     
+    metadata['drift_trials'] = dd_vals
+    metadata['boxcar_size'] = boxcar_size
+    metadata['dd'] = delta_dd * u.Hz / u.s
+    
     # Copy back to CPU if requested
     if return_space == 'cpu':
         dedopp_cpu = cp.asnumpy(dedopp_gpu)
-        return dd_vals, dedopp_cpu
+        return dedopp_cpu, metadata
     else:
-        return cp.asarray(dd_vals), dedopp_gpu
+        return dedopp_gpu, metadata
 
-
-def _hitsearch(drift_trials, dedopp, metadata, threshold=10, min_distance=100):
+def hitsearch(dedopp, metadata, threshold=10, min_distance=100):
     """ Search for hits using peak_local_max method 
     
     Args:
@@ -191,6 +232,8 @@ def _hitsearch(drift_trials, dedopp, metadata, threshold=10, min_distance=100):
                                     driftrate_idx: Index in driftrate array
                                     channel_idx: Index in frequency array
     """
+    
+    drift_trials = metadata['drift_trials']
     
     # Unfortunately we need a CPU copy of the dedoppler for peak finding
     # This means lots of copying back and forth, so potential bottleneck
@@ -221,57 +264,14 @@ def _hitsearch(drift_trials, dedopp, metadata, threshold=10, min_distance=100):
         'channel_idx': peaks[:, 1]
     }
     
+    # Append numerical metadata keys
+    for key, val in metadata.items():
+        if isinstance(val, (int, float)):
+            results[key] = val
+    
     return pd.DataFrame(results)
-
-def apply_boxcar(data, boxcar_size, axis=1, return_space='cpu'):
-    """ Apply moving boxcar filter and renormalise by sqrt(boxcar_size)
     
-    Args:
-        data (np/cp.array): Data to apply boxcar to
-        boxcar_size (int): Size of boxcar filter
-        return_space ('cpu' or 'gpu'): Return in CPU or GPU space
-    
-    Returns: 
-        data (np/cp.array): Data after boxcar filtering.
-    """
-    t0 = time.time()
-    # Move to GPU as required, and multiply by sqrt(boxcar_size)
-    # This keeps stdev noise the same instead of decreasing by sqrt(N)
-    data = cp.asarray(data.astype('float32'))
-    data = uniform_filter1d(data, size=boxcar_size, axis=axis)
-    t1 = time.time()
-    logger.info(f"Filter time: {(t1-t0)*1e3:2.2f}ms")
-    
-    if return_space == 'cpu':
-        return cp.asnumpy(data)
-    else:
-        return data
-
-def apply_boxcar_orig(data, boxcar_size, axis=1, return_space='cpu'):
-    """ Apply moving boxcar filter and renormalise by sqrt(boxcar_size)
-    
-    Args:
-        data (np/cp.array): Data to apply boxcar to
-        boxcar_size (int): Size of boxcar filter
-        return_space ('cpu' or 'gpu'): Return in CPU or GPU space
-    
-    Returns: 
-        data (np/cp.array): Data after boxcar filtering.
-    """
-    t0 = time.time()
-    # Move to GPU as required, and multiply by sqrt(boxcar_size)
-    # This keeps stdev noise the same instead of decreasing by sqrt(N)
-    data = cp.asarray(data.astype('float32')) * np.sqrt(boxcar_size)
-    data = uniform_filter1d(data, size=boxcar_size, axis=axis)
-    t1 = time.time()
-    logger.info(f"Filter time: {(t1-t0)*1e3:2.2f}ms")
-    
-    if return_space == 'cpu':
-        return cp.asnumpy(data)
-    else:
-        return data
-    
-def _merge_hits(hitlist):
+def merge_hits(hitlist):
     """ Group hits corresponding to different boxcar widths and return hit with max SNR 
     
     Args:
@@ -281,14 +281,20 @@ def _merge_hits(hitlist):
         hitlist (pd.DataFrame): Abridged list of hits after merging
     """
     t0 = time.time()
-    p = hitlist.sort_values('channel_idx')
+    p = hitlist.sort_values('snr', ascending=False)
     hits = []
-    while len(p) >= 1:
+    while len(p) > 1:
         # Grab top hit 
         p0 = p.iloc[0]
 
         # Find channels and driftrates within tolerances
-        pq = p.query(f"abs(driftrate_idx - {p0['driftrate_idx']}) <= 2 & abs(channel_idx - {p0['channel_idx']}) <= 2")
+        q = f"""(abs(driftrate_idx - {p0['driftrate_idx']}) <= boxcar_size  |
+                abs(driftrate_idx - {p0['driftrate_idx']}) <= {p0['boxcar_size']})
+                & 
+                (abs(channel_idx - {p0['channel_idx']}) <= {p0['boxcar_size']} | 
+                abs(channel_idx - {p0['channel_idx']}) <= boxcar_size)"""
+        q = q.replace('\n', '') # Query must be one line
+        pq = p.query(q)
         tophit = pq.sort_values("snr", ascending=False).iloc[0]
 
         # Drop all matched rows
@@ -299,50 +305,40 @@ def _merge_hits(hitlist):
     
     return pd.DataFrame(hits)
 
-def hitsearch(drift_trials, dedopp, metadata, threshold=10, min_distance=100, n_boxcar=5):
-    """ Search for hits using peak_local_max method and moving boxcar filter
-    
-    Args:
-        dedopp (np.array): Dedoppler search array of shape (N_trial, N_chan)
-        drift_trials (np.array): List of dedoppler trials corresponding to dedopp N_trial axis
-        metadata (dict): Dictionary of metadata needed to convert from indexes to frequencies etc
-        threshold (float): Threshold value (absolute) above which a peak can be considered
-        min_distance (int): Minimum distance in pixels to nearest peak
-        n_boxcar (int): Number of boxcar trials (2^N)
-    
-    Returns:
-        results (pd.DataFrame): Pandas dataframe of results, with columns 
-                                    driftrate: Drift rate in hz/s
-                                    f_start: Start frequency channel
-                                    snr: signal to noise ratio
-                                    driftrate_idx: Index in driftrate array
-                                    channel_idx: Index in frequency array
-    """    
-    
-    results = _hitsearch(drift_trials, dedopp, metadata, threshold=threshold, min_distance=min_distance)
-    results['boxcar_size'] = 1
-    
-    boxcar_trials = map(int, 2**np.arange(1, n_boxcar + 1))
-    for boxcar_size in boxcar_trials:
-        logger.info(f"--- Boxcar size: {boxcar_size} ---")
-        _dedopp = apply_boxcar(dedopp, boxcar_size=boxcar_size, return_space='gpu')
-        _results = _hitsearch(drift_trials, _dedopp, metadata, threshold=threshold, min_distance=min_distance)
-        _results['boxcar_size'] = boxcar_size
-        results = pd.concat((results, _results), ignore_index=True)
-    
-    results = _merge_hits(results)
-    return results
-
-def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_distance=100, n_boxcar=6):
+def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_distance=100, 
+                 n_boxcar=6, merge_boxcar_trials=True):
     """ Run pipeline """
     
     t0 = time.time()
-    dd, dedopp = dedoppler(data, metadata, max_dd=max_dd, min_dd=min_dd, apply_postprocessing=True)
-    peaks      = hitsearch(dd, dedopp, metadata, threshold=threshold, min_distance=min_distance, n_boxcar=n_boxcar)
+    N_timesteps = data.shape[0]
+    _threshold = threshold * np.sqrt(N_timesteps)
+    dedopp, metadata = dedoppler(data, metadata, boxcar_size=1, boxcar_mode='sum', 
+                                 max_dd=max_dd, min_dd=min_dd, apply_normalization=False)
+    peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_distance=min_distance)
+    peaks['snr'] /= np.sqrt(N_timesteps)
+    
+    if n_boxcar > 1:
+        boxcar_trials = map(int, 2**np.arange(1, n_boxcar))
+        for boxcar_size in boxcar_trials:
+            logger.info(f"--- Boxcar size: {boxcar_size} ---")
+            dedopp, metadata = dedoppler(data, metadata, boxcar_size=boxcar_size,  boxcar_mode='sum',
+                                         max_dd=max_dd, min_dd=min_dd, apply_normalization=False)
+            
+            # Adjust SNR threshold to take into account boxcar size and dedoppler sum
+            # Noise increases by sqrt(N_timesteps * boxcar_size)
+            _threshold = threshold * np.sqrt(N_timesteps * boxcar_size)
+            _peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_distance=min_distance)
+            _peaks['snr'] /= np.sqrt(N_timesteps * boxcar_size)
+            
+            # Join to list
+            peaks = pd.concat((peaks, _peaks), ignore_index=True)
+            
+    if merge_boxcar_trials:
+        peaks = merge_hits(peaks)
     t1 = time.time()
     
     logger.info(f"Pipeline runtime: {(t1-t0):2.2f}s")
-    return dd, dedopp, peaks
+    return dedopp, metadata, peaks
             
 class H5Reader(object):
     """ Basic HDF5 reader """
