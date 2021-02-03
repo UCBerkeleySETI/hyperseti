@@ -22,7 +22,7 @@ def test_dedoppler():
             'df': 1.0*u.Hz}
     
     dedopp, metadata = dedoppler(test_data, metadata, boxcar_size=1,
-                                 max_dd=1.0, apply_normalization=False)
+                                 max_dd=1.0)
     
     assert np.max(dedopp) == np.sum(test_data[:, 511])
     
@@ -43,7 +43,7 @@ def test_dedoppler():
                                   stg.constant_bp_profile(level=1))
 
         dedopp, metadata = dedoppler(frame.data, metadata, boxcar_size=1,
-                                     max_dd=1.0, apply_normalization=False)
+                                     max_dd=1.0)
 
         # Manual dedoppler search -- just find max channel (only works if S/N is good)
         manual_dd_tot = 0
@@ -109,7 +109,7 @@ def test_dedoppler_boxcar():
 
     # With boxcar_size = 1 we should recover 160
     dedopp, metadata = dedoppler(bg, metadata, boxcar_size=1, 
-                                 max_dd=2.0, apply_normalization=False)
+                                 max_dd=2.0)
 
     maxpixel = np.argmax(dedopp)
     mdrift, mchan = (maxpixel // 1024, maxpixel % 1024)
@@ -120,7 +120,7 @@ def test_dedoppler_boxcar():
     # With boxcar_size = 2 we should recover 320 (full amount)
     metadata = {'fch1': 1000*u.MHz, 'dt': 1.0*u.s, 'df': 1.0*u.Hz}
     dedopp, metadata = dedoppler(bg, metadata, boxcar_size=2, 
-                                 max_dd=4.0, apply_normalization=False)
+                                 max_dd=4.0)
 
     maxpixel = np.argmax(dedopp)
     mdrift, mchan = (maxpixel // 1024, maxpixel % 1024)
@@ -151,7 +151,7 @@ def test_hitsearch():
         d[:, n_chan // 2 + ii]   = 1000 / signal_bw
     
     print("--- Run dedoppler() then hitsearch() ---")
-    dedopp, metadata = dedoppler(d, metadata, boxcar_size=16, max_dd=1.0, apply_normalization=False)
+    dedopp, metadata = dedoppler(d, metadata, boxcar_size=16, max_dd=1.0)
     hits0 = hitsearch(dedopp, metadata, threshold=1000).sort_values('snr')
     print(hits0)
     # Output should be 

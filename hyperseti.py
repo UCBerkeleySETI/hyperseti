@@ -132,7 +132,7 @@ def apply_boxcar(data, boxcar_size, axis=1, mode='mean', return_space='cpu'):
         return data
     
 def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
-              boxcar_mode='sum', apply_normalization=False, return_space='cpu'):
+              boxcar_mode='sum', return_space='cpu'):
     """ Apply brute-force dedoppler kernel to data
     
     Args:
@@ -171,10 +171,6 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     
     # Copy data over to GPU
     d_gpu = cp.asarray(data.astype('float32'))
-    
-    # Apply preprocessing normalization
-    if apply_normalization:
-        d_gpu = normalize(d_gpu, return_space='gpu')
     
     # Apply boxcar filter
     if boxcar_size > 1:
@@ -311,14 +307,19 @@ def merge_hits(hitlist):
     return pd.DataFrame(hits)
 
 def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistance=None, 
-                 min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True):
+                 min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True, apply_normalization=False):
     """ Run pipeline """
     
     t0 = time.time()
     N_timesteps = data.shape[0]
     _threshold = threshold * np.sqrt(N_timesteps)
+    
+    # Apply preprocessing normalization
+    if apply_normalization:
+        data = normalize(data, return_space='gpu')
+    
     dedopp, metadata = dedoppler(data, metadata, boxcar_size=1, boxcar_mode='sum', 
-                                 max_dd=max_dd, min_dd=min_dd, apply_normalization=False)
+                                 max_dd=max_dd, min_dd=min_dd)
     peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_fdistance=min_fdistance, min_ddistance=min_ddistance)
     peaks['snr'] /= np.sqrt(N_timesteps)
     
@@ -327,7 +328,7 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
         for boxcar_size in boxcar_trials:
             logger.info(f"--- Boxcar size: {boxcar_size} ---")
             dedopp, metadata = dedoppler(data, metadata, boxcar_size=boxcar_size,  boxcar_mode='sum',
-                                         max_dd=max_dd, min_dd=min_dd, apply_normalization=False)
+                                         max_dd=max_dd, min_dd=min_dd)
             
             # Adjust SNR threshold to take into account boxcar size and dedoppler sum
             # Noise increases by sqrt(N_timesteps * boxcar_size)
