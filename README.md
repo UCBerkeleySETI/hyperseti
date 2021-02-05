@@ -35,3 +35,21 @@ plt.tight_layout()
 ```
 
 ![](https://github.com/UCBerkeleySETI/hyperseti/raw/master/docs/figs/example.png)
+
+Can also search for hits in the dedoppler spectra:
+
+```python
+# ... run code from above ...  
+
+from hyperseti import hitsearch
+hits = hitsearch(dedopp, metadata, threshold=500)
+
+from plotting import overlay_hits
+overlay_hits(hits)
+```
+
+| driftrate | f_start | snr | driftrate_idx | channel_idx | boxcar_size |
+| --- | --- | --- | --- | --- | --- | 
+| 0 	 | 1.0 	 | 1000.000128 	| 3200.0 	| 160 	| 128 	| 1 |
+
+![](https://github.com/UCBerkeleySETI/hyperseti/raw/master/docs/figs/example2.png)
