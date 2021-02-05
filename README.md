@@ -53,3 +53,19 @@ overlay_hits(hits)
 | 0 	 | 1.0 	 | 1000.000128 	| 3200.0 	| 160 	| 128 	| 1 |
 
 ![](https://github.com/UCBerkeleySETI/hyperseti/raw/master/docs/figs/example2.png)
+
+Or the dedoppler and hitsearch can be done in one line with `run_pipeline()`. 
+Data can be boxcar averaged to look for wider-band signals, and to retrieve signal-to-noise
+for signals with large drift rates:
+
+```python
+dedopp, md, hits = run_pipeline(d, metadata, max_dd=1.0, min_dd=None, threshold=100, 
+                                    n_boxcar=5, merge_boxcar_trials=True)
+```
+
+Reading from file is also supported:
+
+```python
+hits = find_et(filename, filename_out='hits.csv', n_parallel=2, gulp_size=2**18, max_dd=1.0, threshold=50)
+``
+
