@@ -6,7 +6,7 @@ _In beta_
 
 #### Example usage:
 
-```
+```python
 import numpy as np
 import astropy.units as u
 import pylab as plt
@@ -33,3 +33,5 @@ plt.subplot(1,2,2)
 imshow_dedopp(np.log(dedopp), metadata)
 plt.tight_layout()
 ```
+
+![](https://github.com/UCBerkeleySETI/hyperseti/raw/master/docs/figs/example.png)
