@@ -22,8 +22,6 @@ from dask.diagnostics import ProgressBar
 
 # Max threads setup 
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
-MAX_THREADS = 4
-dask.config.set(pool=ThreadPool(MAX_THREADS))
 
 # Logger setup
 logger_name = 'hyperseti'
@@ -95,6 +93,7 @@ def normalize(data, return_space='cpu'):
     else:
         return d_gpu
 
+    
 def apply_boxcar(data, boxcar_size, axis=1, mode='mean', return_space='cpu'):
     """ Apply moving boxcar filter and renormalise by sqrt(boxcar_size)
     
@@ -131,6 +130,7 @@ def apply_boxcar(data, boxcar_size, axis=1, mode='mean', return_space='cpu'):
     else:
         return data
     
+    
 def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
               boxcar_mode='sum', return_space='cpu'):
     """ Apply brute-force dedoppler kernel to data
@@ -139,10 +139,8 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
         data (np.array): Numpy array with shape (N_timestep, N_channel)
         metadata (dict): Metadata dictionary, should contain 'df' and 'dt'
                          (frequency and time resolution)
-        max_dd (float): Maximum doppler drift in Hz/s to search out to
-        min_dd (float): Minimum doppler drift to search
-        
-        apply_normalization (bool): Apply preprocessing to normalise data. Default False
+        max_dd (float): Maximum doppler drift in Hz/s to search out to.
+        min_dd (float): Minimum doppler drift to search.
         boxcar_mode (str): Boxcar mode to apply. mean/sum/gaussian.
         return_space ('cpu' or 'gpu'): Returns array in CPU or GPU space
     
@@ -206,6 +204,33 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
         return dedopp_cpu, metadata
     else:
         return dedopp_gpu, metadata
+
+    
+def create_empty_hits_table():
+    """ Create empty pandas dataframe for hit data
+    
+    Notes:
+        Columns are:
+            Driftrate (float64): Drift rate in Hz/s
+            f_start (float64): Frequency in MHz at start time
+            snr (float64): Signal to noise ratio for detection.
+            driftrate_idx (int): Index of array corresponding to driftrate
+            channel_idx (int): Index of frequency channel for f_start
+            boxcar_size (int): Size of boxcar applied to data
+    
+    Returns:
+        hits (pd.DataFrame): Data frame with columns as above.
+    """
+    # Create empty dataframe
+    hits = pd.DataFrame({'driftrate': pd.Series([], dtype='float64'),
+                          'f_start': pd.Series([], dtype='float64'),
+                          'snr': pd.Series([], dtype='float64'),
+                          'driftrate_idx': pd.Series([], dtype='int'),
+                          'channel_idx': pd.Series([], dtype='int'),
+                          'boxcar_size': pd.Series([], dtype='int'),
+                         })
+    return hits
+
 
 def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=None):
     """ Search for hits using _prominent_peaks method in cupyimg.skimage
@@ -274,6 +299,7 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
     else:
         return None
     
+    
 def merge_hits(hitlist):
     """ Group hits corresponding to different boxcar widths and return hit with max SNR 
     
@@ -308,20 +334,28 @@ def merge_hits(hitlist):
     
     return pd.DataFrame(hits)
 
-def create_empty_hits_table():
-    # Create empty dataframe
-    peaks = pd.DataFrame({'driftrate': pd.Series([], dtype='float64'),
-                          'f_start': pd.Series([], dtype='float64'),
-                          'snr': pd.Series([], dtype='float64'),
-                          'driftrate_idx': pd.Series([], dtype='int'),
-                          'channel_idx': pd.Series([], dtype='int'),
-                          'boxcar_size': pd.Series([], dtype='int'),
-                         })
-    return peaks
 
 def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistance=None, 
                  min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True, apply_normalization=False):
-    """ Run pipeline """
+    """ Run dedoppler + hitsearch pipeline 
+    
+    Args:
+        data (np.array): Numpy array with shape (N_timestep, N_channel)
+        metadata (dict): Metadata dictionary, should contain 'df' and 'dt'
+                         (frequency and time resolution), as astropy quantities
+        max_dd (float): Maximum doppler drift in Hz/s to search out to.
+        min_dd (float): Minimum doppler drift to search.
+        n_boxcar (int): Number of boxcar trials to do, width 2^N e.g. trials=(1,2,4,8,16)
+        merge_boxcar_trials (bool): Merge hits of boxcar trials to remove 'duplicates'. Default True.
+        apply_normalization (bool): Normalize input data. Default True. Required True for S/N calcs.
+        threshold (float): Threshold value (absolute) above which a peak can be considered
+        min_fdistance (int): Minimum distance in pixels to nearest peak along frequency axis
+        min_ddistance (int): Minimum distance in pixels to nearest peak along doppler axis
+    
+    Returns:
+        (dedopp, metadata, peaks): Array of data post dedoppler (at final boxcar width), plus
+                                   metadata (dict) and then table of hits (pd.Dataframe).
+    """
     
     t0 = time.time()
     N_timesteps = data.shape[0]
@@ -355,8 +389,24 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     logger.info(f"Pipeline runtime: {(t1-t0):2.2f}s")
     return dedopp, metadata, peaks
             
+    
 class H5Reader(object):
-    """ Basic HDF5 reader """
+    """ Basic HDF5 reader
+    
+    Reads a HDF5 file in gulps (aka subband). Reads all timesteps at once, and
+    a subsample of frequency channels.
+    
+    Basic usage:
+        ```
+        h5 = H5Reader('test.h5', gulp_size=2**16)   
+        gulp_plan = h5.generate_gulp_metadata()
+
+        for gulp_md in gulp_plan:
+            d = h5.read_data(gulp_md)
+            out = run_pipeline(d, h5.metadata, ...)
+        ```
+
+    """
     def __init__(self, fn, gulp_size=2**19):
         self.fn = fn
         
@@ -371,7 +421,21 @@ class H5Reader(object):
         self.gulp_size = gulp_size
         self.n_sub = self.dshape[2] // gulp_size
     
-    def read_data_plan(self):
+    def generate_gulp_metadata(self):
+        """ An iterator which yields metadata to use to read the next gulp of data.
+        
+        Notes:
+            This is an iterator. Use `next()` to get next metadata, or `list()` to 
+            convert into a list. Otherwise use it in a loop, e.g.
+            `for md in h5.generate_gulp_metadata()`
+        
+        Returns:
+            md (dict): Dictionary with keys:
+                       fch1: First channel 
+                       i0: Index of first channel to read in gulp
+                       i1: Index of last channel to read in gulp
+                       sidx: Gulp (subband) index
+        """
         for ii in range(self.n_sub):
             i0, i1 = ii*self.gulp_size, (ii+1)*self.gulp_size
             md = deepcopy(self.metadata)
@@ -382,6 +446,11 @@ class H5Reader(object):
             yield md
 
     def read_data(self, gulp_md):
+        """ Read data corresponding to gulp metadata 
+        
+        Args:
+            gulp_md (dict): Gulp metadata, from generate_gulp_metadata()
+        """
         t0 = time.time()
         ii = gulp_md['sidx']
         with h5py.File(self.fn, mode='r') as h:
@@ -390,48 +459,78 @@ class H5Reader(object):
         logger.info(f"## Subband {ii+1}/{self.n_sub} read: {(t1-t0)*1e3:2.2f}ms ##")
         return d
 
-def search_subband_dask(md, h5):
-    d_gulp = h5.read_data(md)
-    try:
-        dd, dedopp, peaks = run_pipeline(d_gulp, md, max_dd=1.0, min_dd=None, 
-                                         threshold=100, min_fdistance=1000, min_ddistance=None, 
-                                         n_boxcar=5, merge_boxcar_trials=True, apply_normalization=True)
-        if not peaks.empty:
-            peaks['channel_idx'] += md['i0']
-    except:
-        logger.critical(f"ERROR on subband {md['sidx']}")
-        peaks = create_empty_hits_table()
-        
-    return [peaks,]
 
-def find_et(filename, filename_out='hits.csv', n_parallel=1, gulp_size=2**19):
+def find_et(filename, filename_out='hits.csv', n_parallel=1, gulp_size=2**19, *args, **kwargs):
+    """ Find ET 
     
-    h5 = H5Reader(filename, gulp_size=gulp_size)   
+    Wrapper for reading from a file and running run_pipeline() on all subbands within the file.
     
+    Args:
+        filename (str): Name of input HDF5 file.
+        filename_out (str): Name of output CSV file.
+        n_parallel (int): Number of parallel dask bag threads
+        gulp_size (int): Number of channels to process at once (e.g. N_chan in a coarse channel)
+    
+    Returns:
+        hits (pd.DataFrame): Pandas dataframe of all hits.
+    
+    Notes:
+        Passes keyword arguments on to run_pipeline().
+    """
+    def _search_gulp_dask(md, h5, *args, **kwargs):
+        """ Wrapper to run run_pipeline() via dask """
+        dd, dedopp, peaks = run_pipeline(d_gulp, md, *args, **kwargs)
+        if not peaks.empty:
+            peaks['channel_idx'] += md['i0']        
+        return [peaks,]
+       
+    # Open file reader
+    h5 = H5Reader(filename, gulp_size=gulp_size)
+    
+    # Set max number of parallel threads 
     dask.config.set(pool=ThreadPool(n_parallel))
     t0 = time.time()
-    b = db.from_sequence(h5.read_data_plan())
+    
+    # Generate a dask bag and use it to run parallel threads
+    b = db.from_sequence(h5.generate_gulp_metadata())
     with ProgressBar():
         logger.setLevel(logging.CRITICAL)
-        out = b.map(search_subband_dask, h5).compute()
+        out = b.map(_search_gulp_dask, h5, *args, **kwargs).compute()
 
+    # create single pandas dataframe from output and save to disk
     dframe = pd.concat([o[0] for o in out])
     dframe.to_csv(filename_out)
     t1 = time.time()
-    print(f"## N_PARALLEL {n_parallel} TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
+    
+    logger.info(f"## N_PARALLEL {n_parallel} TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
     return dframe
     
-def find_et_serial(filename, filename_out='hits.csv', n_parallel=1, gulp_size=2**19):
+    
+def find_et_serial(filename, filename_out='hits.csv', gulp_size=2**19, *args, **kwargs):
+    """ Find ET, serial version
+    
+    Wrapper for reading from a file and running run_pipeline() on all subbands within the file.
+    
+    Args:
+        filename (str): Name of input HDF5 file.
+        filename_out (str): Name of output CSV file.
+        gulp_size (int): Number of channels to process at once (e.g. N_chan in a coarse channel)
+    
+    Returns:
+        hits (pd.DataFrame): Pandas dataframe of all hits.
+    
+    Notes:
+        Passes keyword arguments on to run_pipeline(). Same as find_et but doesn't use dask parallelization.
+    """
     peaks = create_empty_hits_table()
     h5 = H5Reader(filename, gulp_size=gulp_size)   
 
     t0 = time.time()
-    gulp_plan = h5.read_data_plan()
+    gulp_plan = h5.generate_gulp_metadata()
     out = []
     for gulp_md in gulp_plan:
         d = h5.read_data(gulp_md)
-        dedopp, metadata, hits = run_pipeline(d, h5.metadata, max_dd=1.0, apply_normalization=True, 
-                                              threshold=100, min_fdistance=100, n_boxcar=5, merge_boxcar_trials=True)
+        dedopp, metadata, hits = run_pipeline(d, h5.metadata, *args, **kwargs)
         out.append(hits)
         logger.info(f"{len(hits)} hits found")
               
@@ -440,22 +539,3 @@ def find_et_serial(filename, filename_out='hits.csv', n_parallel=1, gulp_size=2*
     t1 = time.time()
     print(f"## TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
     return dframe
-
-    
-if __name__ == "__main__":
-    fn = '/datax/collate_mb/PKS_0262_2018-02-21T17:00/blc01/guppi_58171_08035_757812_G26.37-1.21_0001.0000.hires.hdf'
-    h5 = H5Reader(fn, gulp_size=2**20)
-
-    for MAX_THREADS in (1,2,3,4):
-        dask.config.set(pool=ThreadPool(MAX_THREADS))
-
-        t0 = time.time()
-        b = db.from_sequence(h5.read_data_plan())
-        with ProgressBar():
-            logger.setLevel(logging.CRITICAL)
-            out = b.map(search_subband_dask, h5).compute()
-
-        dframe = pd.concat([o[0] for o in out])
-        dframe.to_csv('hits.csv')
-        t1 = time.time()
-        print(f"## MAXTHREADS {MAX_THREADS} TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")

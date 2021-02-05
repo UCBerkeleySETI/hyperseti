@@ -1,6 +1,6 @@
 import pylab as plt
 
-def get_extent(data, metadata, xaxis, yaxis):
+def _get_extent(data, metadata, xaxis, yaxis):
     """ Generate extents for imshow axis 
     
     Args:
@@ -27,8 +27,18 @@ def get_extent(data, metadata, xaxis, yaxis):
 
 
 def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True, *args, **kwargs):
+    """ Generalised imshow function
+    
+    Args:
+        xaxis (str): 'channel', 'frequency' supported
+        yaxis (str): 'driftrate', 'driftidx' or 'time_elapsed', 'timestep' supported
+        metadata (dict): Metadata dictionary
+        show_labels (bool): Show labels on axes
+        show_colorbar (bool): Show colorbar
+       
+    """
     plt.imshow(data, aspect='auto',
-              extent=get_extent(data, metadata, xaxis, yaxis), *args, **kwargs)
+              extent=_get_extent(data, metadata, xaxis, yaxis), *args, **kwargs)
 
     if show_colorbar:
         plt.colorbar()
@@ -39,7 +49,16 @@ def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True, 
 
         
 def imshow_dedopp(dedopp, metadata, xaxis='channel', yaxis='driftrate', *args, **kwargs):
-    """ Do imshow for dedoppler data """
+    """ Do imshow for dedoppler data 
+    
+    Args:
+        xaxis (str): 'channel', 'frequency' supported
+        yaxis (str): 'driftrate', 'driftidx' or 'time_elapsed', 'timestep' supported
+        metadata (dict): Metadata dictionary
+        show_labels (bool): Show labels on axes
+        show_colorbar (bool): Show colorbar
+        
+    """
     _imshow(dedopp, metadata, xaxis, yaxis, *args, **kwargs)
 
     
@@ -47,6 +66,7 @@ def imshow_waterfall(data, metadata, xaxis='channel', yaxis='timestep', *args, *
     """ Do imshow for spectral data """
     _imshow(data, metadata, xaxis, yaxis, *args, **kwargs)
 
+    
 def overlay_hits(hits, xaxis='channel', yaxis='driftrate', marker='x', c='red'):
     if xaxis == 'channel':
         x = hits['channel_idx']

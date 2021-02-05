@@ -72,6 +72,7 @@ def test_dedoppler():
     
     # Finish off figure plotting
     plt.colorbar()
+    plt.savefig('docs/figs/test_dedoppler.png')
     plt.show()
 
 def test_dedoppler_boxcar():
@@ -134,7 +135,9 @@ def test_dedoppler_boxcar():
     imshow_waterfall(bg, metadata)
     plt.subplot(1,2,2)
     imshow_dedopp(dedopp, metadata, 'channel', 'driftrate')
-
+    plt.savefig('docs/figs/test_dedoppler_boxcar.png')
+    plt.show()
+    
 
 def test_hitsearch():
     n_timesteps = 32 
@@ -193,6 +196,9 @@ def test_hitsearch():
     
     plt.subplot(1,2,2)
     imshow_dedopp(dedopp, metadata, 'channel', 'driftrate')
+    
+    plt.savefig('docs/figs/test_hitsearch.png')
+    plt.show()
 
 def test_hitsearch_multi():
     metadata = {'fch1': 6095.214842353016*u.MHz, 
@@ -236,20 +242,6 @@ def test_hitsearch_multi():
     plt.subplot(1,2,2)
     imshow_dedopp(dedopp, md, 'channel', 'driftrate')
     overlay_hits(hits, 'channel', 'driftrate')
-
-def test_file_read():
-    h5 = H5Reader(fn, gulp_size=2**20)
-
-    b = db.from_sequence(h5.read_data(), npartitions=3)
-    with ProgressBar():
-            b.map(search_coarse_channel, self).compute()
-
-    peaks = None
-    for metadata_gulp, d_gulp in h5.read_data():
-        _dd, _dedopp, _peaks = run_pipeline(d_gulp, metadata_gulp, 
-                                            max_dd=1.0, min_dd=None, min_distance=10, 
-                                            threshold=50, n_boxcar=5)
-        if peaks is None:
-            peaks = _peaks
-        else:
-            peaks = pd.concat((peaks, _peaks), ignore_index=True)
+    
+    plt.savefig('docs/figs/test_hitsearch_multi.png')
+    plt.show()
