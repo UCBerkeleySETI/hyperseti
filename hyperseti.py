@@ -52,17 +52,58 @@ extern "C" __global__
 
         // Index for output array
         const int dd_idx = d * F + tid;
-        int idx = 0;
+        float dd_val = 0;
         
+        int idx = 0;
         for (int t = 0; t < T; t++) {
                             // timestep    // dedoppler trial offset
             idx  = tid + (F * t)      + (shift[d] * t / T);
             if (idx < F * T && idx > 0) {
-                dedopp[dd_idx] += data[idx];
+                dd_val += data[idx];
               }
+              dedopp[dd_idx] = dd_val;
             }
         }
 ''', 'dedopplerKernel')
+
+dedoppler_kurtosis_kernel = cp.RawKernel(r'''
+extern "C" __global__
+    __global__ void dedopplerKurtosisKernel
+        (const float *data, float *dedopp, int *shift, int F, int T)
+        /* Each thread computes a different dedoppler sum for a given channel
+        
+         F: N_frequency channels
+         T: N_time steps
+        
+         *data: Data array, (T x F) shape
+         *dedopp: Dedoppler summed data, (D x F) shape
+         *shift: Array of doppler corrections of length D.
+                 shift is total number of channels to shift at time T
+        */
+        {
+        
+        // Setup thread index
+        const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        const int d   = blockIdx.y;   // Dedoppler trial ID
+        const int D   = gridDim.y;   // Number of dedoppler trials
+
+        // Index for output array
+        const int dd_idx = d * F + tid;
+        float S1 = 0;
+        float S2 = 0;
+        
+        int idx = 0;
+        for (int t = 0; t < T; t++) {
+                            // timestep    // dedoppler trial offset
+            idx  = tid + (F * t)      + (shift[d] * t / T);
+            if (idx < F * T && idx > 0) {
+                S1 += data[idx];
+                S2 += data[idx] * data[idx];
+              }
+              dedopp[dd_idx] = (T+1)/(T-1) * (T*(S2 / (S1*S1)) - 1);
+            }
+        }
+''', 'dedopplerKurtosisKernel')
 
 
 def normalize(data, return_space='cpu'):
@@ -132,7 +173,7 @@ def apply_boxcar(data, boxcar_size, axis=1, mode='mean', return_space='cpu'):
     
     
 def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
-              boxcar_mode='sum', return_space='cpu'):
+              boxcar_mode='sum', return_space='cpu', kernel='dedoppler'):
     """ Apply brute-force dedoppler kernel to data
     
     Args:
@@ -185,9 +226,13 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     t0 = time.time()
     #print(dd_shifts)
     logger.debug("Kernel shape (grid, block)", (F_grid, N_dopp), (F_block,))
-    dedoppler_kernel((F_grid, N_dopp), (F_block,), 
-                     (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time)) # grid, block and arguments
+    if kernel == 'dedoppler':
+        dedoppler_kernel((F_grid, N_dopp), (F_block,), 
+                         (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time)) # grid, block and arguments
         
+    elif kernel == 'kurtosis':
+        dedoppler_kurtosis_kernel((F_grid, N_dopp), (F_block,), 
+                         (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time)) # grid, block and arguments        
     t1 = time.time()
     logger.info(f"Kernel time: {(t1-t0)*1e3:2.2f}ms")
     
