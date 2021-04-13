@@ -8,10 +8,9 @@ import os
 from astropy import units as u
 import setigen as stg
 
-from cupyimg.skimage.feature.peak import _prominent_peaks as prominent_peaks
 from cupyx.scipy.ndimage import uniform_filter1d
 
-from peak import prominent_peaks_dcp
+from peak import prominent_peaks
 
 import hdf5plugin
 import h5py

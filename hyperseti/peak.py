@@ -1,16 +1,13 @@
 import cupy as cp
-#import cupyimg.scipy.ndimage as ndi
 from cupyx.scipy import ndimage as ndi
-from cupyimg.skimage import measure
 import time
 
-def prominent_peaks_dcp(
-    image,  min_xdistance=1, min_ydistance=1, threshold=None, num_peaks=cp.inf
-):
+def prominent_peaks(img, min_xdistance=1, min_ydistance=1, threshold=None, num_peaks=cp.inf):
     """Return peaks with non-maximum suppression.
     Identifies most prominent features separated by certain distances.
     Non-maximum suppression with different sizes is applied separately
     in the first and second dimension of the image to identify peaks.
+    
     Parameters
     ----------
     image : (M, N) ndarray
@@ -24,13 +21,18 @@ def prominent_peaks_dcp(
     num_peaks : int
         Maximum number of peaks. When the number of peaks exceeds `num_peaks`,
         return `num_peaks` coordinates based on peak intensity.
+        
     Returns
     -------
     intensity, xcoords, ycoords : tuple of array
         Peak intensity values, x and y indices.
+        
+    Notes
+    -----
+    Modified from https://github.com/mritools/cupyimg _prominent_peaks method
     """
 
-    img = image.copy()
+    #img = image.copy()
     rows, cols = img.shape
 
     if threshold is None:
@@ -45,14 +47,7 @@ def prominent_peaks_dcp(
     )
     te = (time.time() - t0) * 1e3
     print(f"Maxfilter: {te:2.2f} ms")
-        
-    #img_max = ndi.maximum_filter1d(
-    #    img, size=ycoords_size, axis=0, mode="constant", cval=0
-    #)
-    #img_max = ndi.maximum_filter1d(
-    #    img_max, size=xcoords_size, axis=1, mode="constant", cval=0
-    #)
-    
+
     t0 = time.time()
     mask = img == img_max
     img *= mask
@@ -60,35 +55,19 @@ def prominent_peaks_dcp(
     te = (time.time() - t0) * 1e3
     print(f"bitbash: {te:2.2f} ms")
 
-    #t0 = time.time()
-    #label_img = measure.label(img_t)
-    #te = (time.time() - t0) * 1e3
-    #print(f"measureme: {te:2.2f} ms")
-    #t0 = time.time()
-    #props = measure.regionprops(label_img, img_max)
-    #te = (time.time() - t0) * 1e3
-    #print(f"regionprops: {te:2.2f} ms")
-
     t0 = time.time()
     # Find array (x,y) indexes corresponding to max pixels
     peak_idxs = cp.argwhere(mask)
     # Find corresponding maximum values
     peak_vals = img[peak_idxs[:, 0], peak_idxs[:, 1]]
     # Sort peak values low to high
+    ## Sort the list of peaks by intensity, not left-right, so larger peaks
+    ## in Hough space cannot be arbitrarily suppressed by smaller neighbors
     val_sort_idx = cp.argsort(peak_vals)[::-1]
     # Return (x,y) coordinates corresponding to sorted max pixels
     coords = peak_idxs[val_sort_idx]
     te = (time.time() - t0) * 1e3
     print(f"coord search: {te:2.2f} ms")
-    
-
-    #t0 = time.time()
-    ## Sort the list of peaks by intensity, not left-right, so larger peaks
-    ## in Hough space cannot be arbitrarily suppressed by smaller neighbors
-    #props = sorted(props, key=lambda x: x.max_intensity)[::-1]
-    #coords = cp.asarray([np.round(p.centroid) for p in props], dtype=int)
-    #te = (time.time() - t0) * 1e3
-    #print(f"propsort: {te:2.2f} ms")
     
     t0 = time.time()
     img_peaks = []
