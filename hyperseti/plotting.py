@@ -1,4 +1,5 @@
 import pylab as plt
+import cupy as cp
 
 def _get_extent(data, metadata, xaxis, yaxis):
     """ Generate extents for imshow axis 
@@ -37,7 +38,7 @@ def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True, 
         show_colorbar (bool): Show colorbar
        
     """
-    plt.imshow(data, aspect='auto',
+    plt.imshow(cp.asnumpy(data), aspect='auto',
               extent=_get_extent(data, metadata, xaxis, yaxis), *args, **kwargs)
 
     if show_colorbar:

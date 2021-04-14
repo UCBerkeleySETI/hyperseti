@@ -2,6 +2,11 @@ import cupy as cp
 from cupyx.scipy import ndimage as ndi
 import time
 
+# Logging
+from .log import logger_group, Logger
+logger = Logger('hyperseti.peak')
+logger_group.add_logger(logger)
+
 def prominent_peaks(img, min_xdistance=1, min_ydistance=1, threshold=None, num_peaks=cp.inf):
     """Return peaks with non-maximum suppression.
     Identifies most prominent features separated by certain distances.
@@ -31,7 +36,7 @@ def prominent_peaks(img, min_xdistance=1, min_ydistance=1, threshold=None, num_p
     -----
     Modified from https://github.com/mritools/cupyimg _prominent_peaks method
     """
-
+    t00 = time.time()
     #img = image.copy()
     rows, cols = img.shape
 
@@ -46,14 +51,14 @@ def prominent_peaks(img, min_xdistance=1, min_ydistance=1, threshold=None, num_p
         img, size=(ycoords_size, xcoords_size), mode="constant", cval=0
     )
     te = (time.time() - t0) * 1e3
-    print(f"Maxfilter: {te:2.2f} ms")
+    logger.debug(f"Maxfilter: {te:2.2f} ms")
 
     t0 = time.time()
     mask = img == img_max
     img *= mask
     mask = img > threshold
     te = (time.time() - t0) * 1e3
-    print(f"bitbash: {te:2.2f} ms")
+    logger.debug(f"bitbash: {te:2.2f} ms")
 
     t0 = time.time()
     # Find array (x,y) indexes corresponding to max pixels
@@ -67,7 +72,7 @@ def prominent_peaks(img, min_xdistance=1, min_ydistance=1, threshold=None, num_p
     # Return (x,y) coordinates corresponding to sorted max pixels
     coords = peak_idxs[val_sort_idx]
     te = (time.time() - t0) * 1e3
-    print(f"coord search: {te:2.2f} ms")
+    logger.debug(f"coord search: {te:2.2f} ms")
     
     t0 = time.time()
     img_peaks = []
@@ -113,12 +118,15 @@ def prominent_peaks(img, min_xdistance=1, min_ydistance=1, threshold=None, num_p
     ycoords_peaks = cp.array(ycoords_peaks)
     xcoords_peaks = cp.array(xcoords_peaks)
     te = (time.time() - t0) * 1e3
-    print(f"crazyloop: {te:2.2f} ms")
+    logger.debug(f"crazyloop: {te:2.2f} ms")
     
     if num_peaks < len(img_peaks):
         idx_maxsort = cp.argsort(img_peaks)[::-1][:num_peaks]
         img_peaks = img_peaks[idx_maxsort]
         ycoords_peaks = ycoords_peaks[idx_maxsort]
         xcoords_peaks = xcoords_peaks[idx_maxsort]
-
+    
+    te = (time.time() - t0) * 1e3
+    logger.debug(f"prominent_peaks total: {te:2.2f} ms")
+    
     return img_peaks, xcoords_peaks, ycoords_peaks

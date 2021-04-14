@@ -10,7 +10,7 @@ import setigen as stg
 
 from cupyx.scipy.ndimage import uniform_filter1d
 
-from peak import prominent_peaks
+from .peak import prominent_peaks
 
 import hdf5plugin
 import h5py
@@ -21,14 +21,15 @@ import dask
 import dask.bag as db
 from dask.diagnostics import ProgressBar
 
+#logging
+from .log import logger_group, Logger
+logger = Logger('hyperseti.hyperseti')
+logger_group.add_logger(logger)
+
+
 # Max threads setup 
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
-# Logger setup
-logger_name = 'hyperseti'
-logger = logging.getLogger(logger_name)
-logger.setLevel(logging.CRITICAL)
-#logger.setLevel(logging.INFO)
 
 dedoppler_kernel = cp.RawKernel(r'''
 extern "C" __global__
@@ -322,7 +323,7 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
     dedopp_gpu = cp.asarray(dedopp.astype('float32'))
     
     t0 = time.time()
-    intensity, fcoords, dcoords = prominent_peaks_dcp(dedopp_gpu, min_xdistance=min_fdistance, min_ydistance=min_ddistance, threshold=threshold)
+    intensity, fcoords, dcoords = prominent_peaks(dedopp_gpu, min_xdistance=min_fdistance, min_ydistance=min_ddistance, threshold=threshold)
     t1 = time.time()
     logger.info(f"Peak find time: {(t1-t0)*1e3:2.2f}ms")
     t0 = time.time()
