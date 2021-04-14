@@ -8,8 +8,9 @@ import os
 from astropy import units as u
 import setigen as stg
 
-from cupyimg.skimage.feature.peak import _prominent_peaks as prominent_peaks
 from cupyx.scipy.ndimage import uniform_filter1d
+
+from .peak import prominent_peaks
 
 import hdf5plugin
 import h5py
@@ -20,14 +21,15 @@ import dask
 import dask.bag as db
 from dask.diagnostics import ProgressBar
 
+#logging
+from .log import logger_group, Logger
+logger = Logger('hyperseti.hyperseti')
+logger_group.add_logger(logger)
+
+
 # Max threads setup 
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
-# Logger setup
-logger_name = 'hyperseti'
-logger = logging.getLogger(logger_name)
-logger.setLevel(logging.CRITICAL)
-#logger.setLevel(logging.INFO)
 
 dedoppler_kernel = cp.RawKernel(r'''
 extern "C" __global__
@@ -52,17 +54,58 @@ extern "C" __global__
 
         // Index for output array
         const int dd_idx = d * F + tid;
-        int idx = 0;
+        float dd_val = 0;
         
+        int idx = 0;
         for (int t = 0; t < T; t++) {
                             // timestep    // dedoppler trial offset
             idx  = tid + (F * t)      + (shift[d] * t / T);
             if (idx < F * T && idx > 0) {
-                dedopp[dd_idx] += data[idx];
+                dd_val += data[idx];
               }
+              dedopp[dd_idx] = dd_val;
             }
         }
 ''', 'dedopplerKernel')
+
+dedoppler_kurtosis_kernel = cp.RawKernel(r'''
+extern "C" __global__
+    __global__ void dedopplerKurtosisKernel
+        (const float *data, float *dedopp, int *shift, int F, int T)
+        /* Each thread computes a different dedoppler sum for a given channel
+        
+         F: N_frequency channels
+         T: N_time steps
+        
+         *data: Data array, (T x F) shape
+         *dedopp: Dedoppler summed data, (D x F) shape
+         *shift: Array of doppler corrections of length D.
+                 shift is total number of channels to shift at time T
+        */
+        {
+        
+        // Setup thread index
+        const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        const int d   = blockIdx.y;   // Dedoppler trial ID
+        const int D   = gridDim.y;   // Number of dedoppler trials
+
+        // Index for output array
+        const int dd_idx = d * F + tid;
+        float S1 = 0;
+        float S2 = 0;
+        
+        int idx = 0;
+        for (int t = 0; t < T; t++) {
+                            // timestep    // dedoppler trial offset
+            idx  = tid + (F * t)      + (shift[d] * t / T);
+            if (idx < F * T && idx > 0) {
+                S1 += data[idx];
+                S2 += data[idx] * data[idx];
+              }
+              dedopp[dd_idx] = (T+1)/(T-1) * (T*(S2 / (S1*S1)) - 1);
+            }
+        }
+''', 'dedopplerKurtosisKernel')
 
 
 def normalize(data, return_space='cpu'):
@@ -132,7 +175,7 @@ def apply_boxcar(data, boxcar_size, axis=1, mode='mean', return_space='cpu'):
     
     
 def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
-              boxcar_mode='sum', return_space='cpu'):
+              boxcar_mode='sum', return_space='cpu', kernel='dedoppler'):
     """ Apply brute-force dedoppler kernel to data
     
     Args:
@@ -147,6 +190,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     Returns:
         dd_vals, dedopp_gpu (np.array, np/cp.array): 
     """
+    t0 = time.time()
     if min_dd is None:
         min_dd = np.abs(max_dd) * -1
     
@@ -176,20 +220,26 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     
     # Allocate GPU memory for dedoppler data
     dedopp_gpu = cp.zeros((N_dopp, N_chan), dtype=cp.float32)
+    t1 = time.time()
+    logger.info(f"Dedopp setup time: {(t1-t0)*1e3:2.2f}ms")
+    
+    # Launch kernel
+    t0 = time.time()
     
     # Setup grid and block dimensions
     F_block = np.min((N_chan, 1024))
     F_grid  = N_chan // F_block
-    
-    # Launch kernel
-    t0 = time.time()
     #print(dd_shifts)
     logger.debug("Kernel shape (grid, block)", (F_grid, N_dopp), (F_block,))
-    dedoppler_kernel((F_grid, N_dopp), (F_block,), 
-                     (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time)) # grid, block and arguments
+    if kernel == 'dedoppler':
+        dedoppler_kernel((F_grid, N_dopp), (F_block,), 
+                         (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time)) # grid, block and arguments
         
+    elif kernel == 'kurtosis':
+        dedoppler_kurtosis_kernel((F_grid, N_dopp), (F_block,), 
+                         (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time)) # grid, block and arguments        
     t1 = time.time()
-    logger.info(f"Kernel time: {(t1-t0)*1e3:2.2f}ms")
+    logger.info(f"Dedopp kernel time: {(t1-t0)*1e3:2.2f}ms")
     
     # Compute drift rate values in Hz/s corresponding to dedopp axis=0
     dd_vals = dd_shifts * delta_dd
@@ -200,6 +250,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     
     # Copy back to CPU if requested
     if return_space == 'cpu':
+        logger.info("Dedoppler: copying over to CPU")
         dedopp_cpu = cp.asnumpy(dedopp_gpu)
         return dedopp_cpu, metadata
     else:
@@ -260,23 +311,28 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
     if min_ddistance is None:
         min_ddistance = len(drift_trials) // 4
     
-    # Unfortunately we need a CPU copy of the dedoppler for peak finding
-    # This means lots of copying back and forth, so potential bottleneck
-    if isinstance(dedopp, np.ndarray):
-        dedopp_cpu = dedopp
-    else:
-        dedopp_cpu = cp.asnumpy(dedopp)
+    # DELETME
+    ## Unfortunately we need a CPU copy of the dedoppler for peak finding
+    ## This means lots of copying back and forth, so potential bottleneck
+    ##if isinstance(dedopp, np.ndarray):
+    ##    dedopp_cpu = dedopp
+    ##else:
+    ##    dedopp_cpu = cp.asnumpy(dedopp)
         
     # Copy over to GPU if required
     dedopp_gpu = cp.asarray(dedopp.astype('float32'))
     
     t0 = time.time()
     intensity, fcoords, dcoords = prominent_peaks(dedopp_gpu, min_xdistance=min_fdistance, min_ydistance=min_ddistance, threshold=threshold)
+    t1 = time.time()
+    logger.info(f"Peak find time: {(t1-t0)*1e3:2.2f}ms")
+    t0 = time.time()
     # copy results over to CPU space
     intensity, fcoords, dcoords = cp.asnumpy(intensity), cp.asnumpy(fcoords), cp.asnumpy(dcoords)
     t1 = time.time()
-    logger.info(f"Peak find time: {(t1-t0)*1e3:2.2f}ms")
+    logger.info(f"Peak find memcopy: {(t1-t0)*1e3:2.2f}ms")
     
+    t0 = time.time()
     if len(fcoords) > 0:
         driftrate_peaks = drift_trials[dcoords]
         frequency_peaks = metadata['fch1'] + metadata['df'] * fcoords
@@ -296,6 +352,8 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
                 results[key] = val
 
         return pd.DataFrame(results)
+        t1 = time.time()
+        logger.info(f"Peak find to dataframe: {(t1-t0)*1e3:2.2f}ms")
     else:
         return None
     
@@ -371,7 +429,7 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     for boxcar_size in boxcar_trials:
         logger.info(f"--- Boxcar size: {boxcar_size} ---")
         dedopp, metadata = dedoppler(data, metadata, boxcar_size=boxcar_size,  boxcar_mode='sum',
-                                     max_dd=max_dd, min_dd=min_dd)
+                                     max_dd=max_dd, min_dd=min_dd, return_space='gpu')
         
         # Adjust SNR threshold to take into account boxcar size and dedoppler sum
         # Noise increases by sqrt(N_timesteps * boxcar_size)
@@ -477,7 +535,7 @@ def find_et(filename, filename_out='hits.csv', n_parallel=1, gulp_size=2**19, *a
     Notes:
         Passes keyword arguments on to run_pipeline().
     """
-    def _search_gulp_dask(md, h5, *args, **kwargs):
+    def _search_gulp_dask(d_gulp, md, h5, *args, **kwargs):
         """ Wrapper to run run_pipeline() via dask """
         dd, dedopp, peaks = run_pipeline(d_gulp, md, *args, **kwargs)
         if not peaks.empty:
@@ -530,7 +588,9 @@ def find_et_serial(filename, filename_out='hits.csv', gulp_size=2**19, *args, **
     out = []
     for gulp_md in gulp_plan:
         d = h5.read_data(gulp_md)
-        dedopp, metadata, hits = run_pipeline(d, h5.metadata, *args, **kwargs)
+        dedopp, metadata, hits = run_pipeline(d, gulp_md, *args, **kwargs)
+        if not hits.empty:
+            hits['channel_idx'] += gulp_md['i0']  
         out.append(hits)
         logger.info(f"{len(hits)} hits found")
               

@@ -67,5 +67,5 @@ Reading from file is also supported:
 
 ```python
 hits = find_et(filename, filename_out='hits.csv', n_parallel=2, gulp_size=2**18, max_dd=1.0, threshold=50)
-``
+```
 
