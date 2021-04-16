@@ -1,4 +1,4 @@
-from hyperseti import logger, dedoppler, run_pipeline, apply_boxcar, normalize, merge_hits, hitsearch
+from hyperseti import dedoppler, run_pipeline, apply_boxcar, normalize, merge_hits, hitsearch
 from hyperseti.data import from_fil
 
 from astropy import units as u
@@ -79,14 +79,14 @@ def test_dedoppler():
 
 def test_dedoppler_boxcar():
     """ Test that boxcar averaging works as expected """
-    def generate_drifting_tone(n_chan, n_timesteps, n_drift_per_step, sigval=10):
+    def generate_drifting_tone(n_chan, n_timesteps, n_drift_per_step, n_beams=1, sigval=10):
         """ Simple tone generator to generate smeared tones """
-        bg = np.zeros((n_timesteps, n_chan))
+        bg = np.zeros((n_timesteps, n_beams, n_chan))
 
         for ii in range(0, bg.shape[0]):
             for nd in range(n_drift_per_step):
                 z = n_drift_per_step * ii + nd
-                bg[ii, bg.shape[1]//2 + z] = sigval / n_drift_per_step
+                bg[ii, :, bg.shape[2]//2 + z] = sigval / n_drift_per_step
         return bg
 
     def maxhold_dedoppler(data):
