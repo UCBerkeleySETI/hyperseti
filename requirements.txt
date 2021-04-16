@@ -1,15 +1,12 @@
 astropy
 blimpy
-cupy
-cupyx
+cupy-cuda110
 dask
 h5py
 hdf5plugin
-itertools
 logbook
 logging
 numpy
 pandas
 pylab
 setigen
-
