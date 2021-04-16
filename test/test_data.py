@@ -1,5 +1,5 @@
 from hyperseti.data import from_fil, from_h5
-from .data_defs import *
+from file_defs import *
 
 d = from_fil(VOYAFIL)
 
