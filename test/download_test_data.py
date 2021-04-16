@@ -13,8 +13,8 @@ def download_test_data():
         os.system('rm *.h5 *.fil *.dat *.log *.png *.csv 2> /dev/null')
     except:
         pass
-    os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.h5"  -o ./Voyager1.single_coarse.fine_res.h5')
-    os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.fil"  -o ./Voyager1.single_coarse.fine_res.fil')
+    os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.h5"  -o ./test_data/Voyager1.single_coarse.fine_res.h5')
+    os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.fil"  -o ./test_data/Voyager1.single_coarse.fine_res.fil')
 
 
 def flip_data(filename):
