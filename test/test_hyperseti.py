@@ -127,7 +127,7 @@ def test_dedoppler_boxcar():
                                  max_dd=4.0)
 
     maxpixel = np.argmax(dedopp)
-    mdrift, mchan = (maxpixel // 1024, maxpixel % 1024) # <----- UNUSED
+    mdrift, mchan = (maxpixel // 1024, maxpixel % 1024) # <----------- UNUSED
     maxpixel_val = np.max(dedopp)
     print(f"dedopp recovered power (boxcar 2): {maxpixel_val}")
     assert maxpixel_val == np.sum(bg)
@@ -237,17 +237,17 @@ def test_hitsearch_multi():
                               stg.constant_bp_profile(level=1))
     
     frame.save_fil(filename=synthetic_fil)
-    data = from_fil(synthetic_fil)
+    darray = from_fil(synthetic_fil)
     
     fig = plt.figure(figsize=(10, 6))  #  <============ fig is UNUSED
 
-    dedopp, md, hits = run_pipeline(data, metadata, max_dd=1.0, min_dd=None, threshold=100, 
+    dedopp, md, hits = run_pipeline(darray.data, metadata, max_dd=1.0, min_dd=None, threshold=100, 
                                     n_boxcar=5, merge_boxcar_trials=True)
     print(hits.sort_values('snr', ascending=False))
     
     plt.figure(figsize=(10, 4))
     plt.subplot(1,2,1)
-    imshow_waterfall(data, md, 'channel', 'timestep')
+    imshow_waterfall(darray.data, md, 'channel', 'timestep')
     
     plt.subplot(1,2,2)
     imshow_dedopp(dedopp, md, 'channel', 'driftrate')
