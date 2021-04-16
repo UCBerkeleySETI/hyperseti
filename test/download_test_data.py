@@ -4,7 +4,7 @@ import h5py
 import hdf5plugin
 import blimpy as bl
 
-HERE = os.path.split(os.path.abspath(__file__))[0]
+from file_defs import voyager_fil, voyager_h5, voyager_h5_flipped
 
 
 def download_test_data():
@@ -17,16 +17,14 @@ def download_test_data():
     os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.fil"  -o ./test_data/Voyager1.single_coarse.fine_res.fil')
 
 
-def flip_data(filename):
+def flip_data():
     """ Flip Voyager data along frequency axis.
 
     The flipped file is used to check logic works when frequency is inverted.
     """
     print("Generating frequency flipped version of Voyager data...")
-    assert filename.endswith('.h5')
-    flipped_filename = filename.replace('.h5', '.flipped.h5')
-    os.system('cp %s %s' % (filename, flipped_filename))
-    with h5py.File(flipped_filename, 'r+') as h:
+    os.system('cp %s %s' % (voyager_h5, voyager_h5_flipped))
+    with h5py.File(voyager_h5_flipped, 'r+') as h:
         foff_orig = h['data'].attrs['foff']
         fch1_orig = h['data'].attrs['fch1']
         nchans    = h['data'].attrs['nchans']
@@ -43,6 +41,4 @@ def flip_data(filename):
 
 if __name__ == "__main__":
     download_test_data()
-    voyager_fp = os.path.join(HERE, 'Voyager1.single_coarse.fine_res.h5')
-    flip_data(voyager_fp)
-
+    flip_data()
