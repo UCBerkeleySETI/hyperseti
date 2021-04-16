@@ -15,8 +15,8 @@ def test_dedoppler():
     """ Basic tests of the dedoppler functionality """
     
     # zero drift test, no normalization
-    test_data = np.ones(shape=(32, 1024))
-    test_data[:, 511] = 10
+    test_data = np.ones(shape=(32, 1, 1024))
+    test_data[:, :, 511] = 10
     
     metadata = {'fch1': 1000*u.MHz, 
             'dt': 1.0*u.s, 
@@ -25,7 +25,7 @@ def test_dedoppler():
     dedopp, metadata = dedoppler(test_data, metadata, boxcar_size=1,
                                  max_dd=1.0)
     
-    assert np.max(dedopp) == np.sum(test_data[:, 511])
+    assert np.max(dedopp) == np.sum(test_data[:, :, 511])
     
 
     
