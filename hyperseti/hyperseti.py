@@ -11,6 +11,7 @@ import setigen as stg
 from cupyx.scipy.ndimage import uniform_filter1d
 
 from .peak import prominent_peaks
+from .data import from_fil, from_h5
 
 import hdf5plugin
 import h5py
@@ -121,7 +122,7 @@ def normalize(data, return_space='cpu'):
     """
     
     # Copy over to GPU if required
-    d_gpu = cp.asarray(data.astype('float32'))
+    d_gpu = cp.asarray(data.astype('float32', copy=False))
     
     # Normalise
     t0 = time.time()
@@ -159,7 +160,7 @@ def apply_boxcar(data, boxcar_size, axis=1, mode='mean', return_space='cpu'):
     t0 = time.time()
     # Move to GPU as required, and multiply by sqrt(boxcar_size)
     # This keeps stdev noise the same instead of decreasing by sqrt(N)
-    data = cp.asarray(data.astype('float32'))
+    data = cp.asarray(data.astype('float32', copy=False))
     data = uniform_filter1d(data, size=boxcar_size, axis=axis)
     if mode == 'gaussian':
         data *= np.sqrt(boxcar_size)
@@ -195,7 +196,12 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
         min_dd = np.abs(max_dd) * -1
     
     # Compute minimum possible drift (delta_dd)
-    N_time, N_chan = data.shape
+    N_time, N_beam, N_chan = data.shape
+    if N_beam == 1:
+        data = data.squeeze()
+    else:
+        data = data[:, 0, :] # TODO ADD POL SUPPORT
+        
     obs_len  = N_time * metadata['dt'].to('s').value
     delta_dd = metadata['df'].to('Hz').value / obs_len  # e.g. 2.79 Hz / 300 s = 0.0093 Hz/s
     
@@ -212,7 +218,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     N_dopp = len(dd_shifts)
     
     # Copy data over to GPU
-    d_gpu = cp.asarray(data.astype('float32'))
+    d_gpu = cp.asarray(data.astype('float32', copy=False))
     
     # Apply boxcar filter
     if boxcar_size > 1:
@@ -310,17 +316,9 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
     
     if min_ddistance is None:
         min_ddistance = len(drift_trials) // 4
-    
-    # DELETME
-    ## Unfortunately we need a CPU copy of the dedoppler for peak finding
-    ## This means lots of copying back and forth, so potential bottleneck
-    ##if isinstance(dedopp, np.ndarray):
-    ##    dedopp_cpu = dedopp
-    ##else:
-    ##    dedopp_cpu = cp.asnumpy(dedopp)
-        
+
     # Copy over to GPU if required
-    dedopp_gpu = cp.asarray(dedopp.astype('float32'))
+    dedopp_gpu = cp.asarray(dedopp.astype('float32', copy=False))
     
     t0 = time.time()
     intensity, fcoords, dcoords = prominent_peaks(dedopp_gpu, min_xdistance=min_fdistance, min_ydistance=min_ddistance, threshold=threshold)
@@ -335,6 +333,7 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
     t0 = time.time()
     if len(fcoords) > 0:
         driftrate_peaks = drift_trials[dcoords]
+        logger.debug(f"{metadata['fch1']}, {metadata['df']}, {fcoords}")
         frequency_peaks = metadata['fch1'] + metadata['df'] * fcoords
 
 
@@ -416,12 +415,14 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     """
     
     t0 = time.time()
+    logger.debug(data.shape)
     N_timesteps = data.shape[0]
     _threshold = threshold * np.sqrt(N_timesteps)
     
     # Apply preprocessing normalization
     if apply_normalization:
         data = normalize(data, return_space='gpu')
+    
     
     peaks = create_empty_hits_table()
     
@@ -448,122 +449,6 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     return dedopp, metadata, peaks
             
     
-class H5Reader(object):
-    """ Basic HDF5 reader
-    
-    Reads a HDF5 file in gulps (aka subband). Reads all timesteps at once, and
-    a subsample of frequency channels.
-    
-    Basic usage:
-        ```
-        h5 = H5Reader('test.h5', gulp_size=2**16)   
-        gulp_plan = h5.generate_gulp_metadata()
-
-        for gulp_md in gulp_plan:
-            d = h5.read_data(gulp_md)
-            out = run_pipeline(d, h5.metadata, ...)
-        ```
-
-    """
-    def __init__(self, fn, gulp_size=2**19):
-        self.fn = fn
-        
-        with h5py.File(fn, mode='r') as h:
-            self.metadata = {
-                'fch1': h['data'].attrs['fch1'] * u.MHz,
-                'dt': h['data'].attrs['tsamp'] * u.s,
-                'df': (h['data'].attrs['foff'] * u.MHz).to('Hz')
-            }
-            self.dshape = h['data'].shape
-            
-        self.gulp_size = gulp_size
-        self.n_sub = self.dshape[2] // gulp_size
-    
-    def generate_gulp_metadata(self):
-        """ An iterator which yields metadata to use to read the next gulp of data.
-        
-        Notes:
-            This is an iterator. Use `next()` to get next metadata, or `list()` to 
-            convert into a list. Otherwise use it in a loop, e.g.
-            `for md in h5.generate_gulp_metadata()`
-        
-        Returns:
-            md (dict): Dictionary with keys:
-                       fch1: First channel 
-                       i0: Index of first channel to read in gulp
-                       i1: Index of last channel to read in gulp
-                       sidx: Gulp (subband) index
-        """
-        for ii in range(self.n_sub):
-            i0, i1 = ii*self.gulp_size, (ii+1)*self.gulp_size
-            md = deepcopy(self.metadata)
-            md['fch1'] += md['df'] * i0
-            md['i0'] = i0
-            md['i1'] = i1
-            md['sidx'] = ii
-            yield md
-
-    def read_data(self, gulp_md):
-        """ Read data corresponding to gulp metadata 
-        
-        Args:
-            gulp_md (dict): Gulp metadata, from generate_gulp_metadata()
-        """
-        t0 = time.time()
-        ii = gulp_md['sidx']
-        with h5py.File(self.fn, mode='r') as h:
-            d = h['data'][:, 0, gulp_md['i0']:gulp_md['i1']]
-        t1 = time.time()
-        logger.info(f"## Subband {ii+1}/{self.n_sub} read: {(t1-t0)*1e3:2.2f}ms ##")
-        return d
-
-
-def find_et(filename, filename_out='hits.csv', n_parallel=1, gulp_size=2**19, *args, **kwargs):
-    """ Find ET 
-    
-    Wrapper for reading from a file and running run_pipeline() on all subbands within the file.
-    
-    Args:
-        filename (str): Name of input HDF5 file.
-        filename_out (str): Name of output CSV file.
-        n_parallel (int): Number of parallel dask bag threads
-        gulp_size (int): Number of channels to process at once (e.g. N_chan in a coarse channel)
-    
-    Returns:
-        hits (pd.DataFrame): Pandas dataframe of all hits.
-    
-    Notes:
-        Passes keyword arguments on to run_pipeline().
-    """
-    def _search_gulp_dask(d_gulp, md, h5, *args, **kwargs):
-        """ Wrapper to run run_pipeline() via dask """
-        dd, dedopp, peaks = run_pipeline(d_gulp, md, *args, **kwargs)
-        if not peaks.empty:
-            peaks['channel_idx'] += md['i0']        
-        return [peaks,]
-       
-    # Open file reader
-    h5 = H5Reader(filename, gulp_size=gulp_size)
-    
-    # Set max number of parallel threads 
-    dask.config.set(pool=ThreadPool(n_parallel))
-    t0 = time.time()
-    
-    # Generate a dask bag and use it to run parallel threads
-    b = db.from_sequence(h5.generate_gulp_metadata())
-    with ProgressBar():
-        logger.setLevel(logging.CRITICAL)
-        out = b.map(_search_gulp_dask, h5, *args, **kwargs).compute()
-
-    # create single pandas dataframe from output and save to disk
-    dframe = pd.concat([o[0] for o in out])
-    dframe.to_csv(filename_out)
-    t1 = time.time()
-    
-    logger.info(f"## N_PARALLEL {n_parallel} TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
-    return dframe
-    
-    
 def find_et_serial(filename, filename_out='hits.csv', gulp_size=2**19, *args, **kwargs):
     """ Find ET, serial version
     
@@ -580,20 +465,20 @@ def find_et_serial(filename, filename_out='hits.csv', gulp_size=2**19, *args, **
     Notes:
         Passes keyword arguments on to run_pipeline(). Same as find_et but doesn't use dask parallelization.
     """
-    peaks = create_empty_hits_table()
-    h5 = H5Reader(filename, gulp_size=gulp_size)   
-
     t0 = time.time()
-    gulp_plan = h5.generate_gulp_metadata()
+    #peaks = create_empty_hits_table()    
+    ds = from_h5(filename)
     out = []
-    for gulp_md in gulp_plan:
-        d = h5.read_data(gulp_md)
-        dedopp, metadata, hits = run_pipeline(d, gulp_md, *args, **kwargs)
-        if not hits.empty:
-            hits['channel_idx'] += gulp_md['i0']  
+    for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
+        print(d_arr)
+        d = d_arr.data
+        f = d_arr.frequency
+        t = d_arr.time
+        md = {'fch1': f.val_start * f.units, 'df': f.val_step * f.units, 'dt': t.val_step * t.units}
+        dedopp, metadata, hits = run_pipeline(d, md, *args, **kwargs)
         out.append(hits)
         logger.info(f"{len(hits)} hits found")
-              
+    
     dframe = pd.concat(out)
     dframe.to_csv(filename_out)
     t1 = time.time()
