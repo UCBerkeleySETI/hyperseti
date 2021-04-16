@@ -1,6 +1,6 @@
-import os
+from os import path
 
-TESTDIR = os.path.split(os.path.abspath(__file__))[0]
-VOYAH5 = TESTDIR + '/Voyager1.single_coarse.fine_res.h5'
-VOYAH5FLIPPED = TESTDIR + '/Voyager1.single_coarse.fine_res.flipped.h5'
-VOYAFIL = TESTDIR + '/Voyager1.single_coarse.fine_res.fil'
+here = path.dirname(path.abspath(__file__))
+
+voyager_fil = path.join(here, 'test_data/Voyager1.single_coarse.fine_res.fil')
+voyager_h5 = path.join(here, 'test_data/Voyager1.single_coarse.fine_res.h5')
