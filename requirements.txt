@@ -1,0 +1,15 @@
+astropy
+blimpy
+cupy
+cupyx
+dask
+h5py
+hdf5plugin
+itertools
+logbook
+logging
+numpy
+pandas
+pylab
+setigen
+
