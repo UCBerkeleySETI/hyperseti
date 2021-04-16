@@ -43,14 +43,14 @@ def test_dedoppler():
                                   stg.constant_bp_profile(level=1))
 
         frame.save_fil(filename=synthetic_fil)
-        data = from_fil(synthetic_fil)
-        dedopp, metadata = dedoppler(data, metadata, boxcar_size=1,
+        darray = from_fil(synthetic_fil)
+        dedopp, metadata = dedoppler(darray.data, metadata, boxcar_size=1,
                                      max_dd=1.0)
 
         # Manual dedoppler search -- just find max channel (only works if S/N is good)
         manual_dd_tot = 0
-        for ii in range(data.shape[0]):
-            manual_dd_tot += np.max(data[ii])
+        for ii in range(darray.data.shape[0]):
+            manual_dd_tot += np.max(darray.data[ii])
         imshow_dedopp(dedopp, metadata, show_colorbar=False)
 
         maxpixel = np.argmax(dedopp)
@@ -155,14 +155,14 @@ def test_hitsearch():
     frame.add_noise(x_mean=0, x_std=1, noise_type='gaussian')
 
     frame.save_fil(filename=synthetic_fil)
-    data = from_fil(synthetic_fil)
+    darray = from_fil(synthetic_fil)
 
     # Add a signal with bandwidth into the data, SNR of 1000
     for ii in range(signal_bw):
-        data[:, :, n_chan // 2 + ii]   = 1000 / signal_bw
+        darray.data[:, :, n_chan // 2 + ii]   = 1000 / signal_bw
     
     print("--- Run dedoppler() then hitsearch() ---")
-    dedopp, metadata = dedoppler(data, metadata, boxcar_size=16, max_dd=1.0)
+    dedopp, metadata = dedoppler(darray.data, metadata, boxcar_size=16, max_dd=1.0)
     hits0 = hitsearch(dedopp, metadata, threshold=1000).sort_values('snr')
     print(hits0)
     # Output should be 
@@ -176,7 +176,7 @@ def test_hitsearch():
     assert len(hits0) == 1
     
     print("--- run_pipeline with w/o merge --- ")
-    dedopp, metadata, hits = run_pipeline(data, metadata, max_dd=1.0, min_dd=None, threshold=100, 
+    dedopp, metadata, hits = run_pipeline(darray.data, metadata, max_dd=1.0, min_dd=None, threshold=100, 
                                           n_boxcar=7, merge_boxcar_trials=False)
 
     for rid, hit in hits.iterrows():
@@ -191,7 +191,7 @@ def test_hitsearch():
     print(merged_hits)
     
     print("--- run_pipeline with merge --- ")
-    dedopp, md, hits2 = run_pipeline(data, metadata, max_dd=1.0, min_dd=None, threshold=100, 
+    dedopp, md, hits2 = run_pipeline(darray.data, metadata, max_dd=1.0, min_dd=None, threshold=100, 
                                            n_boxcar=7, merge_boxcar_trials=True)
     hits2
     print(hits2)    
@@ -200,7 +200,7 @@ def test_hitsearch():
 
     plt.figure(figsize=(10, 4))
     plt.subplot(1,2,1)
-    imshow_waterfall(data, metadata, 'channel', 'timestep')
+    imshow_waterfall(darray.data, metadata, 'channel', 'timestep')
     
     plt.subplot(1,2,2)
     imshow_dedopp(dedopp, metadata, 'channel', 'driftrate')
@@ -239,7 +239,7 @@ def test_hitsearch_multi():
     frame.save_fil(filename=synthetic_fil)
     data = from_fil(synthetic_fil)
     
-    fig = plt.figure(figsize=(10, 6))  #  fig is UNUSED
+    fig = plt.figure(figsize=(10, 6))  #  <============ fig is UNUSED
 
     dedopp, md, hits = run_pipeline(data, metadata, max_dd=1.0, min_dd=None, threshold=100, 
                                     n_boxcar=5, merge_boxcar_trials=True)
