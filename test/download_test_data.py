@@ -1,10 +1,13 @@
 import os
+from shutil import rmtree
 
 import h5py
 import hdf5plugin
 import blimpy as bl
 
 from file_defs import voyager_fil, voyager_h5, voyager_h5_flipped
+
+DATADIR = './test_data/'
 
 
 def download_test_data():
@@ -13,8 +16,8 @@ def download_test_data():
         os.system('rm *.h5 *.fil *.dat *.log *.png *.csv 2> /dev/null')
     except:
         pass
-    os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.h5"  -o ./test_data/Voyager1.single_coarse.fine_res.h5')
-    os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.fil"  -o ./test_data/Voyager1.single_coarse.fine_res.fil')
+    os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.h5"  -o ' + DATADIR + 'Voyager1.single_coarse.fine_res.h5')
+    os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.fil"  -o ' + DATADIR + 'Voyager1.single_coarse.fine_res.fil')
 
 
 def flip_data():
@@ -40,5 +43,7 @@ def flip_data():
 
 
 if __name__ == "__main__":
+    rmtree(DATADIR, ignore_errors=True)
+    mkdir(DATADIR)
     download_test_data()
     flip_data()
