@@ -152,13 +152,17 @@ def test_hitsearch():
     metadata = {'fch1': 1000*u.MHz, 'dt': 1.0*u.s, 'df': 1.0*u.Hz}
     frame = stg.Frame(fchans=n_chan*u.pixel, tchans=n_timesteps*u.pixel,
               df=metadata['df'], dt=metadata['dt'], fch1=metadata['fch1'])
-    d = frame.add_noise(x_mean=0, x_std=1, noise_type='gaussian')
+    frame.add_noise(x_mean=0, x_std=1, noise_type='gaussian')
+
+    frame.save_fil(filename=synthetic_fil)
+    data = from_fil(synthetic_fil)
+
     # Add a signal with bandwidth into the data, SNR of 1000
     for ii in range(signal_bw):
-        d[:, n_chan // 2 + ii]   = 1000 / signal_bw
+        data[:, :, n_chan // 2 + ii]   = 1000 / signal_bw
     
     print("--- Run dedoppler() then hitsearch() ---")
-    dedopp, metadata = dedoppler(d, metadata, boxcar_size=16, max_dd=1.0)
+    dedopp, metadata = dedoppler(data, metadata, boxcar_size=16, max_dd=1.0)
     hits0 = hitsearch(dedopp, metadata, threshold=1000).sort_values('snr')
     print(hits0)
     # Output should be 
@@ -172,7 +176,7 @@ def test_hitsearch():
     assert len(hits0) == 1
     
     print("--- run_pipeline with w/o merge --- ")
-    dedopp, metadata, hits = run_pipeline(d, metadata, max_dd=1.0, min_dd=None, threshold=100, 
+    dedopp, metadata, hits = run_pipeline(data, metadata, max_dd=1.0, min_dd=None, threshold=100, 
                                           n_boxcar=7, merge_boxcar_trials=False)
 
     for rid, hit in hits.iterrows():
@@ -187,7 +191,7 @@ def test_hitsearch():
     print(merged_hits)
     
     print("--- run_pipeline with merge --- ")
-    dedopp, md, hits2 = run_pipeline(d, metadata, max_dd=1.0, min_dd=None, threshold=100, 
+    dedopp, md, hits2 = run_pipeline(data, metadata, max_dd=1.0, min_dd=None, threshold=100, 
                                            n_boxcar=7, merge_boxcar_trials=True)
     hits2
     print(hits2)    
@@ -196,7 +200,7 @@ def test_hitsearch():
 
     plt.figure(figsize=(10, 4))
     plt.subplot(1,2,1)
-    imshow_waterfall(d, metadata, 'channel', 'timestep')
+    imshow_waterfall(data, metadata, 'channel', 'timestep')
     
     plt.subplot(1,2,2)
     imshow_dedopp(dedopp, metadata, 'channel', 'driftrate')
