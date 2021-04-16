@@ -72,16 +72,19 @@ extern "C" __global__
 dedoppler_kurtosis_kernel = cp.RawKernel(r'''
 extern "C" __global__
     __global__ void dedopplerKurtosisKernel
-        (const float *data, float *dedopp, int *shift, int F, int T)
+        (const float *data, float *dedopp, int *shift, int F, int T, int N)
         /* Each thread computes a different dedoppler sum for a given channel
         
          F: N_frequency channels
          T: N_time steps
-        
+         N: N_acc number of accumulations averaged within time step
+         
          *data: Data array, (T x F) shape
          *dedopp: Dedoppler summed data, (D x F) shape
          *shift: Array of doppler corrections of length D.
                  shift is total number of channels to shift at time T
+        
+        Note: output needs to be scaled by N_acc, number of time accumulations
         */
         {
         
@@ -103,7 +106,7 @@ extern "C" __global__
                 S1 += data[idx];
                 S2 += data[idx] * data[idx];
               }
-              dedopp[dd_idx] = (T+1)/(T-1) * (T*(S2 / (S1*S1)) - 1);
+              dedopp[dd_idx] = (N*T+1)/(T-1) * (T*(S2 / (S1*S1)) - 1);
             }
         }
 ''', 'dedopplerKurtosisKernel')
@@ -209,11 +212,13 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     N_dopp_upper   = int(max_dd / delta_dd)
     N_dopp_lower   = int(min_dd / delta_dd)
     
-    if N_dopp_upper > N_dopp_lower:
+    if max_dd == 0 and min_dd is None:
+        dd_shifts = np.array([0], dtype='int32')
+    elif N_dopp_upper > N_dopp_lower:
         dd_shifts      = np.arange(N_dopp_lower, N_dopp_upper + 1, dtype='int32')
     else:
         dd_shifts      = np.arange(N_dopp_upper, N_dopp_lower + 1, dtype='int32')[::-1]
-        
+    
     dd_shifts_gpu  = cp.asarray(dd_shifts)
     N_dopp = len(dd_shifts)
     
@@ -236,14 +241,20 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     F_block = np.min((N_chan, 1024))
     F_grid  = N_chan // F_block
     #print(dd_shifts)
-    logger.debug("Kernel shape (grid, block)", (F_grid, N_dopp), (F_block,))
+    logger.debug(f"Kernel shape (grid, block) {(F_grid, N_dopp), (F_block,)}")
     if kernel == 'dedoppler':
         dedoppler_kernel((F_grid, N_dopp), (F_block,), 
                          (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time)) # grid, block and arguments
         
     elif kernel == 'kurtosis':
+         # output must be scaled by N_acc, which can be figured out from df and dt metadata
+        samps_per_sec = (1.0 / np.abs(metadata['df'])).to('s') / 2 # Nyq sample rate for channel
+        N_acc = int(metadata['dt'].to('s') / samps_per_sec)
+        logger.debug(f'rescaling SK by {N_acc}')
+        logger.debug(f"driftrates: {dd_shifts}")
         dedoppler_kurtosis_kernel((F_grid, N_dopp), (F_block,), 
-                         (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time)) # grid, block and arguments        
+                         (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time, N_acc)) # grid, block and arguments 
+        
     t1 = time.time()
     logger.info(f"Dedopp kernel time: {(t1-t0)*1e3:2.2f}ms")
     
@@ -262,6 +273,24 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     else:
         return dedopp_gpu, metadata
 
+
+def spectral_kurtosis(data, metadata, boxcar_size=1, return_space='cpu'):
+    """ Compute spectral kurtosis for zero-drift data """
+    dedopp_SK, metadata = dedoppler(data, metadata, boxcar_size=boxcar_size, return_space=return_space,
+                                              kernel='kurtosis', max_dd=0)
+    return dedopp_SK[0]
+
+
+def sk_flag(data, metadata, boxcar_size=1, n_sigma=3, return_space='cpu'):
+    """ Apply spectral kurtosis flagging """
+    samps_per_sec = (1.0 / metadata['df']).to('s') / 2 # Nyq sample rate for channel
+    N_acc = int(metadata['dt'].to('s') / samps_per_sec)
+    var_theoretical = 2.0 / np.sqrt(N_acc)
+    std_theoretical = np.sqrt(var_theoretical)
+    sk = spectral_kurtosis(data, metadata, boxcar_size=boxcar_size, return_space=return_space)
+    mask_upper = sk > 1.0 + n_sigma * var_theoretical
+    mask_lower = sk < 1.0
+    return mask
     
 def create_empty_hits_table():
     """ Create empty pandas dataframe for hit data
