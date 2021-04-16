@@ -5,7 +5,6 @@ dask
 h5py
 hdf5plugin
 logbook
-logging
 numpy
 pandas
 pylab
