@@ -121,7 +121,7 @@ def normalize(data, return_space='cpu'):
         data (np/cp.array): Data to preprocess
         return_space ('cpu' or 'gpu'): Returns array in CPU or GPU space
         
-    Returns: d_gpu (cp.array): Preprocessed data
+    Returns: d_gpu (cp.array): Normalized data
     """
     
     # Copy over to GPU if required
@@ -129,7 +129,7 @@ def normalize(data, return_space='cpu'):
     
     # Normalise
     t0 = time.time()
-    d_median = cp.mean(d_gpu)
+    d_median = cp.median(d_gpu)
     d_std  = cp.std(d_gpu)
     d_gpu = (d_gpu - d_median) / d_std
     t1 = time.time()
@@ -281,16 +281,48 @@ def spectral_kurtosis(data, metadata, boxcar_size=1, return_space='cpu'):
     return dedopp_SK[0]
 
 
-def sk_flag(data, metadata, boxcar_size=1, n_sigma=3, return_space='cpu'):
-    """ Apply spectral kurtosis flagging """
+def sk_flag(data, metadata, boxcar_size=1, n_sigma_upper=3, n_sigma_lower=2, 
+            flag_upper=True, flag_lower=True, return_space='cpu'):
+    """ Apply spectral kurtosis flagging 
+    
+    Args:
+        data (np.array): Numpy array with shape (N_timestep, N_beam, N_channel)
+        metadata (dict): Metadata dictionary, should contain 'df' and 'dt'
+                         (frequency and time resolution)
+        boxcar_mode (str): Boxcar mode to apply. mean/sum/gaussian.
+        n_sigma_upper (float): Number of stdev above SK estimate to flag (upper bound)
+        n_sigma_lower (float): Number of stdev below SK estmate to flag (lower bound)
+        flag_upper (bool): Flag channels with large SK (highly variable signals)
+        flag_lower (bool): Flag channels with small SK (very stable signals)
+        return_space ('cpu' or 'gpu'): Returns array in CPU or GPU space
+    
+    Returns:
+        mask (np.array, bool): Array of True/False flags per channel
+    """
     samps_per_sec = (1.0 / metadata['df']).to('s') / 2 # Nyq sample rate for channel
     N_acc = int(metadata['dt'].to('s') / samps_per_sec)
     var_theoretical = 2.0 / np.sqrt(N_acc)
     std_theoretical = np.sqrt(var_theoretical)
     sk = spectral_kurtosis(data, metadata, boxcar_size=boxcar_size, return_space=return_space)
-    mask_upper = sk > 1.0 + n_sigma * var_theoretical
-    mask_lower = sk < 1.0
+    
+    if flag_upper and flag_lower:
+        mask  = sk > 1.0 + n_sigma_upper * std_theoretical
+        mask  |= sk < 1.0 - (n_sigma_lower * std_theoretical)
+    elif flag_upper and not flag_lower:
+        mask  = sk > 1.0 + n_sigma_upper * std_theoretical
+    elif flag_lower and not flag_upper:
+        mask  = sk < 1.0 - (n_sigma_lower * std_theoretical)
+    else:
+        raise RuntimeError("No flags to process: need to flag upper and/or lower!")
     return mask
+
+    if return_space == 'cpu':
+        logger.info("sk_flag: copying over to CPU")
+        mask_cpu = cp.asnumpy(mask)
+        return mask_cpu
+    else:
+        return mask
+
     
 def create_empty_hits_table():
     """ Create empty pandas dataframe for hit data
