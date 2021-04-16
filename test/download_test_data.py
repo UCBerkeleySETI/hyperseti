@@ -44,6 +44,6 @@ def flip_data():
 
 if __name__ == "__main__":
     rmtree(DATADIR, ignore_errors=True)
-    mkdir(DATADIR)
+    os.mkdir(DATADIR)
     download_test_data()
     flip_data()
