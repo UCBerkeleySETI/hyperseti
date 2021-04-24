@@ -3,13 +3,6 @@ import os
 from astropy.coordinates import SkyCoord
 import itertools
 
-# Filterbank reading
-from blimpy.io import sigproc
-
-# HDF5 reading
-import hdf5plugin
-import h5py
-
 # Dask SVG HTML plotting
 from dask.array.svg import svg
 
@@ -197,6 +190,9 @@ def from_fil(filename):
     
     Returns a DataArray object with mem-mapped filterbank data.
     """
+    # Filterbank reading
+    from blimpy.io import sigproc
+
     hdr    = sigproc.read_header(filename)
     hdrlen = sigproc.len_header(filename)
     n_int  = sigproc.calc_n_ints_in_file(filename)
@@ -226,6 +222,10 @@ def from_h5(filename):
     
     Returns a DataArray object with h5py mapped data.
     """
+    # HDF5 reading
+    import hdf5plugin
+    import h5py
+    
     h5 = h5py.File(filename, mode='r')
     data  = h5['data']
     hdr = data.attrs
