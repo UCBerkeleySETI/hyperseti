@@ -1,5 +1,8 @@
 import cupy as cp
 import numpy as np
+from functools import wraps
+
+from .data_array import DataArray
 
 # Logging
 from .log import logger_group, Logger
@@ -25,6 +28,7 @@ def on_gpu(func):
         
     """
     func_name = func.__name__
+    @wraps(func)
     def inner(*args, **kwargs):
         new_args = []
         for idx, arg in enumerate(args):
@@ -71,4 +75,40 @@ def on_gpu(func):
                 return new_output
         else:
             return output 
+    return inner
+
+            
+def datwrapper(func):
+    """ Decorator to split metadata off from DataArray 
+    
+    Supplies metadata= kwarg to wrapped function, derived from
+    attributes of the DataArray. Splits off the DataArray.data
+    and returns that as first argument.
+    
+    Notes:
+        Specific for hyperseti, this will also generate df and dt from
+        dimension scales. 
+    """
+    func_name = func.__name__
+    @wraps(func)
+    def inner(*args, **kwargs):
+        if isinstance(args[0], DataArray):
+            args = list(args)
+            d = args[0]
+            metadata = {}
+            # Copy attribute key:values over 
+            for k, v in d.attrs.items():
+                metadata[k] = v
+                
+            metadata['dt'] = d.time.units * d.time.val_step
+            metadata['t0'] = d.time.time_start
+            metadata['df'] = d.frequency.units * d.frequency.val_step
+            metadata['f0'] = d.frequency.units * d.frequency.val_start
+            
+            # Replace DataArray with underlying data
+            args[0] = d.data
+            
+            kwargs['metadata'] = metadata
+        output = func(*args, **kwargs)
+        return output 
     return inner

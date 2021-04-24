@@ -181,7 +181,7 @@ class DataArray(object):
             selector = {key: slice for key, slice in zip(dims, slices)}
             yield self.isel(selector)
 
-            
+
 def from_fil(filename):
     """ Create a DataArray from a sigproc filterbank file
     

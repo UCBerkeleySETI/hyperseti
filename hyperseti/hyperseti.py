@@ -12,7 +12,7 @@ from cupyx.scipy.ndimage import uniform_filter1d
 
 from .peak import prominent_peaks
 from .data_array import from_fil, from_h5
-from .utils import on_gpu
+from .utils import on_gpu, datwrapper
 from .gpu_kernels import dedoppler_kernel, dedoppler_kurtosis_kernel
 
 #logging
@@ -102,9 +102,11 @@ def apply_boxcar(data, boxcar_size, axis=1, mode='mean'):
     logger.info(f"Filter time: {(t1-t0)*1e3:2.2f}ms")
     
     return data
-    
-@on_gpu    
-def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
+
+  
+@datwrapper
+@on_gpu  
+def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
               boxcar_mode='sum', kernel='dedoppler'):
     """ Apply brute-force dedoppler kernel to data
     
@@ -126,10 +128,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     
     # Compute minimum possible drift (delta_dd)
     N_time, N_beam, N_chan = data.shape
-    if N_beam == 1:
-        data = data.squeeze()
-    else:
-        data = data[:, 0, :] # TODO ADD POL SUPPORT
+    data = data[:, beam_id, :] # TODO ADD POL SUPPORT
         
     obs_len  = N_time * metadata['dt'].to('s').value
     delta_dd = metadata['df'].to('Hz').value / obs_len  # e.g. 2.79 Hz / 300 s = 0.0093 Hz/s
@@ -221,6 +220,8 @@ def create_empty_hits_table():
     return hits
 
 
+@datwrapper
+@on_gpu
 def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=None):
     """ Search for hits using _prominent_peaks method in cupyimg.skimage
     
@@ -265,8 +266,8 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
     t0 = time.time()
     if len(fcoords) > 0:
         driftrate_peaks = drift_trials[dcoords]
-        logger.debug(f"{metadata['fch1']}, {metadata['df']}, {fcoords}")
-        frequency_peaks = metadata['fch1'] + metadata['df'] * fcoords
+        logger.debug(f"{metadata['f0']}, {metadata['df']}, {fcoords}")
+        frequency_peaks = metadata['f0'] + metadata['df'] * fcoords
 
 
         results = {
@@ -324,6 +325,8 @@ def merge_hits(hitlist):
     return pd.DataFrame(hits)
 
 
+@datwrapper
+@on_gpu
 def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistance=None, 
                  min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True, apply_normalization=False):
     """ Run dedoppler + hitsearch pipeline 
@@ -406,7 +409,8 @@ def find_et_serial(filename, filename_out='hits.csv', gulp_size=2**19, *args, **
         d = d_arr.data
         f = d_arr.frequency
         t = d_arr.time
-        md = {'fch1': f.val_start * f.units, 'df': f.val_step * f.units, 'dt': t.val_step * t.units}
+        md = {'f0': f.val_start * f.units, 'df': f.val_step * f.units, 
+              'dt': t.val_step * t.units, 't0': t.time_start}
         dedopp, metadata, hits = run_pipeline(d, md, *args, **kwargs)
         out.append(hits)
         logger.info(f"{len(hits)} hits found")
