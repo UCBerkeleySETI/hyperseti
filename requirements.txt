@@ -1,0 +1,10 @@
+astropy
+blimpy
+cupy-cuda110
+dask
+h5py
+hdf5plugin
+logbook
+numpy
+pandas
+setigen
