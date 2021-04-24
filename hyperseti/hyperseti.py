@@ -11,108 +11,20 @@ import setigen as stg
 from cupyx.scipy.ndimage import uniform_filter1d
 
 from .peak import prominent_peaks
-from .data import from_fil, from_h5
-
-import hdf5plugin
-import h5py
-from copy import deepcopy
-
-from multiprocessing.pool import ThreadPool
-import dask
-import dask.bag as db
-from dask.diagnostics import ProgressBar
+from .data_array import from_fil, from_h5
+from .utils import on_gpu
+from .gpu_kernels import dedoppler_kernel, dedoppler_kurtosis_kernel
 
 #logging
 from .log import logger_group, Logger
 logger = Logger('hyperseti.hyperseti')
 logger_group.add_logger(logger)
 
-
 # Max threads setup 
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
-
-dedoppler_kernel = cp.RawKernel(r'''
-extern "C" __global__
-    __global__ void dedopplerKernel
-        (const float *data, float *dedopp, int *shift, int F, int T)
-        /* Each thread computes a different dedoppler sum for a given channel
-        
-         F: N_frequency channels
-         T: N_time steps
-        
-         *data: Data array, (T x F) shape
-         *dedopp: Dedoppler summed data, (D x F) shape
-         *shift: Array of doppler corrections of length D.
-                 shift is total number of channels to shift at time T
-        */
-        {
-        
-        // Setup thread index
-        const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        const int d   = blockIdx.y;   // Dedoppler trial ID
-        const int D   = gridDim.y;   // Number of dedoppler trials
-
-        // Index for output array
-        const int dd_idx = d * F + tid;
-        float dd_val = 0;
-        
-        int idx = 0;
-        for (int t = 0; t < T; t++) {
-                            // timestep    // dedoppler trial offset
-            idx  = tid + (F * t)      + (shift[d] * t / T);
-            if (idx < F * T && idx > 0) {
-                dd_val += data[idx];
-              }
-              dedopp[dd_idx] = dd_val;
-            }
-        }
-''', 'dedopplerKernel')
-
-dedoppler_kurtosis_kernel = cp.RawKernel(r'''
-extern "C" __global__
-    __global__ void dedopplerKurtosisKernel
-        (const float *data, float *dedopp, int *shift, int F, int T, int N)
-        /* Each thread computes a different dedoppler sum for a given channel
-        
-         F: N_frequency channels
-         T: N_time steps
-         N: N_acc number of accumulations averaged within time step
-         
-         *data: Data array, (T x F) shape
-         *dedopp: Dedoppler summed data, (D x F) shape
-         *shift: Array of doppler corrections of length D.
-                 shift is total number of channels to shift at time T
-        
-        Note: output needs to be scaled by N_acc, number of time accumulations
-        */
-        {
-        
-        // Setup thread index
-        const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        const int d   = blockIdx.y;   // Dedoppler trial ID
-        const int D   = gridDim.y;   // Number of dedoppler trials
-
-        // Index for output array
-        const int dd_idx = d * F + tid;
-        float S1 = 0;
-        float S2 = 0;
-        
-        int idx = 0;
-        for (int t = 0; t < T; t++) {
-                            // timestep    // dedoppler trial offset
-            idx  = tid + (F * t)      + (shift[d] * t / T);
-            if (idx < F * T && idx > 0) {
-                S1 += data[idx];
-                S2 += data[idx] * data[idx];
-              }
-              dedopp[dd_idx] = (N*T+1)/(T-1) * (T*(S2 / (S1*S1)) - 1);
-            }
-        }
-''', 'dedopplerKurtosisKernel')
-
-
-def normalize(data, mask=None, padding=0, return_space='cpu'):
+@on_gpu
+def normalize(data, mask=None, padding=0):
     """ Apply normalization on GPU
     
     Applies normalisation (data - mean) / stdev
@@ -125,9 +37,8 @@ def normalize(data, mask=None, padding=0, return_space='cpu'):
         
     Returns: d_gpu (cp.array): Normalized data
     """
-    
-    # Copy over to GPU if required
-    d_gpu = cp.asarray(data.astype('float32', copy=False))
+
+    d_gpu = data
     d_gpu_flagged = cp.asarray(data.astype('float32', copy=True))
     
     paddingu = None if padding == 0 else -padding
@@ -156,13 +67,10 @@ def normalize(data, mask=None, padding=0, return_space='cpu'):
     t1 = time.time()
     logger.info(f"Normalisation time: {(t1-t0)*1e3:2.2f}ms")
     
-    if return_space == 'cpu':
-        return cp.asnumpy(d_gpu)
-    else:
-        return d_gpu
+    return d_gpu
 
-    
-def apply_boxcar(data, boxcar_size, axis=1, mode='mean', return_space='cpu'):
+@on_gpu
+def apply_boxcar(data, boxcar_size, axis=1, mode='mean'):
     """ Apply moving boxcar filter and renormalise by sqrt(boxcar_size)
     
     Boxcar applies a moving MEAN to the data. 
@@ -193,14 +101,11 @@ def apply_boxcar(data, boxcar_size, axis=1, mode='mean', return_space='cpu'):
     t1 = time.time()
     logger.info(f"Filter time: {(t1-t0)*1e3:2.2f}ms")
     
-    if return_space == 'cpu':
-        return cp.asnumpy(data)
-    else:
-        return data
+    return data
     
-    
+@on_gpu    
 def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
-              boxcar_mode='sum', return_space='cpu', kernel='dedoppler'):
+              boxcar_mode='sum', kernel='dedoppler'):
     """ Apply brute-force dedoppler kernel to data
     
     Args:
@@ -286,63 +191,8 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1,
     metadata['boxcar_size'] = boxcar_size
     metadata['dd'] = delta_dd * u.Hz / u.s
     
-    # Copy back to CPU if requested
-    if return_space == 'cpu':
-        logger.info("Dedoppler: copying over to CPU")
-        dedopp_cpu = cp.asnumpy(dedopp_gpu)
-        return dedopp_cpu, metadata
-    else:
-        return dedopp_gpu, metadata
+    return dedopp_gpu, metadata
 
-
-def spectral_kurtosis(data, metadata, boxcar_size=1, return_space='cpu'):
-    """ Compute spectral kurtosis for zero-drift data """
-    dedopp_SK, metadata = dedoppler(data, metadata, boxcar_size=boxcar_size, return_space=return_space,
-                                              kernel='kurtosis', max_dd=0)
-    return dedopp_SK[0]
-
-
-def sk_flag(data, metadata, boxcar_size=1, n_sigma_upper=3, n_sigma_lower=2, 
-            flag_upper=True, flag_lower=True, return_space='cpu'):
-    """ Apply spectral kurtosis flagging 
-    
-    Args:
-        data (np.array): Numpy array with shape (N_timestep, N_beam, N_channel)
-        metadata (dict): Metadata dictionary, should contain 'df' and 'dt'
-                         (frequency and time resolution)
-        boxcar_mode (str): Boxcar mode to apply. mean/sum/gaussian.
-        n_sigma_upper (float): Number of stdev above SK estimate to flag (upper bound)
-        n_sigma_lower (float): Number of stdev below SK estmate to flag (lower bound)
-        flag_upper (bool): Flag channels with large SK (highly variable signals)
-        flag_lower (bool): Flag channels with small SK (very stable signals)
-        return_space ('cpu' or 'gpu'): Returns array in CPU or GPU space
-    
-    Returns:
-        mask (np.array, bool): Array of True/False flags per channel
-    """
-    samps_per_sec = (1.0 / metadata['df']).to('s') / 2 # Nyq sample rate for channel
-    N_acc = int(metadata['dt'].to('s') / samps_per_sec)
-    var_theoretical = 2.0 / np.sqrt(N_acc)
-    std_theoretical = np.sqrt(var_theoretical)
-    sk = spectral_kurtosis(data, metadata, boxcar_size=boxcar_size, return_space=return_space)
-    
-    if flag_upper and flag_lower:
-        mask  = sk > 1.0 + n_sigma_upper * std_theoretical
-        mask  |= sk < 1.0 - (n_sigma_lower * std_theoretical)
-    elif flag_upper and not flag_lower:
-        mask  = sk > 1.0 + n_sigma_upper * std_theoretical
-    elif flag_lower and not flag_upper:
-        mask  = sk < 1.0 - (n_sigma_lower * std_theoretical)
-    else:
-        raise RuntimeError("No flags to process: need to flag upper and/or lower!")
-    return mask
-
-    if return_space == 'cpu':
-        logger.info("sk_flag: copying over to CPU")
-        mask_cpu = cp.asnumpy(mask)
-        return mask_cpu
-    else:
-        return mask
 
     
 def create_empty_hits_table():
