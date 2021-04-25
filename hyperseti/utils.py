@@ -2,6 +2,7 @@ import cupy as cp
 import numpy as np
 from functools import wraps
 from inspect import signature
+from astropy.units import Unit
 
 from .data_array import DataArray
 from .dimension_scale import DimensionScale, TimeScale
@@ -112,6 +113,8 @@ def datwrapper(dims=None, *args, **kwargs):
                         metadata['time_step'] = d.time.units * d.time.val_step
                     else:
                         scale = d.scales[dim]
+                        scale.units = Unit('') if scale.units is None else scale.units
+                        logger.debug(f"{dim} {scale}")
                         metadata[f"{dim}_start"] = scale.units * scale.val_start
                         metadata[f"{dim}_step"]  = scale.units * scale.val_step
 
@@ -124,7 +127,7 @@ def datwrapper(dims=None, *args, **kwargs):
                     
             # OUTPUT MODIFYING
             output = func(*args, **kwargs)
-            if isinstance(output[0], (np.ndarray, cp.ndarray)) and isinstance(output[1], dict) and dims is not None:
+            if dims is not None:
                 logger.debug(f"<{func_name}> Generating DataArray from function output")
                 new_output = []
                 new_data = output[0]

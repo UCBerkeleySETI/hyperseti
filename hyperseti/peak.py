@@ -37,7 +37,7 @@ def prominent_peaks(img, min_xdistance=1, min_ydistance=1, threshold=None, num_p
     Modified from https://github.com/mritools/cupyimg _prominent_peaks method
     """
     t00 = time.time()
-    #img = image.copy()
+    logger.debug(img.shape)
     rows, cols = img.shape
 
     if threshold is None:
