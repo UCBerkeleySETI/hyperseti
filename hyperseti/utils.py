@@ -1,8 +1,10 @@
 import cupy as cp
 import numpy as np
 from functools import wraps
+from inspect import signature
 
 from .data_array import DataArray
+from .dimension_scale import DimensionScale, TimeScale
 
 # Logging
 from .log import logger_group, Logger
@@ -78,37 +80,78 @@ def on_gpu(func):
     return inner
 
             
-def datwrapper(func):
+def datwrapper(dims=None, *args, **kwargs):
     """ Decorator to split metadata off from DataArray 
     
     Supplies metadata= kwarg to wrapped function, derived from
     attributes of the DataArray. Splits off the DataArray.data
     and returns that as first argument.
     
+    wrapped funcion must have data as first output, and metadata dict
+    
     Notes:
         Specific for hyperseti, this will also generate df and dt from
         dimension scales. 
     """
-    func_name = func.__name__
-    @wraps(func)
-    def inner(*args, **kwargs):
-        if isinstance(args[0], DataArray):
-            args = list(args)
-            d = args[0]
-            metadata = {}
-            # Copy attribute key:values over 
-            for k, v in d.attrs.items():
-                metadata[k] = v
-                
-            metadata['dt'] = d.time.units * d.time.val_step
-            metadata['t0'] = d.time.time_start
-            metadata['df'] = d.frequency.units * d.frequency.val_step
-            metadata['f0'] = d.frequency.units * d.frequency.val_start
-            
-            # Replace DataArray with underlying data
-            args[0] = d.data
-            
-            kwargs['metadata'] = metadata
-        output = func(*args, **kwargs)
-        return output 
-    return inner
+    def _datwrapper(func):
+        func_name = func.__name__
+        @wraps(func)
+        def inner(*args, **kwargs):
+            # INPUT MODIFYING
+            if isinstance(args[0], DataArray):
+                args = list(args)
+                d = args[0]
+                metadata = {}
+                # Copy attribute key:values over 
+                for k, v in d.attrs.items():
+                    metadata[k] = v
+                metadata['dims'] = dims
+                for dim in d.dims:
+                    if dim == 'time':
+                        metadata['time_start']  = d.time.time_start
+                        metadata['time_step'] = d.time.units * d.time.val_step
+                    else:
+                        scale = d.scales[dim]
+                        metadata[f"{dim}_start"] = scale.units * scale.val_start
+                        metadata[f"{dim}_step"]  = scale.units * scale.val_step
+
+                # Replace DataArray with underlying data
+                args[0] = d.data
+
+                # Check if metadata is an argument of the function to be called
+                if 'metadata' in signature(func).parameters:
+                    kwargs['metadata'] = metadata
+                    
+            # OUTPUT MODIFYING
+            output = func(*args, **kwargs)
+            if isinstance(output[0], (np.ndarray, cp.ndarray)) and isinstance(output[1], dict) and dims is not None:
+                logger.debug(f"<{func_name}> Generating DataArray from function output")
+                new_output = []
+                new_data = output[0]
+                new_md   = output[1]
+                logger.debug(f"<{func_name}> data shape: {new_data.shape}")
+
+                scales = {}
+                for dim_idx, dim in enumerate(dims):
+                    nstep = new_data.shape[dim_idx]
+                    if dim == 'time':
+                        time_start, time_step = metadata["time_start"], metadata["time_step"]
+                        scales[dim] = TimeScale('time', time_start.value, time_step.to('s').value, 
+                                           nstep, time_format=time_start.format, time_delta_format='sec')
+                    else:
+                        scale_start, scale_step = metadata.get(f"{dim}_start", 0), metadata.get(f"{dim}_step", 0)
+                        logger.debug(f"{dim} {scale_start}")
+                        scale_unit = None if np.isscalar(scale_start) else scale_start.unit
+                        scales[dim] = DimensionScale(dim, scale_start, scale_step, 
+                                               nstep, units=scale_unit)
+                darr = DataArray(new_data, dims, scales=scales, attrs=new_md)
+                print(type(darr))
+                new_output.append(darr)
+                new_output.append(new_md)
+                for op in output[2:]:
+                    new_output.append(op)
+                return new_output 
+            else:
+                return output      
+        return inner
+    return _datwrapper

@@ -14,6 +14,7 @@ from .log import logger_group, Logger
 logger = Logger('hyperseti.data')
 logger_group.add_logger(logger)
 
+
 class DataArray(object):
     """ An N-dimensional array with dimension scales and metadata
 

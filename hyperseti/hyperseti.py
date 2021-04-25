@@ -23,6 +23,8 @@ logger_group.add_logger(logger)
 # Max threads setup 
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
+
+@datwrapper(dims=None)
 @on_gpu
 def normalize(data, mask=None, padding=0):
     """ Apply normalization on GPU
@@ -69,6 +71,7 @@ def normalize(data, mask=None, padding=0):
     
     return d_gpu
 
+@datwrapper(dims=None)
 @on_gpu
 def apply_boxcar(data, boxcar_size, axis=1, mode='mean'):
     """ Apply moving boxcar filter and renormalise by sqrt(boxcar_size)
@@ -104,7 +107,7 @@ def apply_boxcar(data, boxcar_size, axis=1, mode='mean'):
     return data
 
   
-@datwrapper
+@datwrapper(dims=('time', 'beam_id', 'frequency'))
 @on_gpu  
 def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
               boxcar_mode='sum', kernel='dedoppler'):
@@ -117,7 +120,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
         max_dd (float): Maximum doppler drift in Hz/s to search out to.
         min_dd (float): Minimum doppler drift to search.
         boxcar_mode (str): Boxcar mode to apply. mean/sum/gaussian.
-        return_space ('cpu' or 'gpu'): Returns array in CPU or GPU space
+        kernel (str): 'dedoppler' or 'kurtosis'
     
     Returns:
         dd_vals, dedopp_gpu (np.array, np/cp.array): 
@@ -130,8 +133,8 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     N_time, N_beam, N_chan = data.shape
     data = data[:, beam_id, :] # TODO ADD POL SUPPORT
         
-    obs_len  = N_time * metadata['dt'].to('s').value
-    delta_dd = metadata['df'].to('Hz').value / obs_len  # e.g. 2.79 Hz / 300 s = 0.0093 Hz/s
+    obs_len  = N_time * metadata['time_step'].to('s').value
+    delta_dd = metadata['frequency_step'].to('Hz').value / obs_len  # e.g. 2.79 Hz / 300 s = 0.0093 Hz/s
     
     # Compute dedoppler shift schedules
     N_dopp_upper   = int(max_dd / delta_dd)
@@ -173,8 +176,8 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
         
     elif kernel == 'kurtosis':
          # output must be scaled by N_acc, which can be figured out from df and dt metadata
-        samps_per_sec = (1.0 / np.abs(metadata['df'])).to('s') / 2 # Nyq sample rate for channel
-        N_acc = int(metadata['dt'].to('s') / samps_per_sec)
+        samps_per_sec = (1.0 / np.abs(metadata['frequency_step'])).to('s') / 2 # Nyq sample rate for channel
+        N_acc = int(metadata['time_step'].to('s') / samps_per_sec)
         logger.debug(f'rescaling SK by {N_acc}')
         logger.debug(f"driftrates: {dd_shifts}")
         dedoppler_kurtosis_kernel((F_grid, N_dopp), (F_block,), 
@@ -186,10 +189,10 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     # Compute drift rate values in Hz/s corresponding to dedopp axis=0
     dd_vals = dd_shifts * delta_dd
     
-    metadata['drift_trials'] = dd_vals
+    metadata['drift_trials'] = dd_vals * u.Hz / u.s
     metadata['boxcar_size'] = boxcar_size
     metadata['dd'] = delta_dd * u.Hz / u.s
-    
+    dedopp_gpu = cp.expand_dims(dedopp_gpu, axis=1)
     return dedopp_gpu, metadata
 
 
@@ -266,8 +269,8 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
     t0 = time.time()
     if len(fcoords) > 0:
         driftrate_peaks = drift_trials[dcoords]
-        logger.debug(f"{metadata['f0']}, {metadata['df']}, {fcoords}")
-        frequency_peaks = metadata['f0'] + metadata['df'] * fcoords
+        logger.debug(f"{metadata['f0']}, {metadata['frequency_step']}, {fcoords}")
+        frequency_peaks = metadata['f0'] + metadata['frequency_step'] * fcoords
 
 
         results = {
@@ -409,8 +412,8 @@ def find_et_serial(filename, filename_out='hits.csv', gulp_size=2**19, *args, **
         d = d_arr.data
         f = d_arr.frequency
         t = d_arr.time
-        md = {'f0': f.val_start * f.units, 'df': f.val_step * f.units, 
-              'dt': t.val_step * t.units, 't0': t.time_start}
+        md = {'frequency_start': f.val_start * f.units, 'frequency_step': f.val_step * f.units, 
+              'time_step': t.val_step * t.units, 'time_start': t.time_start}
         dedopp, metadata, hits = run_pipeline(d, md, *args, **kwargs)
         out.append(hits)
         logger.info(f"{len(hits)} hits found")
