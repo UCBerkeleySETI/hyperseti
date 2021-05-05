@@ -4,4 +4,3 @@ pytest-runner
 pytest-order
 codecov
 coverage
-
