@@ -1,6 +1,6 @@
 astropy
 blimpy
-cupy-cuda110
+#cupy-cuda110
 dask
 h5py
 hdf5plugin

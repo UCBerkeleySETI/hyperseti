@@ -80,7 +80,7 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     t1 = time.time()
     
     logger.info(f"Pipeline runtime: {(t1-t0):2.2f}s")
-    return dedopp, metadata, peaks
+    return peaks
             
 
 def find_et(filename, filename_out='hits.csv', gulp_size=2**19, *args, **kwargs):
@@ -104,7 +104,7 @@ def find_et(filename, filename_out='hits.csv', gulp_size=2**19, *args, **kwargs)
     ds = from_h5(filename)
     out = []
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
-        print(d_arr)
+        #print(d_arr)
         dedopp, metadata, hits = run_pipeline(d_arr, *args, **kwargs)
         out.append(hits)
         logger.info(f"{len(hits)} hits found")

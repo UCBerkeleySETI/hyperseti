@@ -94,7 +94,7 @@ def datwrapper(dims=None, *args, **kwargs):
         Specific for hyperseti, this will also generate df and dt from
         dimension scales. 
     """
-    def _datwrapper(func):
+    def _datwrapper(func, *args, **kwargs):
         func_name = func.__name__
         @wraps(func)
         def inner(*args, **kwargs):
@@ -124,7 +124,15 @@ def datwrapper(dims=None, *args, **kwargs):
                 # Check if metadata is an argument of the function to be called
                 if 'metadata' in signature(func).parameters:
                     kwargs['metadata'] = metadata
-                    
+            else:
+                try:
+                    metadata = kwargs['metadata']
+                except KeyError:
+                    # Try and get metadata by looking up argument and finding index
+                    func_params = list(signature(func).parameters.keys())
+                    md_idx = func_params.index('metadata')
+                    metadata = args[md_idx]
+                
             # OUTPUT MODIFYING
             output = func(*args, **kwargs)
             if dims is not None:
@@ -148,7 +156,6 @@ def datwrapper(dims=None, *args, **kwargs):
                         scales[dim] = DimensionScale(dim, scale_start, scale_step, 
                                                nstep, units=scale_unit)
                 darr = DataArray(new_data, dims, scales=scales, attrs=new_md)
-                print(type(darr))
                 new_output.append(darr)
                 new_output.append(new_md)
                 for op in output[2:]:

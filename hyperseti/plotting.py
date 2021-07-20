@@ -1,6 +1,8 @@
 import pylab as plt
 import cupy as cp
 
+from .utils import on_gpu, datwrapper
+
 def _get_extent(data, metadata, xaxis, yaxis):
     """ Generate extents for imshow axis 
     
@@ -12,17 +14,17 @@ def _get_extent(data, metadata, xaxis, yaxis):
     if xaxis == 'channel':
         ex_x0, ex_x1 = 0, data.shape[1]    
     elif xaxis == 'frequency':
-        ex_x0, ex_x1 = metadata['fch1'], metadata['fch1'] + metadata['df'] * data.shape[1]
+        ex_x0, ex_x1 = metadata['frequency_start'].value, metadata['frequency_start'].value + metadata['frequency_step'].value * data.shape[1]
         
     if yaxis == 'driftrate':
-        ex_y0, ex_y1 = metadata['drift_trials'][-1], metadata['drift_trials'][0]
+        ex_y0, ex_y1 = metadata['drift_rates'][-1].value, metadata['drift_rates'][0].value
     elif yaxis == 'driftidx':
         ex_y0, ex_y1 = data.shape[0], 0
     
     if yaxis == 'timestep':
         ex_y0, ex_y1 = data.shape[0], 0
     elif yaxis == 'time_elapsed':
-        ex_y0, ex_y1 = metadata['dt'] * data.shape[0], 0
+        ex_y0, ex_y1 = metadata['time_step'].value * data.shape[0], 0
         
     return (ex_x0, ex_x1, ex_y0, ex_y1)
 
@@ -38,7 +40,8 @@ def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True, 
         show_colorbar (bool): Show colorbar
        
     """
-    plt.imshow(cp.asnumpy(data), aspect='auto',
+    data = cp.asnumpy(data).squeeze()
+    plt.imshow(data, aspect='auto',
               extent=_get_extent(data, metadata, xaxis, yaxis), *args, **kwargs)
 
     if show_colorbar:
@@ -49,6 +52,7 @@ def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True, 
         plt.ylabel(yaxis)
 
         
+@datwrapper(dims=None)     
 def imshow_dedopp(dedopp, metadata, xaxis='channel', yaxis='driftrate', *args, **kwargs):
     """ Do imshow for dedoppler data 
     
@@ -63,6 +67,7 @@ def imshow_dedopp(dedopp, metadata, xaxis='channel', yaxis='driftrate', *args, *
     _imshow(dedopp, metadata, xaxis, yaxis, *args, **kwargs)
 
     
+@datwrapper(dims=None)      
 def imshow_waterfall(data, metadata, xaxis='channel', yaxis='timestep', *args, **kwargs):
     """ Do imshow for spectral data """
     _imshow(data, metadata, xaxis, yaxis, *args, **kwargs)
