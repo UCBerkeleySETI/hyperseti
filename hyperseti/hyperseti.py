@@ -24,7 +24,7 @@ logger_group.add_logger(logger)
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 
-@datwrapper(dims=None)
+@datwrapper(dims=(None))
 @on_gpu
 def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistance=None, 
                  min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True, apply_normalization=True):
@@ -57,19 +57,18 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     if apply_normalization:
         data = normalize(data, return_space='gpu')
     
-    
     peaks = create_empty_hits_table()
     
     boxcar_trials = map(int, 2**np.arange(0, n_boxcar))
     for boxcar_size in boxcar_trials:
         logger.info(f"--- Boxcar size: {boxcar_size} ---")
-        dedopp, metadata = dedoppler(data, metadata, boxcar_size=boxcar_size,  boxcar_mode='sum',
+        dedopp, md = dedoppler(data, metadata, boxcar_size=boxcar_size,  boxcar_mode='sum',
                                      max_dd=max_dd, min_dd=min_dd, return_space='gpu')
         
         # Adjust SNR threshold to take into account boxcar size and dedoppler sum
         # Noise increases by sqrt(N_timesteps * boxcar_size)
         _threshold = threshold * np.sqrt(N_timesteps * boxcar_size)
-        _peaks = hitsearch(dedopp, metadata, threshold=_threshold, min_fdistance=min_fdistance, min_ddistance=min_ddistance)
+        _peaks = hitsearch(dedopp, threshold=_threshold, min_fdistance=min_fdistance, min_ddistance=min_ddistance)
         
         if _peaks is not None:
             _peaks['snr'] /= np.sqrt(N_timesteps * boxcar_size)

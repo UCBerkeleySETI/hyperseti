@@ -37,6 +37,8 @@ def on_gpu(func):
         for idx, arg in enumerate(args):
             if isinstance(arg, np.ndarray):
                 logger.info(f"<{func_name}> Converting arg {idx} to cupy..")
+                if arg.dtype != np.dtype('float32'):
+                    logger.warning(f"<{func_name}> Arg {idx} is not float32, could cause issues...")
                 arg = cp.asarray(arg)
             new_args.append(arg)
             
@@ -131,12 +133,11 @@ def datwrapper(dims=None, *args, **kwargs):
                     # Try and get metadata by looking up argument and finding index
                     func_params = list(signature(func).parameters.keys())
                     md_idx = func_params.index('metadata')
-                    metadata = args[md_idx]
-                
+                        
             # OUTPUT MODIFYING
             output = func(*args, **kwargs)
             if dims is not None:
-                logger.debug(f"<{func_name}> Generating DataArray from function output")
+                logger.debug(f"<{func_name}> Generating DataArray from function output, {dims}")
                 new_output = []
                 new_data = output[0]
                 new_md   = output[1]
@@ -146,11 +147,11 @@ def datwrapper(dims=None, *args, **kwargs):
                 for dim_idx, dim in enumerate(dims):
                     nstep = new_data.shape[dim_idx]
                     if dim == 'time':
-                        time_start, time_step = metadata["time_start"], metadata["time_step"]
+                        time_start, time_step = new_md["time_start"], new_md["time_step"]
                         scales[dim] = TimeScale('time', time_start.value, time_step.to('s').value, 
                                            nstep, time_format=time_start.format, time_delta_format='sec')
                     else:
-                        scale_start, scale_step = metadata.get(f"{dim}_start", 0), metadata.get(f"{dim}_step", 0)
+                        scale_start, scale_step = new_md.get(f"{dim}_start", 0), new_md.get(f"{dim}_step", 0)
                         logger.debug(f"{dim} {scale_start}")
                         scale_unit = None if np.isscalar(scale_start) else scale_start.unit
                         scales[dim] = DimensionScale(dim, scale_start, scale_step, 

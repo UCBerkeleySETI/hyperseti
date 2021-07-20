@@ -1,6 +1,8 @@
 from hyperseti.dedoppler import dedoppler, apply_boxcar, normalize
-from hyperseti.hits import hitsearch
+from hyperseti.hits import hitsearch, merge_hits
+from hyperseti import run_pipeline
 from hyperseti.data_array import from_fil
+import cupy as cp
 
 from astropy import units as u
 import setigen as stg
@@ -12,20 +14,21 @@ from file_defs import synthetic_fil
 
 import logbook
 import hyperseti
-hyperseti.dedoppler.logger.level = logbook.DEBUG
+#hyperseti.dedoppler.logger.level = logbook.DEBUG
+#hyperseti.utils.logger.level = logbook.DEBUG
 
 def test_dedoppler():
     """ Basic tests of the dedoppler functionality """
 
     # zero drift test, no normalization
-    test_data = np.ones(shape=(32, 1, 1024))
+    test_data = np.ones(shape=(32, 1, 1024), dtype='float32')
     test_data[:, :, 511] = 10
     
-    metadata = {'frequency_start': 1000*u.MHz, 
+    metadata_in = {'frequency_start': 1000*u.MHz, 
                 'time_step': 1.0*u.s, 
                 'frequency_step': 1.0*u.Hz}
     
-    dedopp, metadata = dedoppler(test_data, metadata, boxcar_size=1,
+    dedopp, metadata = dedoppler(test_data, metadata_in, boxcar_size=1,
                                  max_dd=1.0)
     print(type(dedopp))
     print(dedopp.data)
@@ -35,10 +38,16 @@ def test_dedoppler():
 
     for dr_test in (0.0, 0.1, 0.5, -0.25, -0.5):
         # single drifting tone
-        frame = stg.Frame(fchans=2**10*u.pixel, tchans=32*u.pixel,
-                  df=metadata['frequency_step'], dt=metadata['time_step'], fch1=metadata['frequency_start'])
+        frame = stg.Frame(
+                  fchans=2**10*u.pixel, tchans=32*u.pixel,
+                  df=metadata_in['frequency_step'], 
+                  dt=metadata_in['time_step'], 
+                  fch1=metadata_in['frequency_start'])
     
-        tone = {'f_start': frame.get_frequency(index=500), 'drift_rate': dr_test * u.Hz / u.s, 'snr': 500, 'width': metadata['frequency_step']}
+        tone = {'f_start': frame.get_frequency(index=500), 
+                'drift_rate': dr_test * u.Hz / u.s, 
+                'snr': 500, 
+                'width': metadata_in['frequency_step']}
         frame.add_noise(x_mean=1, noise_type='chi2')
 
         frame.add_signal(stg.constant_path(f_start=tone['f_start'],
@@ -48,8 +57,8 @@ def test_dedoppler():
                                   stg.constant_bp_profile(level=1))
 
         frame.save_fil(filename=synthetic_fil)
-        print(f"Running dedoppler on {dr_test}")
         darray = from_fil(synthetic_fil)
+
         dedopp, metadata = dedoppler(darray, boxcar_size=1, max_dd=1.0, return_space='cpu')
 
         # Manual dedoppler search -- just find max channel (only works if S/N is good)
@@ -80,14 +89,14 @@ def test_dedoppler():
 
     # Finish off figure plotting
     plt.colorbar()
-    plt.savefig('docs/figs/test_dedoppler.png')
+    plt.savefig('test_figs/test_dedoppler.png')
     plt.show()
 
 def test_dedoppler_boxcar():
     """ Test that boxcar averaging works as expected """
     def generate_drifting_tone(n_chan, n_timesteps, n_drift_per_step, n_beams=1, sigval=10):
         """ Simple tone generator to generate smeared tones """
-        bg = np.zeros((n_timesteps, n_beams, n_chan))
+        bg = np.zeros((n_timesteps, n_beams, n_chan), dtype='float32')
 
         for ii in range(0, bg.shape[0]):
             for nd in range(n_drift_per_step):
@@ -108,8 +117,7 @@ def test_dedoppler_boxcar():
 
     # Drift rate of 2 channels / integration
     # To simulate channel smearing
-    metadata = {'fch1': 1000*u.MHz, 'dt': 1.0*u.s, 'df': 1.0*u.Hz}
-
+    metadata = {'frequency_start': 1000*u.MHz, 'time_step': 1.0*u.s, 'frequency_step': 1.0*u.Hz}
     bg = generate_drifting_tone(n_chan=256, n_timesteps=32, n_drift_per_step=2, sigval=10)
     print(f"Total power in frame: {np.sum(bg)}")
 
@@ -119,22 +127,23 @@ def test_dedoppler_boxcar():
 
     # With boxcar_size = 1 we should recover 160
     dedopp, metadata = dedoppler(bg, metadata, boxcar_size=1,
-                                 max_dd=2.0)
+                                 max_dd=2.0, return_space='gpu')
 
-    maxpixel = np.argmax(dedopp)
+    maxpixel = np.argmax(cp.asnumpy(dedopp.data))
     mdrift, mchan = (maxpixel // 1024, maxpixel % 1024)
-    maxpixel_val = np.max(dedopp)
+    maxpixel_val = np.max(cp.asnumpy(dedopp.data))
     print(f"dedopp recovered power (boxcar 1): {maxpixel_val}")
     assert maxpixel_val == maxhold_res
 
     # With boxcar_size = 2 we should recover 320 (full amount)
-    metadata = {'fch1': 1000*u.MHz, 'dt': 1.0*u.s, 'df': 1.0*u.Hz}
-    dedopp, metadata = dedoppler(bg, metadata, boxcar_size=2,
-                                 max_dd=4.0)
+    metadata = {'frequency_start': 1000*u.MHz, 'time_step': 1.0*u.s, 'frequency_step': 1.0*u.Hz}
+    bg = generate_drifting_tone(n_chan=256, n_timesteps=32, n_drift_per_step=2, sigval=10)
+    dedopp, metadata = dedoppler(bg, metadata, boxcar_size=2, 
+                                 max_dd=4.0, return_space='cpu')
 
-    maxpixel = np.argmax(dedopp)
+    maxpixel = np.argmax(cp.asnumpy(dedopp.data))
     mdrift, mchan = (maxpixel // 1024, maxpixel % 1024) # <----------- UNUSED
-    maxpixel_val = np.max(dedopp)
+    maxpixel_val = np.max(cp.asnumpy(dedopp.data))
     print(f"dedopp recovered power (boxcar 2): {maxpixel_val}")
     assert maxpixel_val == np.sum(bg)
 
@@ -143,8 +152,8 @@ def test_dedoppler_boxcar():
     plt.subplot(1,2,1)
     imshow_waterfall(bg, metadata)
     plt.subplot(1,2,2)
-    imshow_dedopp(dedopp, metadata, 'channel', 'driftrate')
-    plt.savefig('docs/figs/test_dedoppler_boxcar.png')
+    imshow_dedopp(dedopp.data, metadata, 'channel', 'driftrate')
+    plt.savefig('test_figs/test_dedoppler_boxcar.png')
     plt.show()
 
 
@@ -155,9 +164,9 @@ def test_hitsearch():
     signal_bw = 16
 
     # Create test data
-    metadata = {'fch1': 1000*u.MHz, 'dt': 1.0*u.s, 'df': 1.0*u.Hz}
+    metadata = {'frequency_start': 1000*u.MHz, 'time_step': 1.0*u.s, 'frequency_step': 1.0*u.Hz}
     frame = stg.Frame(fchans=n_chan*u.pixel, tchans=n_timesteps*u.pixel,
-              df=metadata['df'], dt=metadata['dt'], fch1=metadata['fch1'])
+              df=metadata['frequency_step'], dt=metadata['time_step'], fch1=metadata['frequency_start'])
     frame.add_noise(x_mean=0, x_std=1, noise_type='gaussian')
 
     frame.save_fil(filename=synthetic_fil)
@@ -168,8 +177,8 @@ def test_hitsearch():
         darray.data[:, :, n_chan // 2 + ii]   = 1000 / signal_bw
 
     print("--- Run dedoppler() then hitsearch() ---")
-    dedopp, metadata = dedoppler(darray.data, metadata, boxcar_size=16, max_dd=1.0)
-    hits0 = hitsearch(dedopp, metadata, threshold=1000).sort_values('snr')
+    dedopp, md = dedoppler(darray, boxcar_size=16, max_dd=1.0)
+    hits0 = hitsearch(dedopp, threshold=1000).sort_values('snr')
     print(hits0)
     # Output should be
     #driftrate      f_start      snr  driftrate_idx  channel_idx  boxcar_size
@@ -182,7 +191,7 @@ def test_hitsearch():
     assert len(hits0) == 1
 
     print("--- run_pipeline with w/o merge --- ")
-    dedopp, metadata, hits = run_pipeline(darray.data, metadata, max_dd=1.0, min_dd=None, threshold=100,
+    hits = run_pipeline(darray, max_dd=1.0, min_dd=None, threshold=100,
                                           n_boxcar=7, merge_boxcar_trials=False)
 
     for rid, hit in hits.iterrows():
@@ -197,7 +206,7 @@ def test_hitsearch():
     print(merged_hits)
 
     print("--- run_pipeline with merge --- ")
-    dedopp, md, hits2 = run_pipeline(darray.data, metadata, max_dd=1.0, min_dd=None, threshold=100,
+    hits2 = run_pipeline(darray.data, metadata, max_dd=1.0, min_dd=None, threshold=100,
                                            n_boxcar=7, merge_boxcar_trials=True)
     hits2
     print(hits2)
@@ -206,25 +215,25 @@ def test_hitsearch():
 
     plt.figure(figsize=(10, 4))
     plt.subplot(1,2,1)
-    imshow_waterfall(darray.data, metadata, 'channel', 'timestep')
+    imshow_waterfall(darray, xaxis='channel', yaxis='timestep')
 
     plt.subplot(1,2,2)
-    imshow_dedopp(dedopp, metadata, 'channel', 'driftrate')
+    imshow_dedopp(dedopp, xaxis='channel', yaxis='driftrate')
 
-    plt.savefig('docs/figs/test_hitsearch.png')
+    plt.savefig('test_figs/test_hitsearch.png')
     plt.show()
 
 def test_hitsearch_multi():
     """ Test hit search routine with multiple signals """
-    metadata = {'fch1': 6095.214842353016*u.MHz,
-            'dt': 18.25361108*u.s,
-            'df': 2.7939677238464355*u.Hz}
+    metadata_in = {'frequency_start': 6095.214842353016*u.MHz,
+            'time_step': 18.25361108*u.s,
+            'frequency_step': 2.7939677238464355*u.Hz}
 
     frame = stg.Frame(fchans=2**12*u.pixel,
                       tchans=32*u.pixel,
-                      df=metadata['df'],
-                      dt=metadata['dt'],
-                      fch1=metadata['fch1'])
+                      df=metadata_in['frequency_step'],
+                      dt=metadata_in['time_step'],
+                      fch1=metadata_in['frequency_start'])
 
     test_tones = [
       {'f_start': frame.get_frequency(index=500), 'drift_rate': 0.50*u.Hz/u.s, 'snr': 100, 'width': 20*u.Hz},
@@ -247,7 +256,7 @@ def test_hitsearch_multi():
 
     fig = plt.figure(figsize=(10, 6))  #  <============ fig is UNUSED
 
-    dedopp, md, hits = run_pipeline(darray.data, metadata, max_dd=1.0, min_dd=None, threshold=100,
+    dedopp, md, hits = run_pipeline(darray.data, metadata, max_dd=1.0, min_dd=None, threshold=20,
                                     n_boxcar=5, merge_boxcar_trials=True)
     print(hits.sort_values('snr', ascending=False))
 
@@ -259,11 +268,11 @@ def test_hitsearch_multi():
     imshow_dedopp(dedopp, md, 'channel', 'driftrate')
     overlay_hits(hits, 'channel', 'driftrate')
 
-    plt.savefig('docs/figs/test_hitsearch_multi.png')
+    plt.savefig('test_figs/test_hitsearch_multi.png')
     plt.show()
 
 if __name__ == "__main__":
-    test_dedoppler()
-    test_dedoppler_boxcar()
+    #test_dedoppler()
+    #test_dedoppler_boxcar()
     test_hitsearch()
     test_hitsearch_multi()
