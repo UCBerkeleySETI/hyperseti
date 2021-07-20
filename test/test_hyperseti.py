@@ -10,7 +10,8 @@ import pylab as plt
 import numpy as np
 
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
-from file_defs import synthetic_fil
+from file_defs import synthetic_fil, test_fig_dir
+import os
 
 import logbook
 import hyperseti
@@ -89,7 +90,7 @@ def test_dedoppler():
 
     # Finish off figure plotting
     plt.colorbar()
-    plt.savefig('test_figs/test_dedoppler.png')
+    plt.savefig(os.path.join(test_fig_dir, 'test_dedoppler.png'))
     plt.show()
 
 def test_dedoppler_boxcar():
@@ -153,7 +154,7 @@ def test_dedoppler_boxcar():
     imshow_waterfall(bg, metadata)
     plt.subplot(1,2,2)
     imshow_dedopp(dedopp.data, metadata, 'channel', 'driftrate')
-    plt.savefig('test_figs/test_dedoppler_boxcar.png')
+    plt.savefig(os.path.join(test_fig_dir, 'test_dedoppler_boxcar.png'))
     plt.show()
 
 
@@ -220,7 +221,7 @@ def test_hitsearch():
     plt.subplot(1,2,2)
     imshow_dedopp(dedopp, xaxis='channel', yaxis='driftrate')
 
-    plt.savefig('test_figs/test_hitsearch.png')
+    plt.savefig(os.path.join(test_fig_dir, 'test_hitsearch.png'))
     plt.show()
 
 def test_hitsearch_multi():
@@ -270,7 +271,7 @@ def test_hitsearch_multi():
     imshow_dedopp(dedopp, xaxis='channel', yaxis='driftrate')
     overlay_hits(hits, 'channel', 'driftrate')
 
-    plt.savefig('test_figs/test_hitsearch_multi.png')
+    plt.savefig(os.path.join('test_hitsearch_multi.png'))
     plt.show()
 
 if __name__ == "__main__":
