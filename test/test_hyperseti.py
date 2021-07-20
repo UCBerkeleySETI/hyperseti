@@ -256,23 +256,25 @@ def test_hitsearch_multi():
 
     fig = plt.figure(figsize=(10, 6))  #  <============ fig is UNUSED
 
-    dedopp, md, hits = run_pipeline(darray.data, metadata, max_dd=1.0, min_dd=None, threshold=20,
+    hits = run_pipeline(darray, max_dd=1.0, min_dd=None, threshold=20,
                                     n_boxcar=5, merge_boxcar_trials=True)
     print(hits.sort_values('snr', ascending=False))
 
     plt.figure(figsize=(10, 4))
     plt.subplot(1,2,1)
-    imshow_waterfall(darray.data, md, 'channel', 'timestep')
+    imshow_waterfall(darray, xaxis='channel', yaxis='timestep')
 
     plt.subplot(1,2,2)
-    imshow_dedopp(dedopp, md, 'channel', 'driftrate')
+    dedopp, md = dedoppler(darray, max_dd=1.0, min_dd=None)
+
+    imshow_dedopp(dedopp, xaxis='channel', yaxis='driftrate')
     overlay_hits(hits, 'channel', 'driftrate')
 
     plt.savefig('test_figs/test_hitsearch_multi.png')
     plt.show()
 
 if __name__ == "__main__":
-    #test_dedoppler()
-    #test_dedoppler_boxcar()
+    test_dedoppler()
+    test_dedoppler_boxcar()
     test_hitsearch()
     test_hitsearch_multi()

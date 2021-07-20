@@ -80,7 +80,7 @@ def overlay_hits(hits, xaxis='channel', yaxis='driftrate', marker='x', c='red'):
         x = hits['f_start']
     
     if yaxis == 'driftrate':
-        y = hits['driftrate']
+        y = hits['drift_rate']
     elif yaxis == 'driftidx':
         y = hits['drift_idx']
     
