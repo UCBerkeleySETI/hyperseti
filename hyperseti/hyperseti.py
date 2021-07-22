@@ -104,7 +104,7 @@ def find_et(filename, filename_out='hits.csv', gulp_size=2**19, *args, **kwargs)
     out = []
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
         #print(d_arr)
-        dedopp, metadata, hits = run_pipeline(d_arr, *args, **kwargs)
+        hits = run_pipeline(d_arr, *args, **kwargs)
         out.append(hits)
         logger.info(f"{len(hits)} hits found")
     

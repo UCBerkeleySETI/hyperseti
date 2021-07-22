@@ -36,7 +36,7 @@ class DataArray(object):
         scales: dict of {dim: DimensionScale}
         attrs: dict of metadata attributes (can be anything)
     """
-    def __init__(self, data, dims, scales, attrs, slice_info=None):
+    def __init__(self, data, dims, scales, attrs, slice_info=None, parent_shape=None):
         
         # Check correct setup
         assert isinstance(attrs, dict)
@@ -52,10 +52,12 @@ class DataArray(object):
         self.data   = data
         self.dims   = dims
         self.scales = scales
-        self.slice_info = slice_info
         
         for dim in dims:
             self.__dict__[dim] = self.scales[dim]
+        
+        self.slice_info = slice_info
+        self._is_slice = False if slice_info is None else True
     
     @property
     def shape(self):
@@ -81,10 +83,13 @@ class DataArray(object):
             "  </thead>",
             "  <tbody>",
             f"    <tr><th> Shape </th><td> {self.data.shape} </td> </tr>",
-            f"    <tr><th> Dims </th><td> {self.dims} </td> </tr>",
-            "  </tbody>",
-            "</table>",
+            f"    <tr><th> Dims </th><td> {self.dims} </td> </tr>"
         ]
+        
+        table += ["  </tbody>", "</table>"]
+                     
+        if self._is_slice:
+            table.append(f"    <tr><th> Slice info </th><td> {self.slice_info} </td> </tr>")        
         
         attrs_table = ["<table>", 
                        "<thead><tr><th></th><th>Attributes</th></tr></thead>",

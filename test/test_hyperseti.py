@@ -1,6 +1,6 @@
 from hyperseti.dedoppler import dedoppler, apply_boxcar, normalize
 from hyperseti.hits import hitsearch, merge_hits
-from hyperseti import run_pipeline
+from hyperseti import run_pipeline, find_et
 from hyperseti.data_array import from_fil
 import cupy as cp
 
@@ -10,7 +10,7 @@ import pylab as plt
 import numpy as np
 
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
-from file_defs import synthetic_fil, test_fig_dir
+from file_defs import synthetic_fil, test_fig_dir, voyager_h5
 import os
 
 import logbook
@@ -179,7 +179,7 @@ def test_hitsearch():
 
     print("--- Run dedoppler() then hitsearch() ---")
     dedopp, md = dedoppler(darray, boxcar_size=16, max_dd=1.0)
-    hits0 = hitsearch(dedopp, threshold=1000).sort_values('snr')
+    hits0 = hitsearch(dedopp, threshold=1000)
     print(hits0)
     # Output should be
     #driftrate      f_start      snr  driftrate_idx  channel_idx  boxcar_size
@@ -274,6 +274,9 @@ def test_hitsearch_multi():
     plt.savefig(os.path.join('test_hitsearch_multi.png'))
     plt.show()
 
+def test_find_et():
+    find_et(voyager_h5, max_dd=1.0)
+    
 if __name__ == "__main__":
     test_dedoppler()
     test_dedoppler_boxcar()
