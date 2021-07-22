@@ -24,3 +24,7 @@ test/test_data
 .benchmarks
 .pytest_cache
 notebook/devel/
+htmlcov/
+.coverage
+htmlcov.tar.gz
+coverage.xml
