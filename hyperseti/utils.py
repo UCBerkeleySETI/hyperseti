@@ -36,15 +36,29 @@ def on_gpu(func):
         
     """
     func_name = func.__name__
+    func_params = list(signature(func).parameters.keys())
     @wraps(func)
     def inner(*args, **kwargs):
         new_args = []
+        logger.debug(f"{func_name} on_gpu inner, args: {args}")
         for idx, arg in enumerate(args):
+            argname = func_params[idx]
             if isinstance(arg, np.ndarray):
-                logger.info(f"<{func_name}> Converting arg {idx} to cupy..")
+                logger.info(f"<{func_name}> Converting ndarray arg {argname} to cupy..")
                 if arg.dtype != np.dtype('float32'):
-                    logger.warning(f"<{func_name}> Arg {idx} is not float32, could cause issues...")
+                    logger.warning(f"<{func_name}> Arg {argname} is not float32, could cause issues...")
                 arg = cp.asarray(arg)
+            elif hasattr(arg, '__array__'):
+                # Duck-type numpy array
+                logger.info(f"<{func_name}> Converting numpy-like arg {argname} to cupy..")
+                if arg.dtype != np.dtype('float32'):
+                    warnings.warn(f"<{func_name}> Arg {argname} is not float32, could cause issues...", RuntimeWarning)
+                arg = cp.asarray(arg)                
+            if isinstance(arg, DataArray):
+                logger.info(f"<{func_name}> Converting arg {argname}.data to cupy..")
+                if arg.data.dtype != np.dtype('float32'):
+                    warnings.warn(f"<{func_name}> Arg {argname}.data is not float32, could cause issues...", RuntimeWarning)
+                arg.data = cp.asarray(arg.data)                
             new_args.append(arg)
             
         return_space = None

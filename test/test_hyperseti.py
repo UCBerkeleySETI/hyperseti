@@ -10,7 +10,7 @@ import pylab as plt
 import numpy as np
 
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
-from file_defs import synthetic_fil, test_fig_dir, voyager_h5
+from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
 import os
 
 import logbook

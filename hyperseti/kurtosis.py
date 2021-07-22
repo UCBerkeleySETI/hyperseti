@@ -1,7 +1,7 @@
 import cupy as cp
 import numpy as np
 
-from .utils import on_gpu
+from .utils import on_gpu, datwrapper
 
 #logging
 from .log import logger_group, Logger
@@ -9,7 +9,9 @@ logger = Logger('hyperseti.kurtosis')
 logger_group.add_logger(logger)
 
 
+
 @on_gpu
+@datwrapper(dims=None)
 def spectral_kurtosis(x, metadata):
     """ GPU Spectral Kurtosis Kernel 
     
@@ -17,8 +19,8 @@ def spectral_kurtosis(x, metadata):
         x (array): Data to compute SK on
         N (int): Number of time samples in averaged data
     """
-    samps_per_sec = (1.0 / np.abs(metadata['df'])).to('s') / 2 # Nyq sample rate for channel
-    N_acc = int(metadata['dt'].to('s') / samps_per_sec)
+    samps_per_sec = (1.0 / np.abs(metadata['frequency_step'])).to('s') / 2 # Nyq sample rate for channel
+    N_acc = int(metadata['time_step'].to('s') / samps_per_sec)
     logger.debug(f'rescaling SK by {N_acc}')
     
     x_sum  = cp.sum(x, axis=0)
@@ -28,6 +30,7 @@ def spectral_kurtosis(x, metadata):
 
 
 @on_gpu
+@datwrapper(dims=None)
 def sk_flag(data, metadata, n_sigma_upper=3, n_sigma_lower=2, 
             flag_upper=True, flag_lower=True):
     """ Apply spectral kurtosis flagging 
@@ -46,8 +49,10 @@ def sk_flag(data, metadata, n_sigma_upper=3, n_sigma_lower=2,
     Returns:
         mask (np.array, bool): Array of True/False flags per channel
     """
-    samps_per_sec = (1.0 / metadata['df']).to('s') / 2 # Nyq sample rate for channel
-    N_acc = int(metadata['dt'].to('s') / samps_per_sec)
+    Fs = (1.0 / metadata['frequency_step'] / 2)
+    samps_per_sec = np.abs(Fs.to('s').value) # Nyq sample rate for channel
+    N_acc = int(metadata['time_step'].to('s').value / samps_per_sec)
+
     var_theoretical = 2.0 / np.sqrt(N_acc)
     std_theoretical = np.sqrt(var_theoretical)
     sk = spectral_kurtosis(data, metadata)

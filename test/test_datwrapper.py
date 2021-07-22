@@ -5,7 +5,7 @@ from hyperseti.dedoppler import dedoppler
 from hyperseti.data_array import DataArray, from_h5, from_fil
 from hyperseti.dimension_scale import DimensionScale, TimeScale
 from hyperseti.utils import datwrapper, on_gpu
-from file_defs import voyager_fil, voyager_h5
+from .file_defs import voyager_fil, voyager_h5
 import pytest
 
 import logbook
