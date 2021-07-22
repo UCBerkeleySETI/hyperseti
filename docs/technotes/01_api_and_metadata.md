@@ -34,7 +34,7 @@ able to see just above the function def what the output dims will be.
 ### Current issues to fix 
 Limitations and annoying things about the `@datwrapper` approach:
 * If you're not careful, and you do something like `data_dedoppler, metadata = dedoppler(data, metadata)`, you can accidentally confuse yourself and use the wrong metadata dict.
-* Currently the datwrapper either doesn't return a `DataArray`, or needs to be told the dims of the new `DataArray`. It would be nice to allow it to return a data array with original dimensions (e.g. normalize and apply_boxcar functions do not change dimensions).
+* ~~Currently the datwrapper either doesn't return a `DataArray`, or needs to be told the dims of the new `DataArray`. It would be nice to allow it to return a data array with original dimensions (e.g. normalize and apply_boxcar functions do not change dimensions).~~ *Added 23 Jul 21*
 * Hard requrement that the wrapped function has `(data, metadata)` as first two arguments. 
 * If you supply `data=DataArray` AND ALSO `metadata=Dict`, you get an error raised.
 * If you supply a `DataArray`, it can cause unexpected errors with proceeding arguments. For example you would think that for:
