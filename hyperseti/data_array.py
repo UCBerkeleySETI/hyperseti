@@ -2,6 +2,7 @@ import numpy as np
 import os
 from astropy.coordinates import SkyCoord
 import itertools
+import cupy as cp
 
 # Dask SVG HTML plotting
 from dask.array.svg import svg
@@ -36,7 +37,7 @@ class DataArray(object):
         scales: dict of {dim: DimensionScale}
         attrs: dict of metadata attributes (can be anything)
     """
-    def __init__(self, data, dims, scales, attrs, slice_info=None, parent_shape=None):
+    def __init__(self, data, dims, scales, attrs, units=None, slice_info=None, parent_shape=None):
         
         # Check correct setup
         assert isinstance(attrs, dict)
@@ -52,6 +53,7 @@ class DataArray(object):
         self.data   = data
         self.dims   = dims
         self.scales = scales
+        self.units  = units
         
         for dim in dims:
             self.__dict__[dim] = self.scales[dim]
@@ -83,13 +85,17 @@ class DataArray(object):
             "  </thead>",
             "  <tbody>",
             f"    <tr><th> Shape </th><td> {self.data.shape} </td> </tr>",
-            f"    <tr><th> Dims </th><td> {self.dims} </td> </tr>"
+            f"    <tr><th> Dimensions </th><td> {self.dims} </td> </tr>"
         ]
         
-        table += ["  </tbody>", "</table>"]
+
                      
         if self._is_slice:
-            table.append(f"    <tr><th> Slice info </th><td> {self.slice_info} </td> </tr>")        
+            table.append(f"    <tr><th> Slice info </th><td> {self.slice_info} </td> </tr>")  
+        table.append(f"    <tr><th> Data units </th><td> {self.units} </td> </tr>")
+        table.append(f"    <tr><th> Array type </th><td> {type(self.data), self.data.dtype} </td> </tr>")
+        
+        table += ["  </tbody>", "</table>"]
         
         attrs_table = ["<table>", 
                        "<thead><tr><th></th><th>Attributes</th></tr></thead>",
@@ -100,7 +106,8 @@ class DataArray(object):
         
         dims_table = ["<table>", "<thead><tr> <td></td><th>Dimension Scales</th></tr></thead>"]
         for k, v in self.scales.items():
-            dims_table.append(f"<tr><th>{k}</th> <td>{v.val_start, v.val_step}</td> </tr>")
+            v_units = '' if v.units is None else v.units
+            dims_table.append(f"<tr><th>{k}</th> <td>{v.val_start, v.val_step} {v_units}</td> </tr>")
         dims_table.append("</tbody></table>")
         
         table = "\n".join(table)
@@ -120,6 +127,25 @@ class DataArray(object):
             "</table>",
         ]
         return "\n".join(html)
+    
+    def __array__(self):
+        """ Returns an evaluated numpy array when np.asarray called. 
+        
+        See https://numpy.org/neps/nep-0030-duck-array-protocol.html
+        """
+        if isinstance(self.data, cp.core.core.ndarray):
+            return cp.asnumpy(self.data)
+        else:
+            return self.data[:]
+
+    def __duckarray__(self):
+        """ Returns itself (original object) 
+        
+        Note: proposed in NEP 30 but not yet implemented/supported.
+        Idea is to return this when np.duckarray is called.
+        See https://numpy.org/neps/nep-0030-duck-array-protocol.html
+        """
+        return self.data    
     
     def isel(self, sel):
         """ Select subset of data using slices along specified dimension.
@@ -187,6 +213,31 @@ class DataArray(object):
             selector = {key: slice for key, slice in zip(dims, slices)}
             yield self.isel(selector)
 
+    def apply_transform(self, transform, *args, **kwargs):
+        """ Apply a tranformation function (e.g. np.log) to the data 
+        
+        Args:
+            transform (str or function): Transform function to apply, e.g. 'log', or np.log
+                                         If a string is passed, a lookup will be done to find
+                                         the corresponding numpy or cupy function.
+        """
+        func = None
+        if callable(transform):
+            func = transform
+        elif isinstance(self.data, cp.core.core.ndarray):
+            cp_funcs = dir(cp)
+            if transform in cp_funcs:
+                func = getattr(cp, transform)
+        else:
+            np_funcs = dir(np)
+            if transform in np_funcs:
+                func = getattr(np, transform)
+        if func is None:
+            raise RuntimeError(f"Could not interpret {transform} as cupy/numpy or callable function")
+        self.data = func(self.data, *args, **kwargs)
+        
+        
+
 
 def from_fil(filename):
     """ Create a DataArray from a sigproc filterbank file
@@ -216,7 +267,7 @@ def from_fil(filename):
         'frequency': DimensionScale('frequency', hdr['fch1'], hdr['foff'], data.shape[2], units='MHz')
     }
     
-    d = DataArray(data, dims, scales, attrs)
+    d = DataArray(data, dims, scales, attrs, units='counts')
     return d
 
 
@@ -245,6 +296,6 @@ def from_h5(filename):
         'frequency': DimensionScale('frequency', hdr['fch1'], hdr['foff'], data.shape[2], units='MHz')
     }
     
-    d = DataArray(data, dims, scales, attrs)
+    d = DataArray(data, dims, scales, attrs, units='counts')
     return d
     
