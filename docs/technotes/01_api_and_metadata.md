@@ -37,11 +37,7 @@ Limitations and annoying things about the `@datwrapper` approach:
 * ~~Currently the datwrapper either doesn't return a `DataArray`, or needs to be told the dims of the new `DataArray`. It would be nice to allow it to return a data array with original dimensions (e.g. normalize and apply_boxcar functions do not change dimensions).~~ *Added 23 Jul 21*
 * Hard requrement that the wrapped function has `(data, metadata)` as first two arguments. 
 * If you supply `data=DataArray` AND ALSO `metadata=Dict`, you get an error raised.
-* If you supply a `DataArray`, it can cause unexpected errors with proceeding arguments. For example you would think that for:
-```python
-imshow_waterfall(data, metadata, xaxis='channel', yaxis='timestep')
-```
-you should be able to supply `(DataArray(), 'channel', 'timestep')`, but currently this will interpret 'channel' as being the metadata argument.
+* ~~If you supply a `DataArray`, it can cause unexpected errors with proceeding arguments.~~ *Fixed 24 Jul 21*
 
 ## Metadata approach
 
