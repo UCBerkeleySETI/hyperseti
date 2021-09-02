@@ -8,7 +8,7 @@ Where data is a numpy-like array, and metadata is a python dictionary of metadat
 
 Where possible, key functions should also return `(data, metadata)` as their first two items. 
 
-These functions are wrapped with a decorator `@datwrapper()` ([code here](https://github.com/UCBerkeleySETI/hyperseti/blob/master/hyperseti/utils.py#L86)), 
+These functions are wrapped with a decorator `@datwrapper()` ([code here](https://github.com/UCBerkeleySETI/hyperseti/blob/master/hyperseti/utils.py#L105)), 
 which allows a `DataArray` to be used instead of a bare
 numpy array + metadata dictionary.  `@datwrapper` supplies the `metadata=` kwarg to wrapped function, which it derives
 from attributes of the DataArray. It also splits off the DataArray.data and returns that as first argument.
