@@ -8,6 +8,7 @@ import blimpy as bl
 from file_defs import voyager_fil, voyager_h5, voyager_h5_flipped
 
 DATADIR = './test_data/'
+FIGDIR = './test_figs/'
 
 
 def download_test_data():
@@ -45,5 +46,7 @@ def flip_data():
 if __name__ == "__main__":
     rmtree(DATADIR, ignore_errors=True)
     os.mkdir(DATADIR)
+    rmtree(FIGDIR, ignore_errors=True)
+    os.mkdir(FIGDIR)
     download_test_data()
     flip_data()

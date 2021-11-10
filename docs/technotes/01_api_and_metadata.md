@@ -8,7 +8,7 @@ Where data is a numpy-like array, and metadata is a python dictionary of metadat
 
 Where possible, key functions should also return `(data, metadata)` as their first two items. 
 
-These functions are wrapped with a decorator `@datwrapper()` ([code here](https://github.com/UCBerkeleySETI/hyperseti/blob/master/hyperseti/utils.py#L86)), 
+These functions are wrapped with a decorator `@datwrapper()` ([code here](https://github.com/UCBerkeleySETI/hyperseti/blob/master/hyperseti/utils.py#L105)), 
 which allows a `DataArray` to be used instead of a bare
 numpy array + metadata dictionary.  `@datwrapper` supplies the `metadata=` kwarg to wrapped function, which it derives
 from attributes of the DataArray. It also splits off the DataArray.data and returns that as first argument.
@@ -37,11 +37,7 @@ Limitations and annoying things about the `@datwrapper` approach:
 * ~~Currently the datwrapper either doesn't return a `DataArray`, or needs to be told the dims of the new `DataArray`. It would be nice to allow it to return a data array with original dimensions (e.g. normalize and apply_boxcar functions do not change dimensions).~~ *Added 23 Jul 21*
 * Hard requrement that the wrapped function has `(data, metadata)` as first two arguments. 
 * If you supply `data=DataArray` AND ALSO `metadata=Dict`, you get an error raised.
-* If you supply a `DataArray`, it can cause unexpected errors with proceeding arguments. For example you would think that for:
-```python
-imshow_waterfall(data, metadata, xaxis='channel', yaxis='timestep')
-```
-you should be able to supply `(DataArray(), 'channel', 'timestep')`, but currently this will interpret 'channel' as being the metadata argument.
+* ~~If you supply a `DataArray`, it can cause unexpected errors with proceeding arguments.~~ *Fixed 24 Jul 21*
 
 ## Metadata approach
 

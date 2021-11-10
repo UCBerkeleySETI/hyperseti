@@ -271,7 +271,7 @@ def test_hitsearch_multi():
     imshow_dedopp(dedopp, xaxis='channel', yaxis='driftrate')
     overlay_hits(hits, 'channel', 'driftrate')
 
-    plt.savefig(os.path.join('test_hitsearch_multi.png'))
+    plt.savefig(os.path.join(test_fig_dir, 'test_hitsearch_multi.png'))
     plt.show()
 
 def test_find_et():
