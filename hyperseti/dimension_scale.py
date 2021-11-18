@@ -103,8 +103,14 @@ class DimensionScale(object):
     """
     def __init__(self, name, val_start, val_step, n_step, units=None):
         self.name = name
-        self.val_start = val_start
-        self.val_step  = val_step
+        if isinstance(val_start, Quantity):
+            self.val_start = val_start.to(units).value
+        else:
+            self.val_start = val_start
+        if isinstance(val_step, Quantity):
+            self.val_step  = val_step.to(units).value
+        else:
+            self.val_step  = val_step
         self.n_step    = n_step
         self.units     = Unit(units) if isinstance(units, str) else units
         self.shape = (n_step,)

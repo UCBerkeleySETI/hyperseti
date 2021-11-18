@@ -2,6 +2,7 @@ import cupy as cp
 import numpy as np
 import time
 import os
+from copy import deepcopy
 
 from astropy import units as u
 from cupyx.scipy.ndimage import uniform_filter1d
@@ -14,7 +15,7 @@ from .log import logger_group, Logger
 logger = Logger('hyperseti.dedoppler')
 logger_group.add_logger(logger)
   
-@datwrapper(dims=('drift_rate', 'beam_id', 'frequency'))
+@datwrapper(dims=('drift_rate', 'feed_id', 'frequency'))
 @on_gpu  
 def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
               boxcar_mode='sum', kernel='dedoppler'):
@@ -32,7 +33,10 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     Returns:
         dd_vals, dedopp_gpu (np.array, np/cp.array): 
     """
+   
     t0 = time.time()
+    metadata = deepcopy(metadata)
+
     if min_dd is None:
         min_dd = np.abs(max_dd) * -1
     
@@ -98,7 +102,6 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     # Compute drift rate values in Hz/s corresponding to dedopp axis=0
     dd_vals = dd_shifts * delta_dd
     
-    metadata['drift_rates'] = dd_vals * u.Hz / u.s
     metadata['drift_rate_start'] = dd_vals[0] * u.Hz / u.s
     metadata['drift_rate_step']  = delta_dd * u.Hz / u.s
     metadata['boxcar_size'] = boxcar_size

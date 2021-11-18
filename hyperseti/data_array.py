@@ -93,7 +93,7 @@ class DataArray(object):
         if self._is_slice:
             table.append(f"    <tr><th> Slice info </th><td> {self.slice_info} </td> </tr>")  
         table.append(f"    <tr><th> Data units </th><td> {self.units} </td> </tr>")
-        table.append(f"    <tr><th> Array type </th><td> {type(self.data), self.data.dtype} </td> </tr>")
+        table.append(f"    <tr><th> Array type </th><td> {str(type(self.data)), self.data.dtype} </td> </tr>")
         
         table += ["  </tbody>", "</table>"]
         

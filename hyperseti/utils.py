@@ -2,7 +2,7 @@ import cupy as cp
 import numpy as np
 from functools import wraps
 from inspect import signature
-from astropy.units import Unit
+from astropy.units import Unit, Quantity
 import numpy as np
 import cupy as cp
 import pandas as pd
@@ -175,8 +175,9 @@ def datwrapper(dims=None, *args, **kwargs):
             elif isinstance(output, (list, tuple)):
                 # Check to see if we can apply original dimensions
                 # This requires input to be a DataArray, and output to have array + metadata
+                _dims = None
                 if dims is None:
-                    if len(output >= 2):
+                    if len(output) >= 2:
                         has_array = isinstance(output[0], (np.ndarray, cp.core.core.ndarray))
                         has_metadata = isinstance(output[1], dict)
                         if has_array and has_metadata and isinstance(args[0], DataArray):
@@ -196,6 +197,16 @@ def datwrapper(dims=None, *args, **kwargs):
                     new_md   = output[1]
                     new_md['output_dims'] = _dims  # Add output_dims to metadata out
                     
+                    # Get rid of input dims that aren't used anymore
+                    for d in new_md.pop('input_dims', ('unset',) ):
+                        #print(d, new_md['output_dims'])
+                        if d not in new_md['output_dims']:
+                            logger.debug(f"<{func_name}> deleting missing output dimension: {d}")
+                            new_md.pop(f"{d}_start", 0)
+                            new_md.pop(f"{d}_step", 0)
+                    # TODO: Should we delete any keys ending with _step or _start?
+                    # TODO: Check for {x}_step (for key in new_md: if key.endswith(_step): pop)
+
                     # Create DataArray attribute dict, which will not include start/stop scales or dims
                     array_md = copy.deepcopy(new_md)
                     array_md.pop('input_dims', 0)
