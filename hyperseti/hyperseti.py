@@ -9,7 +9,9 @@ import setigen as stg
 
 from cupyx.scipy.ndimage import uniform_filter1d
 
-from .dedoppler import dedoppler, normalize, apply_boxcar
+from .dedoppler import dedoppler
+from .normalize import normalize
+from .filter import apply_boxcar
 from .hits import hitsearch, merge_hits, create_empty_hits_table
 from .peak import prominent_peaks
 from .data_array import from_fil, from_h5

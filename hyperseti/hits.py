@@ -6,7 +6,6 @@ import os
 
 from astropy import units as u
 
-from .dedoppler import dedoppler, normalize, apply_boxcar
 from .peak import prominent_peaks
 from .data_array import from_fil, from_h5
 from .utils import on_gpu, datwrapper
