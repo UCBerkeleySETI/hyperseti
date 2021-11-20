@@ -9,6 +9,7 @@ from cupyx.scipy.ndimage import uniform_filter1d
 
 from .utils import on_gpu, datwrapper
 from .gpu_kernels import dedoppler_kernel, dedoppler_kurtosis_kernel
+from .filter import apply_boxcar_drift
 
 #logging
 from .log import logger_group, Logger
@@ -18,7 +19,7 @@ logger_group.add_logger(logger)
 @datwrapper(dims=('drift_rate', 'feed_id', 'frequency'))
 @on_gpu  
 def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
-              boxcar_mode='sum', kernel='dedoppler'):
+              boxcar_mode='sum', kernel='dedoppler', apply_smearing_corr=True):
     """ Apply brute-force dedoppler kernel to data
     
     Args:
@@ -105,6 +106,11 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     metadata['drift_rate_start'] = dd_vals[0] * u.Hz / u.s
     metadata['drift_rate_step']  = delta_dd * u.Hz / u.s
     metadata['boxcar_size'] = boxcar_size
+    metadata['integration_time'] = metadata['time_step']
     # metadata['time_step'] = obs_len * u.s   # NB: Why did I do this?
     dedopp_gpu = cp.expand_dims(dedopp_gpu, axis=1)
+
+    if apply_smearing_corr:
+        dedopp_darr, metadata = apply_boxcar_drift(dedopp_gpu, metadata)
+        dedopp_gpu = dedopp_darr.data
     return dedopp_gpu, metadata

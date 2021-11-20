@@ -231,7 +231,10 @@ def datwrapper(dims=None, *args, **kwargs):
                     new_output.append(new_md)
                     for op in output[2:]:
                         new_output.append(op)
-                    return new_output 
+                    if len(new_output) == 1:
+                        return new_output[0]
+                    else:
+                        return new_output 
                 # Otherwise, we return the un-edited output
                 else:
                     return output
