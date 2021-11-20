@@ -64,6 +64,13 @@ class DataArray(object):
     @property
     def shape(self):
         return self.data.shape
+
+    @property
+    def space(self):
+        if isinstance(self.data, cp.core.core.ndarray):
+            return 'gpu'
+        else:
+            return 'cpu'
     
     @property
     def dtype(self):
@@ -86,6 +93,7 @@ class DataArray(object):
             "  <tbody>",
             f"    <tr><th> Shape </th><td> {self.data.shape} </td> </tr>",
             f"    <tr><th> Dimensions </th><td> {self.dims} </td> </tr>"
+            f"    <tr><th> Space </th><td> {self.space} </td> </tr>"
         ]
         
 
@@ -93,7 +101,8 @@ class DataArray(object):
         if self._is_slice:
             table.append(f"    <tr><th> Slice info </th><td> {self.slice_info} </td> </tr>")  
         table.append(f"    <tr><th> Data units </th><td> {self.units} </td> </tr>")
-        table.append(f"    <tr><th> Array type </th><td> {str(type(self.data)), self.data.dtype} </td> </tr>")
+        container_str = str(type(self.data)).split("'")[1]
+        table.append(f"    <tr><th> Array type </th><td> {container_str, self.data.dtype} </td> </tr>")
         
         table += ["  </tbody>", "</table>"]
         
