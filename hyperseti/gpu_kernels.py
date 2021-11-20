@@ -31,7 +31,9 @@ extern "C" __global__
             if (idx < F * T && idx > 0) {
                 dd_val += data[idx];
               }
-              dedopp[dd_idx] = dd_val;
+              // Divide through by sqrt(T) to keep S/N same as input
+              float Tf = (float)T;
+              dedopp[dd_idx] = dd_val / sqrt(Tf);
             }
         }
 ''', 'dedopplerKernel')
