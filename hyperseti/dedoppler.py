@@ -106,11 +106,14 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     metadata['drift_rate_start'] = dd_vals[0] * u.Hz / u.s
     metadata['drift_rate_step']  = delta_dd * u.Hz / u.s
     metadata['boxcar_size'] = boxcar_size
+    metadata['n_integration'] = N_time
     metadata['integration_time'] = metadata['time_step']
-    # metadata['time_step'] = obs_len * u.s   # NB: Why did I do this?
+    metadata['obs_len'] = obs_len * u.s
+
     dedopp_gpu = cp.expand_dims(dedopp_gpu, axis=1)
 
     if apply_smearing_corr:
+        logger.debug(f"Applying smearing correction")
         dedopp_darr, metadata = apply_boxcar_drift(dedopp_gpu, metadata)
         dedopp_gpu = dedopp_darr.data
     return dedopp_gpu, metadata
