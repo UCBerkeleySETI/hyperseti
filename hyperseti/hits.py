@@ -100,19 +100,27 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
                                     channel_idx: Index in frequency array
     """
     
-    drift_trials = metadata['drift_rates']
+    # The following statement used to be:  drift_trials = metadata['drift_rates']
+    # and crashed with a KeyError.
+    drift_trials = dedopp[:, 0, 0]
+    print("DEBUG hitsearch incoming metadata: {}".format(metadata))
+    print("DEBUG hitsearch incoming dedopp: {}, 1st 3 in 1st column: {}".format(dedopp.shape, dedopp[0:3, 0, 0].squeeze()))
+    print("DEBUG hitsearch drift_trials: {}, 1st 3: {}".format(drift_trials.shape, drift_trials[0:3]))
     
     if min_fdistance is None:
         min_fdistance = metadata['boxcar_size'] * 2
     
     if min_ddistance is None:
         min_ddistance = len(drift_trials) // 4
+
+    print("DEBUG min_fdistance = {}, min_ddistance = {}".format(min_fdistance, min_ddistance))
     
     t0 = time.time()
     dfs = []
     for beam_idx in range(dedopp.shape[1]):
         imgdata = dedopp[:, beam_idx, :].squeeze()
         intensity, fcoords, dcoords = prominent_peaks(imgdata, min_xdistance=min_fdistance, min_ydistance=min_ddistance, threshold=threshold)
+        print("DEBUG intensity = {}, fcoords = {}, dcoords = {}".format(intensity, fcoords, dcoords))
         t1 = time.time()
         logger.info(f"Peak find time: {(t1-t0)*1e3:2.2f}ms")
         t0 = time.time()
@@ -124,9 +132,10 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
         t0 = time.time()
         if len(fcoords) > 0:
             driftrate_peaks = drift_trials[dcoords]
+            print("DEBUG hitsearch: driftrate_peaks: {}".format(driftrate_peaks))
             logger.debug(f"{metadata['frequency_start']}, {metadata['frequency_step']}, {fcoords}")
             frequency_peaks = metadata['frequency_start'] + metadata['frequency_step'] * fcoords
-
+            print("DEBUG hitsearch: frequency_peaks: {}".format(frequency_peaks))
 
             results = {
                 'drift_rate': driftrate_peaks,
@@ -142,7 +151,9 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
                 if isinstance(val, (int, float)):
                     results[key] = val
 
-            dfs.append(pd.DataFrame(results))
+            print("hitsearch: results type {}, value: {}".format(type(results), results))
+            df = pd.DataFrame.from_dict(results)
+            dfs.append(df)
         
             t1 = time.time()
             logger.info(f"Peak find to dataframe: {(t1-t0)*1e3:2.2f}ms")
