@@ -259,7 +259,7 @@ def test_hitsearch_multi():
 
     fig = plt.figure(figsize=(10, 6))  #  <============ fig is UNUSED
 
-    hits = run_pipeline(darray, metadata_in, max_dd=1.0, min_dd=None, threshold=20,
+    hits = run_pipeline(darray.data, metadata_in, max_dd=1.0, min_dd=None, threshold=20,
                                     n_boxcar=5, merge_boxcar_trials=True)
     print(hits.sort_values('snr', ascending=False))
 
