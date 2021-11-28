@@ -1,4 +1,6 @@
-from hyperseti.dedoppler import dedoppler, apply_boxcar, normalize
+from hyperseti.dedoppler import dedoppler
+from hyperseti.filter import apply_boxcar
+from hyperseti.normalize import normalize
 from hyperseti.hits import hitsearch, merge_hits
 from hyperseti import run_pipeline, find_et
 from hyperseti.data_array import from_fil
@@ -10,7 +12,7 @@ import pylab as plt
 import numpy as np
 
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
-from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
+from file_defs import synthetic_fil, test_fig_dir, voyager_h5
 import os
 
 import logbook
@@ -31,9 +33,9 @@ def test_dedoppler():
     
     dedopp, metadata = dedoppler(test_data, metadata_in, boxcar_size=1,
                                  max_dd=1.0)
-    print(type(dedopp))
-    print(dedopp.data)
-    print(np.max(dedopp.data), np.sum(test_data[:, :, 511]))
+    print("type(dedopp):", type(dedopp))
+    print("dedopp.data:", dedopp.data)
+    print("np.max(dedopp.data):", np.max(dedopp.data), ", np.sum(test_data[:, :, 511]):", np.sum(test_data[:, :, 511]))
     assert np.max(dedopp.data) == np.sum(test_data[:, :, 511])
     
 
