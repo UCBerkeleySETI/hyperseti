@@ -105,6 +105,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     
     metadata['drift_rate_start'] = dd_vals[0] * u.Hz / u.s
     metadata['drift_rate_step']  = delta_dd * u.Hz / u.s
+    metadata['drift_rates'] = dd_vals
     metadata['boxcar_size'] = boxcar_size
     metadata['n_integration'] = N_time
     metadata['integration_time'] = metadata['time_step']
