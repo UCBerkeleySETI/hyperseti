@@ -9,7 +9,7 @@ from cupyx.scipy.ndimage import uniform_filter1d
 
 from .utils import on_gpu, datwrapper
 from .gpu_kernels import dedoppler_kernel, dedoppler_kurtosis_kernel
-from .filter import apply_boxcar_drift
+from .filter import apply_boxcar_drift, apply_boxcar
 
 #logging
 from .log import logger_group, Logger
