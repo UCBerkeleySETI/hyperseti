@@ -89,7 +89,7 @@ def test_datwrapper_create_data_array():
     assert isinstance(mdout2, dict)
     assert dout2.dims == ('pork', 'noodles')
     assert len(dout2.scales.keys()) == 2
-    assert len(mdout2) == 7    # test, pork_start, pork_step, noodles_start, noodles_Step, output_dims, input_dims
+    assert len(mdout2) == 6    # test, pork_start, pork_step, noodles_start, noodles_Step, output_dims ## input_dims
     assert len(dout2.attrs) == 1   # Check step/stop are parsed as dimensions
     
     dout2.attrs['test2'] = 'hi'
@@ -98,7 +98,7 @@ def test_datwrapper_create_data_array():
     assert isinstance(mdout3, dict)
     assert 'test2' in mdout3.keys()
     assert 'test2' in dout3.attrs.keys()
-    assert len(mdout3) == 8    # test, pork_start, pork_step, noodles_start, noodles_Step, output_dims, input_dims
+    assert len(mdout3) == 7    # test, pork_start, pork_step, noodles_start, noodles_Step, output_dims ## input_dims
     assert len(dout3.attrs) == 2   # Check step/stop are parsed as dimensions    
     
 if __name__ == "__main__":

@@ -1,4 +1,6 @@
-from hyperseti.dedoppler import dedoppler, apply_boxcar, normalize
+from hyperseti.dedoppler import dedoppler
+from hyperseti.filter import apply_boxcar
+from hyperseti.normalize import normalize
 from hyperseti.hits import hitsearch, merge_hits
 from hyperseti import run_pipeline, find_et
 from hyperseti.data_array import from_fil
@@ -31,9 +33,9 @@ def test_dedoppler():
     
     dedopp, metadata = dedoppler(test_data, metadata_in, boxcar_size=1,
                                  max_dd=1.0)
-    print(type(dedopp))
-    print(dedopp.data)
-    print(np.max(dedopp.data), np.sum(test_data[:, :, 511]))
+    print("type(dedopp):", type(dedopp))
+    print("dedopp.data:", dedopp.data)
+    print("np.max(dedopp.data):", np.max(dedopp.data), ", np.sum(test_data[:, :, 511]):", np.sum(test_data[:, :, 511]))
     assert np.max(dedopp.data) == np.sum(test_data[:, :, 511])
     
 
@@ -192,7 +194,7 @@ def test_hitsearch():
     assert len(hits0) == 1
 
     print("--- run_pipeline with w/o merge --- ")
-    hits = run_pipeline(darray, max_dd=1.0, min_dd=None, threshold=100,
+    hits = run_pipeline(darray, metadata, max_dd=1.0, min_dd=None, threshold=100,
                                           n_boxcar=7, merge_boxcar_trials=False)
 
     for rid, hit in hits.iterrows():
@@ -257,7 +259,7 @@ def test_hitsearch_multi():
 
     fig = plt.figure(figsize=(10, 6))  #  <============ fig is UNUSED
 
-    hits = run_pipeline(darray, max_dd=1.0, min_dd=None, threshold=20,
+    hits = run_pipeline(darray.data, metadata_in, max_dd=1.0, min_dd=None, threshold=20,
                                     n_boxcar=5, merge_boxcar_trials=True)
     print(hits.sort_values('snr', ascending=False))
 
