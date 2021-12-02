@@ -15,7 +15,7 @@ from .filter import apply_boxcar
 from .hits import hitsearch, merge_hits, create_empty_hits_table
 from .peak import prominent_peaks
 from .data_array import from_fil, from_h5
-from .utils import on_gpu, datwrapper
+from .utils import attach_gpu_device, on_gpu, datwrapper
 
 #logging
 import logbook
