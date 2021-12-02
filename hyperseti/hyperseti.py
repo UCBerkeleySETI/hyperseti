@@ -90,7 +90,7 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     return peaks
             
 
-def find_et(filename, filename_out='hits.csv', gulp_size=2**19, gpu_id=0, log_level=logbook, *args, **kwargs):
+def find_et(filename, filename_out='hits.csv', gulp_size=2**19, gpu_id=0, log_level=logbook.INFO, *args, **kwargs):
     """ Find ET, serial version
     
     Wrapper for reading from a file and running run_pipeline() on all subbands within the file.
