@@ -29,7 +29,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 @datwrapper(dims=(None))
 @on_gpu
-def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistance=None, 
+def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_fdistance=None, 
                  min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True, apply_normalization=True,
                  gpu_id=0, log_level=logbook.INFO):
     """ Run dedoppler + hitsearch pipeline 
@@ -90,7 +90,8 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     return peaks
             
 
-def find_et(filename, filename_out='hits.csv', gulp_size=2**19, gpu_id=0, log_level=logbook.INFO, *args, **kwargs):
+def find_et(filename, filename_out='hits.csv', gulp_size=2**19, max_dd=4.0, min_dd=0.001, threshold=30.0,
+            n_boxcar=6, gpu_id=0, log_level=logbook.INFO, *args, **kwargs):
     """ Find ET, serial version
     
     Wrapper for reading from a file and running run_pipeline() on all subbands within the file.
@@ -99,6 +100,10 @@ def find_et(filename, filename_out='hits.csv', gulp_size=2**19, gpu_id=0, log_le
         filename (str): Name of input HDF5 file.
         filename_out (str): Name of output CSV file.
         gulp_size (int): Number of channels to process at once (e.g. N_chan in a coarse channel)
+        max_dd (float): Maximum doppler drift in Hz/s to search out to.
+        min_dd (float): Minimum doppler drift to search.
+        threshold (float): Minimum SNR value to use in a search.
+        n_boxcar (int): Number of boxcar trials to do, width 2^N e.g. trials=(1,2,4,8,16)
         gpu_id (int): GPU device ID to use
         log_level (int): logbook level to use
    
@@ -110,12 +115,18 @@ def find_et(filename, filename_out='hits.csv', gulp_size=2**19, gpu_id=0, log_le
     """
     t0 = time.time()
     logger_group.level = log_level
-    #peaks = create_empty_hits_table()    
+    logger.debug("find_et: At entry, filename_out={}, gulp_size={}, max_dd={}, min_dd={}, threshold={}, n_boxcar={}, gpu_id={}"
+                 .format(filename_out, gulp_size, max_dd, min_dd, threshold, n_boxcar, gpu_id))
     ds = from_h5(filename)
+    if gulp_size > ds.data.shape[2]:
+        logger.warning("find_et: gulp_size ({}) > Num fine frequency channels ({}).  Setting gulp_size = {}"
+                       .format(gulp_size, ds.data.shape[2], ds.data.shape[2]))
+        gulp_size = ds.data.shape[2]
     out = []
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
         #print(d_arr)
-        hits = run_pipeline(d_arr, gpu_id=gpu_id, log_level=log_level, *args, **kwargs)
+        hits = run_pipeline(d_arr, max_dd=max_dd, min_dd=min_dd, threshold=threshold, n_boxcar=n_boxcar,
+                            gpu_id=gpu_id, log_level=log_level, *args, **kwargs)
         out.append(hits)
         logger.info(f"{len(hits)} hits found")
     
