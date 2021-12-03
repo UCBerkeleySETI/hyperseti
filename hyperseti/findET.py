@@ -1,4 +1,6 @@
 import logbook
+from argparse import ArgumentParser
+
 from hyperseti import find_et
 
 def cmd_tool(args=None):
