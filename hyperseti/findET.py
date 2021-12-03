@@ -21,7 +21,7 @@ def cmd_tool(args=None):
                         help="Number of boxcar trials to do, width 2^N e.g. trials=(1,2,4,8,16).  Default: 6.")
     parser.add_argument("--gpu_id", "-g", type=int, default=0,
                         help="ID of GPU device.  Default: 0.")
-    parser.add_argument("--log_level", "-l", type=str, default="n", choices=["debug", "info", "warning"],
+    parser.add_argument("--log_level", "-l", type=str, default="info", choices=["debug", "info", "warning"],
                         help="Logbook level.  Default: info.")
 
     if args is None:
