@@ -1,9 +1,11 @@
+import sys
 import time
 from datetime import timedelta
 from argparse import ArgumentParser
 import logbook
-from .log import init_logging
+from .log import update_levels
 from hyperseti import find_et
+
 
 def cmd_tool(args=None):
     r"""Coomand line parser"""
@@ -26,7 +28,7 @@ def cmd_tool(args=None):
     parser.add_argument("--gpu_id", "-g", type=int, default=0,
                         help="ID of GPU device.  Default: 0.")
     parser.add_argument("--group_level", "-l", type=str, default="info", choices=["debug", "info", "warning"],
-                        help="Logbook group level.  Default: info.")
+                        help="Level for all functions that are not being debugged.  Default: info.")
     parser.add_argument("--debug_list", "-d", nargs="+", default=[],
                         help="List of logger names to use level=logbook.DEBUG.  Default: nil.")
 
@@ -43,9 +45,9 @@ def cmd_tool(args=None):
         else:
             int_level = logbook.WARNING
 
-    # Initialise the group level and the list of functions to be debugged.
-    init_logging(int_level, args.debug_list)
-
+    # Set the logbook levels for all of the functions.
+    update_levels(int_level, args.debug_list)
+    
     # Find E.T.
     time1 = time.time()
     dframe = find_et(args.input_path, 
@@ -62,6 +64,7 @@ def cmd_tool(args=None):
     time_delta = timedelta(seconds=(time2 - time1))
     print("\nfindET: Elapsed hh:mm:ss = {}".format(time_delta))
     print("findET: Output dataframe:\n", dframe)
+
 
 if __name__ == "__main__":
     cmd_tool()
