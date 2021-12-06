@@ -8,7 +8,6 @@ from .singletons import logger_name_list, logger_list
 
 
 def update_levels(arg_group_level, arg_debug_name_list):
-    print("TRACE update_levels*************arg_debug_name_list:", arg_debug_name_list)
     for ix, logger_name in enumerate(logger_name_list):
         if logger_name in arg_debug_name_list:
             logger_list[ix].level = logbook.DEBUG
