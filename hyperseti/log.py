@@ -3,20 +3,22 @@
 import sys
 import logbook
 from logbook import Logger, StreamHandler
-
 StreamHandler(sys.stdout).push_application()
-logger_group = logbook.LoggerGroup()
-logger_group.level = logbook.INFO
-debug_list = []
+from .singletons import logger_name_list, logger_list
 
-def init_logging(arg_group_level, arg_debug_list):
-    logger_group.level = arg_group_level
-    for logger_name in arg_debug_list:
-        debug_list.append(logger_name)
-    
+
+def update_levels(arg_group_level, arg_debug_name_list):
+    print("TRACE update_levels*************arg_debug_name_list:", arg_debug_name_list)
+    for ix, logger_name in enumerate(logger_name_list):
+        if logger_name in arg_debug_name_list:
+            logger_list[ix].level = logbook.DEBUG
+        else:
+            logger_list[ix].level = arg_group_level
+
+
 def get_logger(arg_name):
     logger = Logger(arg_name)
-    logger_group.add_logger(logger)
-    if arg_name in debug_list:
-        logger.level = logbook.DEBUG
+    logger.level = logbook.WARNING
+    logger_name_list.append(arg_name)
+    logger_list.append(logger)
     return logger
