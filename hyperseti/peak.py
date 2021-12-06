@@ -4,9 +4,9 @@ from cupyx.scipy import ndimage as ndi
 import time
 
 # Logging
-from .log import logger_group, Logger
-logger = Logger('hyperseti.peak')
-logger_group.add_logger(logger)
+from .log import get_logger
+logger = get_logger('hyperseti.peak')
+
 
 prominent_peaks_kernel = cp.RawKernel(r'''
  extern "C" __global__

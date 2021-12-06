@@ -1,6 +1,8 @@
-import logbook
+import time
+from datetime import timedelta
 from argparse import ArgumentParser
-
+import logbook
+from .log import init_logging
 from hyperseti import find_et
 
 def cmd_tool(args=None):
@@ -19,24 +21,33 @@ def cmd_tool(args=None):
                         help="Minimum SNR value for searching.  Default: 30.0.")
     parser.add_argument("--num_boxcars", "-b", type=int, default=6,
                         help="Number of boxcar trials to do, width 2^N e.g. trials=(1,2,4,8,16).  Default: 6.")
+    parser.add_argument("--kernel", "-k", type=str, default="dedoppler", choices=["dedoppler", "kurtosis"],
+                        help="Kernel to be used by the dedoppler module.  Default: dedoppler.")
     parser.add_argument("--gpu_id", "-g", type=int, default=0,
                         help="ID of GPU device.  Default: 0.")
-    parser.add_argument("--log_level", "-l", type=str, default="info", choices=["debug", "info", "warning"],
-                        help="Logbook level.  Default: info.")
+    parser.add_argument("--group_level", "-l", type=str, default="info", choices=["debug", "info", "warning"],
+                        help="Logbook group level.  Default: info.")
+    parser.add_argument("--debug_list", "-d", nargs="+", default=[],
+                        help="List of logger names to use level=logbook.DEBUG.  Default: nil.")
 
     if args is None:
         args = parser.parse_args()
     else:
         args = parser.parse_args(args)
 
-    if args.log_level == "debug":
+    if args.group_level == "debug":
         int_level = logbook.DEBUG
     else:
-        if args.log_level == "info":
+        if args.group_level == "info":
             int_level = logbook.INFO
         else:
             int_level = logbook.WARNING
 
+    # Initialise the group level and the list of functions to be debugged.
+    init_logging(int_level, args.debug_list)
+
+    # Find E.T.
+    time1 = time.time()
     dframe = find_et(args.input_path, 
                     filename_out=args.output_csv_path, 
                     gulp_size=args.gulp_size, 
@@ -44,10 +55,13 @@ def cmd_tool(args=None):
                     min_dd=args.min_drift_rate,
                     n_boxcar=args.num_boxcars,
                     threshold=args.snr_threshold,
-                    gpu_id=args.gpu_id,
-                    log_level=int_level)
+                    kernel=args.kernel,
+                    gpu_id=args.gpu_id)
+    time2 = time.time()
 
-    print("\nfindET: Output dataframe:\n", dframe)
+    time_delta = timedelta(seconds=(time2 - time1))
+    print("\nfindET: Elapsed hh:mm:ss = {}".format(time_delta))
+    print("findET: Output dataframe:\n", dframe)
 
 if __name__ == "__main__":
     cmd_tool()

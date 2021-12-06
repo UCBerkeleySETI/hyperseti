@@ -11,9 +11,8 @@ from .data_array import from_fil, from_h5
 from .utils import on_gpu, datwrapper
 
 #logging
-from .log import logger_group, Logger
-logger = Logger('hyperseti.hitsearch')
-logger_group.add_logger(logger)
+from .log import get_logger
+logger = get_logger('hyperseti.hitsearch')
 
 
 def create_empty_hits_table():

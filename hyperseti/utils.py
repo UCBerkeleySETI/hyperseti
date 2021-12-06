@@ -13,9 +13,8 @@ from .data_array import DataArray
 from .dimension_scale import DimensionScale, TimeScale
 
 # Logging
-from .log import logger_group, Logger
-logger = Logger('hyperseti.utils')
-logger_group.add_logger(logger)
+from .log import get_logger
+logger = get_logger('hyperseti.utils')
 
 
 def attach_gpu_device(new_id):
