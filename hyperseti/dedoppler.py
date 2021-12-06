@@ -59,8 +59,8 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     else:
         dd_shifts      = np.arange(N_dopp_upper, N_dopp_lower + 1, dtype='int32') [::-1]
     
-    print("TRACE dedoppler: delta_dd={}, N_dopp_upper={}, N_dopp_lower={}, dd_shifts={}"
-          .format(delta_dd, N_dopp_upper, N_dopp_lower, dd_shifts))
+    logger.debug("delta_dd={}, N_dopp_upper={}, N_dopp_lower={}, dd_shifts={}"
+                 .format(delta_dd, N_dopp_upper, N_dopp_lower, dd_shifts))
 
     dd_shifts_gpu  = cp.asarray(dd_shifts)
     N_dopp = len(dd_shifts)
@@ -117,7 +117,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     metadata['integration_time'] = metadata['time_step']
     metadata['obs_len'] = obs_len * u.s
 
-    print("TRACE dedoppler: metadata={}".format(metadata))
+    logger.debug("metadata={}".format(metadata))
 
     dedopp_gpu = cp.expand_dims(dedopp_gpu, axis=1)
 
