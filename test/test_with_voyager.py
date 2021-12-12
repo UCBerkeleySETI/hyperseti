@@ -25,7 +25,6 @@ from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
 
 # Other parameters:
 GULP_SIZE = 1048576
-GULP_SIZE = 107375
 MAX_DRIFT_RATE = 4.0
 MIN_DRIFT_RATE = 0.01
 SNR_THRESHOLD = 30.0
@@ -46,6 +45,8 @@ def test_with_voyager():
                     kernel=KERNEL,
                     gpu_id=GPU_ID,
                     threshold=SNR_THRESHOLD)
+    
+    # dfarme column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
     print("Returned dataframe:", dframe)
     list_drate = dframe["drift_rate"].tolist()
     for drate in list_drate:
