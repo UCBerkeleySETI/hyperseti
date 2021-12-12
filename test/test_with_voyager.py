@@ -46,7 +46,7 @@ def test_with_voyager():
                     gpu_id=GPU_ID,
                     threshold=SNR_THRESHOLD)
     
-    # dfarme column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
+    # dframe column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
     print("Returned dataframe:", dframe)
     list_drate = dframe["drift_rate"].tolist()
     for drate in list_drate:
