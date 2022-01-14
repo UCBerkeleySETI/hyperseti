@@ -164,7 +164,7 @@ def datwrapper(dims=None, *args, **kwargs):
             # First, check if the function returns nothing, a bare numpy/cupy array, or pandas array
             if output is None:
                 return output
-            elif isinstance(output, (np.ndarray, cp.core.core.ndarray)):
+            elif isinstance(output, (np.ndarray, cp.ndarray)):
                 if dims is not None:
                     warnings.warn(f"<{func_name}> dimensions supplied, but function returns bare numpy array (no metadata).", RuntimeWarning)
                 return output
@@ -178,7 +178,7 @@ def datwrapper(dims=None, *args, **kwargs):
                 _dims = None
                 if dims is None:
                     if len(output) >= 2:
-                        has_array = isinstance(output[0], (np.ndarray, cp.core.core.ndarray))
+                        has_array = isinstance(output[0], (np.ndarray, cp.ndarray))
                         has_metadata = isinstance(output[1], dict)
                         if has_array and has_metadata and isinstance(args[0], DataArray):
                             # In case the wrapped function manually added output_dims
