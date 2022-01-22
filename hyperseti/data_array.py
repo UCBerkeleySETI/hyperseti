@@ -66,7 +66,7 @@ class DataArray(object):
 
     @property
     def space(self):
-        if isinstance(self.data, cp.core.core.ndarray):
+        if isinstance(self.data, cp.ndarray):
             return 'gpu'
         else:
             return 'cpu'
@@ -141,7 +141,7 @@ class DataArray(object):
         
         See https://numpy.org/neps/nep-0030-duck-array-protocol.html
         """
-        if isinstance(self.data, cp.core.core.ndarray):
+        if isinstance(self.data, cp.ndarray):
             return cp.asnumpy(self.data)
         else:
             return self.data[:]
@@ -232,7 +232,7 @@ class DataArray(object):
         func = None
         if callable(transform):
             func = transform
-        elif isinstance(self.data, cp.core.core.ndarray):
+        elif isinstance(self.data, cp.ndarray):
             cp_funcs = dir(cp)
             if transform in cp_funcs:
                 func = getattr(cp, transform)
