@@ -13,9 +13,21 @@ from .data_array import DataArray
 from .dimension_scale import DimensionScale, TimeScale
 
 # Logging
-from .log import logger_group, Logger
-logger = Logger('hyperseti.utils')
-logger_group.add_logger(logger)
+from .log import get_logger
+logger = get_logger('hyperseti.utils')
+
+
+def attach_gpu_device(new_id):
+    """ On demand, switch to GPU ID new_id.
+    """
+    try:
+        cp.cuda.Device(new_id).use()
+        logger.info("attach_gpu_device: Using device ID ({})".format(new_id))
+    except:
+        cur_id = cp.cuda.Device().id
+        logger.error("attach_gpu_device: cp.cuda.Device({}).use() FAILED!".format(new_id))
+        logger.warning("attach_gpu_device: Will continue to use current device ID ({})".format(cur_id))
+
 
 def on_gpu(func):
     """ Decorator to automatically copy a numpy array over to cupy.

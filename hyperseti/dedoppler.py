@@ -2,6 +2,7 @@ import cupy as cp
 import numpy as np
 import time
 import os
+import sys
 from copy import deepcopy
 
 from astropy import units as u
@@ -12,9 +13,8 @@ from .gpu_kernels import dedoppler_kernel, dedoppler_kurtosis_kernel
 from .filter import apply_boxcar_drift, apply_boxcar
 
 #logging
-from .log import logger_group, Logger
-logger = Logger('hyperseti.dedoppler')
-logger_group.add_logger(logger)
+from .log import get_logger
+logger = get_logger('hyperseti.dedoppler')
   
 @datwrapper(dims=('drift_rate', 'feed_id', 'frequency'))
 @on_gpu  
@@ -51,14 +51,17 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     # Compute dedoppler shift schedules
     N_dopp_upper   = int(max_dd / delta_dd)
     N_dopp_lower   = int(min_dd / delta_dd)
-    
+
     if max_dd == 0 and min_dd is None:
         dd_shifts = np.array([0], dtype='int32')
     elif N_dopp_upper > N_dopp_lower:
         dd_shifts      = np.arange(N_dopp_lower, N_dopp_upper + 1, dtype='int32')
     else:
-        dd_shifts      = np.arange(N_dopp_upper, N_dopp_lower + 1, dtype='int32')[::-1]
+        dd_shifts      = np.arange(N_dopp_upper, N_dopp_lower + 1, dtype='int32') [::-1]
     
+    logger.debug("delta_dd={}, N_dopp_upper={}, N_dopp_lower={}, dd_shifts={}"
+                 .format(delta_dd, N_dopp_upper, N_dopp_lower, dd_shifts))
+
     dd_shifts_gpu  = cp.asarray(dd_shifts)
     N_dopp = len(dd_shifts)
     
@@ -96,9 +99,12 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
         logger.debug(f"driftrates: {dd_shifts}")
         dedoppler_kurtosis_kernel((F_grid, N_dopp), (F_block,), 
                          (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time, N_acc)) # grid, block and arguments 
-        
+    else:
+        logger.critical("dedoppler: Unknown kernel={} !!".format(kernel))
+        sys.exit(86)
+  
     t1 = time.time()
-    logger.info(f"Dedopp kernel time: {(t1-t0)*1e3:2.2f}ms")
+    logger.info("Dedopp kernel ({}) time: {:2.2f}ms".format(kernel, (t1-t0)*1e3))
     
     # Compute drift rate values in Hz/s corresponding to dedopp axis=0
     dd_vals = dd_shifts * delta_dd
@@ -110,6 +116,8 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     metadata['n_integration'] = N_time
     metadata['integration_time'] = metadata['time_step']
     metadata['obs_len'] = obs_len * u.s
+
+    logger.debug("metadata={}".format(metadata))
 
     dedopp_gpu = cp.expand_dims(dedopp_gpu, axis=1)
 

@@ -15,7 +15,8 @@ with open("requirements_test.txt", "r") as fh:
     test_requirements = fh.readlines()
 
 entry_points = {
-    'console_scripts' :  []
+    "console_scripts" : [
+        "findET = hyperseti.findET:cmd_tool" ]
 }
 
 package_data={

@@ -11,9 +11,8 @@ from dask.array.svg import svg
 from .dimension_scale import DimensionScale, TimeScale
 
 # Logging
-from .log import logger_group, Logger
-logger = Logger('hyperseti.data')
-logger_group.add_logger(logger)
+from .log import get_logger
+logger = get_logger('hyperseti.data')
 
 
 class DataArray(object):

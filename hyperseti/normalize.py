@@ -6,9 +6,8 @@ import os
 from .utils import on_gpu, datwrapper
 
 #logging
-from .log import logger_group, Logger
-logger = Logger('hyperseti.normalize')
-logger_group.add_logger(logger)
+from .log import get_logger
+logger = get_logger('hyperseti.normalize')
 
 
 @on_gpu

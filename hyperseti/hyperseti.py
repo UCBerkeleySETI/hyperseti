@@ -15,12 +15,11 @@ from .filter import apply_boxcar
 from .hits import hitsearch, merge_hits, create_empty_hits_table
 from .peak import prominent_peaks
 from .data_array import from_fil, from_h5
-from .utils import on_gpu, datwrapper
+from .utils import attach_gpu_device, on_gpu, datwrapper
 
 #logging
-from .log import logger_group, Logger
-logger = Logger('hyperseti.hyperseti')
-logger_group.add_logger(logger)
+from .log import get_logger
+logger = get_logger('hyperseti.hyperseti')
 
 # Max threads setup 
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
@@ -28,8 +27,9 @@ os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 @datwrapper(dims=(None))
 @on_gpu
-def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistance=None, 
-                 min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True, apply_normalization=True):
+def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_fdistance=None, 
+                 min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True, apply_normalization=True,
+                 kernel='dedoppler', gpu_id=0):
     """ Run dedoppler + hitsearch pipeline 
     
     Args:
@@ -44,6 +44,8 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
         threshold (float): Threshold value (absolute) above which a peak can be considered
         min_fdistance (int): Minimum distance in pixels to nearest peak along frequency axis
         min_ddistance (int): Minimum distance in pixels to nearest peak along doppler axis
+        kernel (str): which GPU kernel to employ for searching.
+        gpu_id (int): GPU device ID to use.
     
     Returns:
         (dedopp, metadata, peaks): Array of data post dedoppler (at final boxcar width), plus
@@ -51,6 +53,7 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     """
     
     t0 = time.time()
+    attach_gpu_device(gpu_id)
     logger.debug(data.shape)
     N_timesteps = data.shape[0]
     _threshold = threshold * np.sqrt(N_timesteps)
@@ -64,7 +67,7 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     boxcar_trials = map(int, 2**np.arange(0, n_boxcar))
     for boxcar_size in boxcar_trials:
         logger.info(f"--- Boxcar size: {boxcar_size} ---")
-        dedopp, md = dedoppler(data, metadata, boxcar_size=boxcar_size,  boxcar_mode='sum',
+        dedopp, md = dedoppler(data, metadata, boxcar_size=boxcar_size,  boxcar_mode='sum', kernel=kernel,
                                      max_dd=max_dd, min_dd=min_dd, return_space='gpu')
         
         # Adjust SNR threshold to take into account boxcar size and dedoppler sum
@@ -84,7 +87,8 @@ def run_pipeline(data, metadata, max_dd, min_dd=None, threshold=50, min_fdistanc
     return peaks
             
 
-def find_et(filename, filename_out='hits.csv', gulp_size=2**19, *args, **kwargs):
+def find_et(filename, filename_out='hits.csv', gulp_size=2**19, max_dd=4.0, min_dd=0.001, threshold=30.0,
+            n_boxcar=6, kernel='dedoppler', gpu_id=0, *args, **kwargs):
     """ Find ET, serial version
     
     Wrapper for reading from a file and running run_pipeline() on all subbands within the file.
@@ -93,7 +97,13 @@ def find_et(filename, filename_out='hits.csv', gulp_size=2**19, *args, **kwargs)
         filename (str): Name of input HDF5 file.
         filename_out (str): Name of output CSV file.
         gulp_size (int): Number of channels to process at once (e.g. N_chan in a coarse channel)
-    
+        max_dd (float): Maximum doppler drift in Hz/s to search out to.
+        min_dd (float): Minimum doppler drift to search.
+        threshold (float): Minimum SNR value to use in a search.
+        n_boxcar (int): Number of boxcar trials to do, width 2^N e.g. trials=(1,2,4,8,16).
+        kernel (str): which GPU kernel to employ for searching.
+        gpu_id (int): GPU device ID to use.
+   
     Returns:
         hits (pd.DataFrame): Pandas dataframe of all hits.
     
@@ -101,12 +111,18 @@ def find_et(filename, filename_out='hits.csv', gulp_size=2**19, *args, **kwargs)
         Passes keyword arguments on to run_pipeline(). Same as find_et but doesn't use dask parallelization.
     """
     t0 = time.time()
-    #peaks = create_empty_hits_table()    
+    logger.debug("find_et: At entry, filename_out={}, gulp_size={}, max_dd={}, min_dd={}, threshold={}, n_boxcar={}, kernel={}, gpu_id={}"
+                 .format(filename_out, gulp_size, max_dd, min_dd, threshold, n_boxcar, kernel, gpu_id))
     ds = from_h5(filename)
+    if gulp_size > ds.data.shape[2]:
+        logger.warning('find_et: gulp_size ({}) > Num fine frequency channels ({}).  Setting gulp_size = {}'
+                       .format(gulp_size, ds.data.shape[2], ds.data.shape[2]))
+        gulp_size = ds.data.shape[2]
     out = []
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
         #print(d_arr)
-        hits = run_pipeline(d_arr, *args, **kwargs)
+        hits = run_pipeline(d_arr, max_dd=max_dd, min_dd=min_dd, threshold=threshold, n_boxcar=n_boxcar,
+                            kernel=kernel, gpu_id=gpu_id, *args, **kwargs)
         out.append(hits)
         logger.info(f"{len(hits)} hits found")
     
