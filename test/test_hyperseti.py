@@ -3,7 +3,7 @@ from hyperseti.filter import apply_boxcar
 from hyperseti.normalize import normalize
 from hyperseti.hits import hitsearch, merge_hits
 from hyperseti import run_pipeline, find_et
-from hyperseti.data_array import from_fil
+from hyperseti.io import from_fil
 import cupy as cp
 
 from astropy import units as u

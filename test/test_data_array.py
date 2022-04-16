@@ -1,4 +1,4 @@
-from hyperseti.data_array import from_fil, from_h5
+from hyperseti.io import from_fil, from_h5
 from .file_defs import voyager_fil, voyager_h5
 import numpy as np
 import cupy as cp

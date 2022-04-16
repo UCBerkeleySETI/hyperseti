@@ -1,3 +1,4 @@
+from .log import update_levels, get_logger
 from .hyperseti import run_pipeline, find_et
 from .hits import hitsearch
 from .version import HYPERSETI_VERSION

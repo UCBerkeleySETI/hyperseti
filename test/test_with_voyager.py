@@ -21,7 +21,7 @@ import logbook
 from hyperseti import find_et
 from hyperseti.log import update_levels
 
-from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
+from file_defs import synthetic_fil, test_fig_dir, voyager_h5
 
 # Other parameters:
 GULP_SIZE = 1048576
@@ -52,3 +52,6 @@ def test_with_voyager():
     for drate in list_drate:
         print("Observed drift rate = {}, should be negative.".format(drate))
         assert drate < 0.0
+
+if __name__ == "__main__":
+    test_with_voyager()

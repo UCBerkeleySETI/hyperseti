@@ -4,8 +4,14 @@ import sys
 import logbook
 from logbook import Logger, StreamHandler
 StreamHandler(sys.stdout).push_application()
-from .singletons import logger_name_list, logger_list
 
+# Disable verbose hdf5plugin warning 
+# https://github.com/silx-kit/hdf5plugin/issues/157
+import logging
+logging.getLogger('hdf5plugin').setLevel(logging.ERROR)
+
+
+from .singletons import logger_name_list, logger_list
 
 def update_levels(arg_group_level, arg_debug_name_list):
     for ix, logger_name in enumerate(logger_name_list):
