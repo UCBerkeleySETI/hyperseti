@@ -9,8 +9,8 @@ logger = get_logger('hyperseti.kurtosis')
 
 
 
-@on_gpu
 @datwrapper(dims=None)
+@on_gpu
 def spectral_kurtosis(x, metadata):
     """ GPU Spectral Kurtosis Kernel 
     
@@ -28,8 +28,8 @@ def spectral_kurtosis(x, metadata):
     return (N_acc*n+1) / (n-1) * (n*(x2_sum / (x_sum*x_sum)) - 1).squeeze()
 
 
-@on_gpu
 @datwrapper(dims=None)
+@on_gpu
 def sk_flag(data, metadata, n_sigma_upper=3, n_sigma_lower=2, 
             flag_upper=True, flag_lower=True):
     """ Apply spectral kurtosis flagging 

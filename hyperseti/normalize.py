@@ -50,7 +50,7 @@ def normalize(data,  mask=None, padding=0):
     logger.debug(f"flag fraction correction factor: {flag_correction}")
     
     #  Apply to original data
-    d_gpu = (d_gpu - d_mean) / d_std
+    d_gpu = ((d_gpu - d_mean) / d_std).astype('float32')
     t1 = time.time()
     logger.info(f"Normalisation time: {(t1-t0)*1e3:2.2f}ms")
     

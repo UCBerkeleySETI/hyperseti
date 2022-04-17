@@ -26,9 +26,9 @@ from file_defs import synthetic_fil, test_fig_dir, voyager_h5
 # Other parameters:
 GULP_SIZE = 1048576
 MAX_DRIFT_RATE = 4.0
-MIN_DRIFT_RATE = 0.01
+MIN_DRIFT_RATE = 0.0
 SNR_THRESHOLD = 30.0
-N_BOXCAR = 6
+N_BOXCAR = 2
 KERNEL = "dedoppler"
 GPU_ID = 0
 
@@ -47,11 +47,12 @@ def test_with_voyager():
                     threshold=SNR_THRESHOLD)
     
     # dframe column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
-    print("Returned dataframe:", dframe)
+    print("Returned dataframe:\n", dframe)
     list_drate = dframe["drift_rate"].tolist()
     for drate in list_drate:
         print("Observed drift rate = {}, should be negative.".format(drate))
         assert drate < 0.0
+    return dframe
 
 if __name__ == "__main__":
-    test_with_voyager()
+    dframe = test_with_voyager()

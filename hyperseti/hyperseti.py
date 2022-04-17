@@ -14,8 +14,9 @@ from .normalize import normalize
 from .filter import apply_boxcar
 from .hits import hitsearch, merge_hits, create_empty_hits_table
 from .peak import prominent_peaks
-from .data_array import from_fil, from_h5
+from .io import from_fil, from_h5
 from .utils import attach_gpu_device, on_gpu, datwrapper
+from .kurtosis import sk_flag
 
 #logging
 from .log import get_logger
@@ -60,7 +61,8 @@ def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_f
     
     # Apply preprocessing normalization
     if apply_normalization:
-        data = normalize(data, return_space='gpu')
+        mask = sk_flag(data, metadata, return_space='gpu')
+        data = normalize(data, mask=mask, return_space='gpu')
     
     peaks = create_empty_hits_table()
     
@@ -87,7 +89,8 @@ def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_f
     return peaks
             
 
-def find_et(filename, filename_out='hits.csv', gulp_size=2**19, max_dd=4.0, min_dd=0.001, threshold=30.0,
+def find_et(filename, filename_out='hits.csv', gulp_size=2**19, max_dd=4.0, min_dd=0.001, 
+            min_fdistance=None, min_ddistance=None, threshold=30.0,
             n_boxcar=6, kernel='dedoppler', gpu_id=0, *args, **kwargs):
     """ Find ET, serial version
     
@@ -114,14 +117,22 @@ def find_et(filename, filename_out='hits.csv', gulp_size=2**19, max_dd=4.0, min_
     logger.debug("find_et: At entry, filename_out={}, gulp_size={}, max_dd={}, min_dd={}, threshold={}, n_boxcar={}, kernel={}, gpu_id={}"
                  .format(filename_out, gulp_size, max_dd, min_dd, threshold, n_boxcar, kernel, gpu_id))
     ds = from_h5(filename)
+
+    if min_fdistance is None:
+        deltaf = ds.frequency.to('Hz').val_step
+        deltat = ds.time.to('s').val_step
+        min_fdistance = int(np.abs(deltat * ds.time.n_step * max_dd / deltaf))
+        logger.info(f"<find_et>: min_fdistance calculated to be {min_fdistance} bins")
+
     if gulp_size > ds.data.shape[2]:
-        logger.warning('find_et: gulp_size ({}) > Num fine frequency channels ({}).  Setting gulp_size = {}'
-                       .format(gulp_size, ds.data.shape[2], ds.data.shape[2]))
+        logger.warning(f'find_et: gulp_size ({gulp_size}) > Num fine frequency channels ({ds.data.shape[2]}).  Setting gulp_size = {ds.data.shape[2]}')
         gulp_size = ds.data.shape[2]
     out = []
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
         #print(d_arr)
-        hits = run_pipeline(d_arr, max_dd=max_dd, min_dd=min_dd, threshold=threshold, n_boxcar=n_boxcar,
+        hits = run_pipeline(d_arr, max_dd=max_dd, min_dd=min_dd, 
+                                threshold=threshold, n_boxcar=n_boxcar, 
+                                min_fdistance=min_fdistance, min_ddistance=min_ddistance,
                             kernel=kernel, gpu_id=gpu_id, *args, **kwargs)
         out.append(hits)
         logger.info(f"{len(hits)} hits found")

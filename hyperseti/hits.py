@@ -7,7 +7,7 @@ import os
 from astropy import units as u
 
 from .peak import prominent_peaks
-from .data_array import from_fil, from_h5
+from .io import from_fil, from_h5
 from .utils import on_gpu, datwrapper
 
 #logging
@@ -39,8 +39,6 @@ def create_empty_hits_table():
                           'boxcar_size': pd.Series([], dtype='int'),
                          })
     return hits
-
-
 
 def merge_hits(hitlist):
     """ Group hits corresponding to different boxcar widths and return hit with max SNR 
@@ -132,7 +130,7 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
                 'f_start': frequency_peaks,
                 'snr': intensity,
                 'driftrate_idx': dcoords,
-                'channel_idx': fcoords,
+                'channel_idx': fcoords, 
                 'beam_idx': beam_idx
             }
 

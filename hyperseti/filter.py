@@ -62,6 +62,7 @@ def apply_boxcar_drift(data, metadata):
     Returns:
         data, metadata (array and dict): Data array with filter applied.
     """
+    logger.info(f"<apply_boxcar_drift>: Applying moving average based on drift rate.")
     metadata = deepcopy(metadata)
     # Compute drift rates from metadata
     dr0, ddr = metadata['drift_rate_start'].value, metadata['drift_rate_step'].value
@@ -72,7 +73,7 @@ def apply_boxcar_drift(data, metadata):
     # Compute smearing (array of n_channels smeared for given driftrate)
     smearing_nchan = cp.abs(dt * drates / df).astype('int32')
     smearing_nchan_max = cp.asnumpy(cp.max(smearing_nchan))
-    
+
     # Apply boxcar filter to compensate for smearing
     for boxcar_size in range(2, smearing_nchan_max+1):
         idxs = cp.where(smearing_nchan == boxcar_size)
