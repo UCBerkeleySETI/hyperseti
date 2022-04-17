@@ -59,6 +59,10 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     else:
         dd_shifts      = np.arange(N_dopp_upper, N_dopp_lower + 1, dtype='int32') [::-1]
     
+    # Correct for negative frequency step
+    if metadata['frequency_step'].to('Hz').value < 0:
+        dd_shifts *= -1
+
     logger.debug("delta_dd={}, N_dopp_upper={}, N_dopp_lower={}, dd_shifts={}"
                  .format(delta_dd, N_dopp_upper, N_dopp_lower, dd_shifts))
 
