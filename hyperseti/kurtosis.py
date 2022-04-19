@@ -30,7 +30,7 @@ def spectral_kurtosis(x, metadata):
 
 @datwrapper(dims=None)
 @on_gpu
-def sk_flag(data, metadata, n_sigma_upper=3, n_sigma_lower=2, 
+def sk_flag(data, metadata, n_sigma_upper=5, n_sigma_lower=5, 
             flag_upper=True, flag_lower=True):
     """ Apply spectral kurtosis flagging 
     
@@ -47,22 +47,31 @@ def sk_flag(data, metadata, n_sigma_upper=3, n_sigma_lower=2,
     
     Returns:
         mask (np.array, bool): Array of True/False flags per channel
+    
+    Notes:
+        sk_flag upper and lower stdev is computed on log2(sk), as the minimum
+        spectral kurtosis (for a CW signal) approaches 0. 
     """
     Fs = (1.0 / metadata['frequency_step'] / 2)
     samps_per_sec = np.abs(Fs.to('s').value) # Nyq sample rate for channel
     N_acc = int(metadata['time_step'].to('s').value / samps_per_sec)
 
-    var_theoretical = 2.0 / np.sqrt(N_acc)
-    std_theoretical = np.sqrt(var_theoretical)
+
     sk = spectral_kurtosis(data, metadata)
+
+    #var_theoretical = 2.0 / np.sqrt(N_acc)
+    #std_theoretical = np.sqrt(var_theoretical)
+    log_sk   = cp.log2(sk) 
+    std_log  = cp.std(log_sk)
+    mean_log = cp.mean(log_sk)
     
     if flag_upper and flag_lower:
-        mask  = sk > 1.0 + n_sigma_upper * std_theoretical
-        mask  |= sk < 1.0 - (n_sigma_lower * std_theoretical)
+        mask  = log_sk < mean_log + (std_log * n_sigma_upper)
+        mask  &= log_sk > mean_log - (std_log * n_sigma_lower)
     elif flag_upper and not flag_lower:
-        mask  = sk > 1.0 + n_sigma_upper * std_theoretical
+        mask  = log_sk > mean_log + (std_log * n_sigma_upper)
     elif flag_lower and not flag_upper:
-        mask  = sk < 1.0 - (n_sigma_lower * std_theoretical)
+        mask  = log_sk < mean_log - (std_log * n_sigma_lower)
     else:
         raise RuntimeError("No flags to process: need to flag upper and/or lower!")
-    return mask
+    return ~mask
