@@ -29,5 +29,5 @@ def from_setigen(stg_frame):
                                     data.shape[2], units='MHz')
     }
     
-    d = DataArray(data, dims, scales, attrs, units='counts')
+    d = DataArray(data.astype('float32'), dims, scales, attrs, units='counts')
     return d
