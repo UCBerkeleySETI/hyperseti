@@ -26,7 +26,7 @@ def from_setigen(stg_frame):
                                data.shape[0], time_format='unix', time_delta_format='sec'),
         'feed_id':   DimensionScale('feed_id', 0, 0, data.shape[1], units=''),
         'frequency': DimensionScale('frequency', stg_frame.fch1, stg_frame.df, 
-                                    data.shape[2], units='MHz')
+                                    data.shape[2], units='Hz')
     }
     
     d = DataArray(data.astype('float32'), dims, scales, attrs, units='counts')
