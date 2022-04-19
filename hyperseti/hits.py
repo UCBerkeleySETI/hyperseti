@@ -1,3 +1,4 @@
+from copy import deepcopy
 import cupy as cp
 import numpy as np
 import time
@@ -77,7 +78,7 @@ def merge_hits(hitlist):
 
 @datwrapper(dims=None)
 @on_gpu
-def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=None):
+def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=None, min_ddistance=None):
     """ Search for hits using _prominent_peaks method in cupyimg.skimage
     
     Args:
@@ -96,7 +97,8 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
                                     driftrate_idx: Index in driftrate array
                                     channel_idx: Index in frequency array
     """
-    
+    metadata = deepcopy(metadata)
+
     drift_trials = metadata['drift_rates']
     
     if min_fdistance is None:
@@ -107,8 +109,8 @@ def hitsearch(dedopp, metadata, threshold=10, min_fdistance=None, min_ddistance=
     
     t0 = time.time()
     dfs = []
-    for beam_idx in range(dedopp.shape[1]):
-        imgdata = dedopp[:, beam_idx, :].squeeze()
+    for beam_idx in range(dedopp_data.shape[1]):
+        imgdata = cp.copy(dedopp_data[:, beam_idx, :].squeeze())
         intensity, fcoords, dcoords = prominent_peaks(imgdata, min_xdistance=min_fdistance, min_ydistance=min_ddistance, threshold=threshold)
         t1 = time.time()
         logger.info(f"Peak find time: {(t1-t0)*1e3:2.2f}ms")
