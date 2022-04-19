@@ -17,7 +17,7 @@ def _get_extent(data, metadata, xaxis, yaxis):
         ex_x0, ex_x1 = metadata['frequency_start'].value, metadata['frequency_start'].value + metadata['frequency_step'].value * data.shape[1]
         
     if yaxis == 'driftrate':
-        ex_y0, ex_y1 = metadata['drift_rate_start'].value, metadata['drift_rate_start'].value + metadata['drift_rate_step'].value * data.shape[0]
+        ex_y1, ex_y0 = metadata['drift_rate_start'].value, metadata['drift_rate_start'].value + metadata['drift_rate_step'].value * data.shape[0]
     elif yaxis == 'driftidx':
         ex_y0, ex_y1 = data.shape[0], 0
     
