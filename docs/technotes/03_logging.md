@@ -22,6 +22,7 @@ logger.level = logbook.DEBUG
 
 Or to activate all:
 ```python
-from hyperseti.log import logger_group
-logger_group.level = logbook.DEBUG
+from hyperseti import set_log_level
 ```
+
+Where log level can be one of ('critical', 'error', 'warning', 'notice', 'info', 'debug')
