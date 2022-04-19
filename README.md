@@ -44,7 +44,7 @@ imshow_dedopp(dedopp)
 plt.tight_layout()
 ```
 
-![image](https://user-images.githubusercontent.com/713251/164058051-9b511f50-d0d0-4058-b512-c062cc7d7964.png)
+![image](https://user-images.githubusercontent.com/713251/164058073-88ccf3b1-b4a1-4160-b650-fca37770f96d.png)
 
 Can also search for hits in the dedoppler spectra:
 
