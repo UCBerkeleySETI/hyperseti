@@ -8,51 +8,60 @@ _In beta_
 
 ```python
 import numpy as np
-import astropy.units as u
 import pylab as plt
+from astropy import units as u
+
+import setigen as stg
+from hyperseti.io import from_setigen
 from hyperseti import dedoppler
-from plotting import imshow_dedopp, imshow_waterfall
+from hyperseti.plotting import imshow_waterfall, imshow_dedopp
 
-# Create a drifting test signal
-N_timestep, N_chans = 32, 256
-test_data = np.ones(shape=(N_timestep, N_chans ))
-for ii in range(N_timestep):
-    test_data[ii, N_chans // 2 + ii] = 100
+# Create data using setigen
+frame = stg.Frame(fchans=8192*u.pixel,
+                  tchans=32*u.pixel,
+                  df=2*u.Hz,
+                  dt=10*u.s,
+                  fch1=1420*u.MHz)
+noise = frame.add_noise(x_mean=10, noise_type='chi2')
+signal = frame.add_signal(stg.constant_path(f_start=frame.get_frequency(index=2000),
+                                            drift_rate=2*u.Hz/u.s),
+                          stg.constant_t_profile(level=frame.get_intensity(snr=50)),
+                          stg.gaussian_f_profile(width=100*u.Hz),
+                          stg.constant_bp_profile(level=1))
 
-# Create basic metadata
-metadata = {'fch1': 1000*u.MHz, 'dt': 1.0*u.s, 'df': 1.0*u.Hz}
+# Convert data into hyperseti DataArray
+d = from_setigen(frame)
 
 # Run dedoppler
-dedopp, metadata = dedoppler(test_data, metadata, boxcar_size=1, max_dd=4.0)
+dedopp, md = dedoppler(d, boxcar_size=1, max_dd=8.0)
 
-# Imshow output
+# Plot waterfall / dedoppler
 plt.figure(figsize=(8, 3))
 plt.subplot(1,2,1)
-imshow_waterfall(np.log(test_data), metadata)
+imshow_waterfall(d)
 plt.subplot(1,2,2)
-imshow_dedopp(np.log(dedopp), metadata)
+imshow_dedopp(dedopp)
 plt.tight_layout()
 ```
 
-![](https://github.com/UCBerkeleySETI/hyperseti/raw/master/docs/figs/example.png)
+![image](https://user-images.githubusercontent.com/713251/164058051-9b511f50-d0d0-4058-b512-c062cc7d7964.png)
 
 Can also search for hits in the dedoppler spectra:
 
 ```python
 # ... run code from above ...  
 
-from hyperseti import hitsearch
-hits = hitsearch(dedopp, metadata, threshold=500)
+from hyperseti import  hitsearch
+hits = hitsearch(dedopp, threshold=100, min_fdistance=10)
 
-from plotting import overlay_hits
+from hyperseti.plotting import overlay_hits
+imshow_dedopp(dedopp)
 overlay_hits(hits)
 ```
 
-| driftrate | f_start | snr | driftrate_idx | channel_idx | boxcar_size |
-| --- | --- | --- | --- | --- | --- | 
-| 0 	 | 1.0 	 | 1000.000128 	| 3200.0 	| 160 	| 128 	| 1 |
+![image](https://user-images.githubusercontent.com/713251/164058025-ab8a3d7a-ffa5-4437-b01b-6c8d6a29cd7c.png)
 
-![](https://github.com/UCBerkeleySETI/hyperseti/raw/master/docs/figs/example2.png)
+![image](https://user-images.githubusercontent.com/713251/164058051-9b511f50-d0d0-4058-b512-c062cc7d7964.png)
 
 Or the dedoppler and hitsearch can be done in one line with `run_pipeline()`. 
 Data can be boxcar averaged to look for wider-band signals, and to retrieve signal-to-noise
