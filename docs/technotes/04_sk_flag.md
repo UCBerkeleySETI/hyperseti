@@ -26,8 +26,15 @@ TLDR: Any frequency bins including constant tones (that don't drift) will have a
 Bins that are crossed by drifting tones will have high SK values. Bins with only noise will have
 SK values close to 1.
 
+### Why are we using SK flagging?
+
+We are using SK flagging when normalizing data. To normalize data, we want to compute the signal-to-noise ratio. By flagging anything with spurious SK values, we can get a good 
+estimate of the true noise.
+
 ### SK definition
 
 ```python
     SK =  ((N_acc × n) + 1) / (n-1) * (n (∑x²) / (∑x)²) - 1)
 ```
+
+Where `N_acc` is the number of accumulations per time bin, and `n` is the length of the x array.
