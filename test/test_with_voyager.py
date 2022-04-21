@@ -21,7 +21,9 @@ import logbook
 from hyperseti import find_et
 from hyperseti.log import update_levels
 
-from file_defs import synthetic_fil, test_fig_dir, voyager_h5
+from hyperseti.io.filterbank import from_fil
+from hyperseti.io.hdf5 import from_h5
+from .file_defs import voyager_h5
 
 # Other parameters:
 GULP_SIZE = 1048576
@@ -35,7 +37,6 @@ GPU_ID = 0
 
 def test_with_voyager():
     print("hyperseti find_et from file {} .....".format(voyager_h5))
-    update_levels(logbook.INFO, [])
     dframe = find_et(voyager_h5, 
                     filename_out='./hyperseti_hits.csv', 
                     gulp_size=GULP_SIZE, 
