@@ -70,7 +70,7 @@ def normalize(data,  mask=None, poly_fit=0):
 
     flag_fraction =  N_flagged / N_tot
     flag_correction =  N_tot / (N_tot - N_flagged) 
-    logger.info(f"Flagged fraction: {flag_fraction:2.4f}")
+    ### logger.info(f"Flagged fraction: {flag_fraction:2.4f}")
     if flag_fraction > 0.2:
         logger.warning(f"High flagged fraction: {flag_fraction:2.3f}")
 
@@ -78,6 +78,6 @@ def normalize(data,  mask=None, poly_fit=0):
     for ii in range(n_ifs):
         data[:, ii] = ((data[:, ii] - d_mean_ifs[ii]) / d_std_ifs[ii])
     t1 = time.time()
-    logger.info(f"Normalisation time: {(t1-t0)*1e3:2.2f}ms")
+    ###logger.info(f"Normalisation time: {(t1-t0)*1e3:2.2f}ms")
     
     return data
