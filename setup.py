@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 
 with open("hyperseti/version.py", "w") as fh:
     fh.write("HYPERSETI_VERSION = '{}'\n".format(__version__))
@@ -17,6 +17,7 @@ with open("requirements_test.txt", "r") as fh:
 entry_points = {
     "console_scripts" : [
         "findET = hyperseti.findET:cmd_tool" ]
+        "tsdat  = hyperseti.tsdat:cmd_tool" ]
 }
 
 package_data={
