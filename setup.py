@@ -16,7 +16,7 @@ with open("requirements_test.txt", "r") as fh:
 
 entry_points = {
     "console_scripts" : [
-        "findET = hyperseti.findET:cmd_tool" ]
+        "findET = hyperseti.findET:cmd_tool",
         "tsdat  = hyperseti.tsdat:cmd_tool" ]
 }
 
