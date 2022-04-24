@@ -120,11 +120,11 @@ def cmd_tool(args=None):
     parser = ArgumentParser(description="Create a turbo_seti .dat file from the hyperseti output CSV and the HDF5 file.")
     parser.add_argument("csv_file", type=str, default=None, help="Input CSV file from hyperseti")
     parser.add_argument("h5_file", type=str, default=None, help="Input HDF5 file")
-    parser.add_argument("dat_file", type=str, default=None, help="Output DAT file")
     parser.add_argument("--max_drift_rate", "-M", type=float, required=True,
                         help="Maximum drift rate (Hz/s).  Required.")
     parser.add_argument("--obs_len", "-l", type=float, required=True,
                         help="Observation length (s).  Required.")
+    parser.add_argument("--outdir", "-o", type=str, default="./", help="Output DAT directry.  Default: ./")
 
     if args is None:
         args = parser.parse_args()
@@ -143,7 +143,11 @@ def cmd_tool(args=None):
         os.system("tsdat -h")
         sys.exit(1)
 
-    path_dat_file = os.path.abspath(args.dat_file)
+    path_dat_dir = os.path.abspath(args.outdir)
+    h5_filename = path_h5_file.split("/")[-1]
+    dat_filename = h5_filename.replace(".h5", ".dat")
+    path_dat_file = path_dat_dir + "/" + dat_filename
+
     with open(path_dat_file, mode="w", encoding="utf-8") as fd:
         tophit_count = 0
         h5 = Waterfall(path_h5_file, load_data=False)
