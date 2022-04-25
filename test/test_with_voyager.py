@@ -21,13 +21,13 @@ import logbook
 from hyperseti import find_et
 from hyperseti.log import update_levels
 
-from file_defs import synthetic_fil, test_fig_dir, voyager_h5
+from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
 
 # Other parameters:
 GULP_SIZE = 1048576
 MAX_DRIFT_RATE = 4.0
 MIN_DRIFT_RATE = 0.0
-SNR_THRESHOLD = 30.0
+SNR_THRESHOLD = 20.0
 N_BOXCAR = 2
 KERNEL = "dedoppler"
 GPU_ID = 0

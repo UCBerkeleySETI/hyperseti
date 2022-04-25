@@ -30,7 +30,7 @@ def test_datwrapper_basic():
     data = cp.array([1,2,3,4])
     metadata = {'frequency_step': 1}
     data_out = do_something(data, metadata)
-    assert isinstance(data_out, cp.core.core.ndarray)
+    assert isinstance(data_out, cp.ndarray)
 
     ## Check DataArray works without metadata
     data_arr = from_fil(voyager_fil)
