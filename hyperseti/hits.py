@@ -7,8 +7,7 @@ import os
 
 from astropy import units as u
 
-from .peak import prominent_peaks
-from .io import from_fil, from_h5
+from .peak import find_peaks_argrelmax
 from .utils import on_gpu, datwrapper
 
 #logging
@@ -78,8 +77,8 @@ def merge_hits(hitlist):
 
 @datwrapper(dims=None)
 @on_gpu
-def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=None, min_ddistance=None):
-    """ Search for hits using _prominent_peaks method in cupyimg.skimage
+def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=100):
+    """ Search for hits using argrelmax method in cusignal
     
     Args:
         dedopp (np.array): Dedoppler search array of shape (N_trial, N_beam, N_chan)
@@ -87,7 +86,6 @@ def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=None, min_ddist
         metadata (dict): Dictionary of metadata needed to convert from indexes to frequencies etc
         threshold (float): Threshold value (absolute) above which a peak can be considered
         min_fdistance (int): Minimum distance in pixels to nearest peak along frequency axis
-        min_ddistance (int): Minimum distance in pixels to nearest peak along doppler axis
     
     Returns:
         results (pd.DataFrame): Pandas dataframe of results, with columns 
@@ -101,17 +99,12 @@ def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=None, min_ddist
 
     drift_trials = metadata['drift_rates']
     
-    if min_fdistance is None:
-        min_fdistance = metadata['boxcar_size'] * 2
-    
-    if min_ddistance is None:
-        min_ddistance = len(drift_trials) // 4
-    
     t0 = time.time()
     dfs = []
     for beam_idx in range(dedopp_data.shape[1]):
-        imgdata = cp.copy(dedopp_data[:, beam_idx, :].squeeze())
-        intensity, fcoords, dcoords = prominent_peaks(imgdata, min_xdistance=min_fdistance, min_ydistance=min_ddistance, threshold=threshold)
+        imgdata = cp.copy(cp.expand_dims(dedopp_data[:, beam_idx, :].squeeze(), 1))
+        intensity, fcoords, dcoords = find_peaks_argrelmax(imgdata, metadata, 
+                                                           threshold=threshold, order=min_fdistance)
         t1 = time.time()
         logger.info(f"Peak find time: {(t1-t0)*1e3:2.2f}ms")
         t0 = time.time()

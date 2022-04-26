@@ -3,17 +3,15 @@ import numpy as np
 import time
 import pandas as pd
 import os
+import h5py
 
 from astropy import units as u
 import setigen as stg
-
-from cupyx.scipy.ndimage import uniform_filter1d
+from blimpy.io import sigproc
 
 from .dedoppler import dedoppler
 from .normalize import normalize
-from .filter import apply_boxcar
 from .hits import hitsearch, merge_hits, create_empty_hits_table
-from .peak import prominent_peaks
 from .io import from_fil, from_h5
 from .utils import attach_gpu_device, on_gpu, datwrapper
 from .kurtosis import sk_flag
@@ -28,8 +26,8 @@ os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 @datwrapper(dims=(None))
 @on_gpu
-def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_fdistance=None, 
-                 min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True, apply_normalization=True,
+def run_pipeline(data, metadata, max_dd=4.0, min_dd=None, threshold=30.0, min_fdistance=None, 
+                 n_boxcar=1, merge_boxcar_trials=True, apply_normalization=True,
                  kernel='dedoppler', gpu_id=0):
     """ Run dedoppler + hitsearch pipeline 
     
@@ -59,6 +57,15 @@ def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_f
     N_timesteps = data.shape[0]
     _threshold = threshold * np.sqrt(N_timesteps)
     
+    if min_fdistance is None:
+        print(metadata)
+        deltaf = metadata['frequency_step'].to('Hz').value
+        deltat = metadata['time_step'].to('s').value
+        n_int  = data.shape[0]
+
+        min_fdistance = int(np.abs(deltat * n_int * max_dd / deltaf))
+        logger.info(f"<run_pipeline>: min_fdistance calculated to be {min_fdistance} bins")
+
     # Apply preprocessing normalization
     if apply_normalization:
         mask = sk_flag(data, metadata, return_space='gpu')
@@ -75,7 +82,7 @@ def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_f
         # Adjust SNR threshold to take into account boxcar size and dedoppler sum
         # Noise increases by sqrt(N_timesteps * boxcar_size)
         _threshold = threshold * np.sqrt(N_timesteps * boxcar_size)
-        _peaks = hitsearch(dedopp, threshold=_threshold, min_fdistance=min_fdistance, min_ddistance=min_ddistance)
+        _peaks = hitsearch(dedopp, threshold=_threshold, min_fdistance=min_fdistance)
         
         if _peaks is not None:
             _peaks['snr'] /= np.sqrt(N_timesteps * boxcar_size)
@@ -90,8 +97,8 @@ def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_f
             
 
 def find_et(filename, filename_out='hits.csv', gulp_size=2**19, max_dd=4.0, min_dd=0.001, 
-            min_fdistance=None, min_ddistance=None, threshold=30.0,
-            n_boxcar=6, kernel='dedoppler', gpu_id=0, *args, **kwargs):
+            min_fdistance=None,  threshold=20.0,
+            n_boxcar=1, kernel='dedoppler', gpu_id=0, *args, **kwargs):
     """ Find ET, serial version
     
     Wrapper for reading from a file and running run_pipeline() on all subbands within the file.
@@ -116,24 +123,24 @@ def find_et(filename, filename_out='hits.csv', gulp_size=2**19, max_dd=4.0, min_
     t0 = time.time()
     logger.debug("find_et: At entry, filename_out={}, gulp_size={}, max_dd={}, min_dd={}, threshold={}, n_boxcar={}, kernel={}, gpu_id={}"
                  .format(filename_out, gulp_size, max_dd, min_dd, threshold, n_boxcar, kernel, gpu_id))
-    ds = from_h5(filename)
-
-    if min_fdistance is None:
-        deltaf = ds.frequency.to('Hz').val_step
-        deltat = ds.time.to('s').val_step
-        min_fdistance = int(np.abs(deltat * ds.time.n_step * max_dd / deltaf))
-        logger.info(f"<find_et>: min_fdistance calculated to be {min_fdistance} bins")
+    if h5py.is_hdf5(filename):
+        ds = from_h5(filename)
+    elif sigproc.is_filterbank(filename):
+        ds = from_fil(filename)
+    else:
+        raise RuntimeError("Only HDF5 and filterbank files currently supported")
 
     if gulp_size > ds.data.shape[2]:
         logger.warning(f'find_et: gulp_size ({gulp_size}) > Num fine frequency channels ({ds.data.shape[2]}).  Setting gulp_size = {ds.data.shape[2]}')
         gulp_size = ds.data.shape[2]
     out = []
+
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
         #print(d_arr)
         hits = run_pipeline(d_arr, max_dd=max_dd, min_dd=min_dd, 
                                 threshold=threshold, n_boxcar=n_boxcar, 
-                                min_fdistance=min_fdistance, min_ddistance=min_ddistance,
-                            kernel=kernel, gpu_id=gpu_id, *args, **kwargs)
+                                min_fdistance=min_fdistance, kernel=kernel, 
+                                gpu_id=gpu_id, *args, **kwargs)
         out.append(hits)
         logger.info(f"{len(hits)} hits found")
     
