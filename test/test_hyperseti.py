@@ -4,6 +4,7 @@ from hyperseti.normalize import normalize
 from hyperseti.hits import hitsearch, merge_hits
 from hyperseti import run_pipeline, find_et
 from hyperseti.io import from_fil
+from hyperseti.log import set_log_level
 import cupy as cp
 
 from astropy import units as u
@@ -12,7 +13,10 @@ import pylab as plt
 import numpy as np
 
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
-from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
+try:
+    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
+except:
+    from file_defs import synthetic_fil, test_fig_dir, voyager_h5
 import os
 
 import logbook
@@ -228,6 +232,8 @@ def test_hitsearch():
 
 def test_hitsearch_multi():
     """ Test hit search routine with multiple signals """
+
+    set_log_level("info")
     metadata_in = {'frequency_start': 6095.214842353016*u.MHz,
             'time_step': 18.25361108*u.s,
             'frequency_step': 2.7939677238464355*u.Hz}
@@ -259,7 +265,7 @@ def test_hitsearch_multi():
 
     fig = plt.figure(figsize=(10, 6))  #  <============ fig is UNUSED
 
-    hits = run_pipeline(darray.data, metadata_in, max_dd=1.0, min_dd=None, threshold=20,
+    hits = run_pipeline(darray.data, metadata_in, max_dd=1.0, threshold=5,
                                     n_boxcar=5, merge_boxcar_trials=True)
     print(hits.sort_values('snr', ascending=False))
 
@@ -280,7 +286,7 @@ def test_find_et():
     find_et(voyager_h5, max_dd=1.0)
     
 if __name__ == "__main__":
-    test_dedoppler()
-    test_dedoppler_boxcar()
-    test_hitsearch()
+    #test_dedoppler()
+    #test_dedoppler_boxcar()
+    #test_hitsearch()
     test_hitsearch_multi()
