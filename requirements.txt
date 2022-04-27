@@ -1,10 +1,10 @@
-astropy
-blimpy
-#cupy-cuda110
-dask
-h5py
-hdf5plugin
-logbook
 numpy
 pandas
+logbook
+astropy
+h5py
+hdf5plugin
+cupy>=8.6.0
+cusignal
 setigen
+blimpy
