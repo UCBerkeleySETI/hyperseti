@@ -31,7 +31,7 @@ def apply_boxcar(data, boxcar_size=1, axis=1, mode='mean'):
     Returns: 
         data (np/cp.array): Data after boxcar filtering.
     """
-    logger.info(f"Running boxcar mode {mode} with size {boxcar_size}")
+    logger.debug(f"apply_boxcar: Running boxcar mode {mode} with size {boxcar_size}")
     if mode not in ('sum', 'mean', 'gaussian'):
         raise RuntimeError("Unknown mode. Only modes sum, mean or gaussian supported.")
     t0 = time.time()
@@ -42,7 +42,7 @@ def apply_boxcar(data, boxcar_size=1, axis=1, mode='mean'):
     elif mode == 'sum':
         data *= boxcar_size
     t1 = time.time()
-    logger.info(f"Filter time: {(t1-t0)*1e3:2.2f}ms")
+    logger.debug(f"apply_boxcar: Filter time: {(t1-t0)*1e3:2.2f}ms")
     
     return data
 
@@ -62,7 +62,7 @@ def apply_boxcar_drift(data, metadata):
     Returns:
         data, metadata (array and dict): Data array with filter applied.
     """
-    logger.info(f"<apply_boxcar_drift>: Applying moving average based on drift rate.")
+    logger.debug(f"apply_boxcar_drift: Applying moving average based on drift rate.")
     metadata = deepcopy(metadata)
     # Compute drift rates from metadata
     dr0, ddr = metadata['drift_rate_start'].value, metadata['drift_rate_step'].value
