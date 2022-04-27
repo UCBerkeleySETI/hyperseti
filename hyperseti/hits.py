@@ -13,7 +13,7 @@ from .utils import on_gpu, datwrapper
 
 #logging
 from .log import get_logger
-logger = get_logger('hyperseti.hitsearch')
+logger = get_logger('hyperseti.hits')
 
 
 def create_empty_hits_table():
@@ -71,7 +71,7 @@ def merge_hits(hitlist):
         p = p.drop(pq.index)
         hits.append(tophit)
     t1 = time.time()
-    logger.info(f"Hit merging time: {(t1-t0)*1e3:2.2f}ms")
+    logger.debug(f"merge_hits: Hit merging time: {(t1-t0)*1e3:2.2f}ms")
     
     return pd.DataFrame(hits)
 
@@ -113,17 +113,17 @@ def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=None, min_ddist
         imgdata = cp.copy(dedopp_data[:, beam_idx, :].squeeze())
         intensity, fcoords, dcoords = prominent_peaks(imgdata, min_xdistance=min_fdistance, min_ydistance=min_ddistance, threshold=threshold)
         t1 = time.time()
-        logger.info(f"Peak find time: {(t1-t0)*1e3:2.2f}ms")
+        logger.debug(f"hitsearch: Peak find time: {(t1-t0)*1e3:2.2f}ms")
         t0 = time.time()
         # copy results over to CPU space
         intensity, fcoords, dcoords = cp.asnumpy(intensity), cp.asnumpy(fcoords), cp.asnumpy(dcoords)
         t1 = time.time()
-        logger.info(f"Peak find memcopy: {(t1-t0)*1e3:2.2f}ms")
+        logger.debug(f"hitsearch: Peak find memcopy: {(t1-t0)*1e3:2.2f}ms")
 
         t0 = time.time()
         if len(fcoords) > 0:
             driftrate_peaks = drift_trials[dcoords]
-            logger.debug(f"{metadata['frequency_start']}, {metadata['frequency_step']}, {fcoords}")
+            logger.debug(f"hitsearch: {metadata['frequency_start']}, {metadata['frequency_step']}, {fcoords}")
             frequency_peaks = metadata['frequency_start'] + metadata['frequency_step'] * fcoords
 
 
@@ -144,10 +144,10 @@ def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=None, min_ddist
             dfs.append(pd.DataFrame(results))
         
             t1 = time.time()
-            logger.info(f"Peak find to dataframe: {(t1-t0)*1e3:2.2f}ms")
+            logger.debug(f"hitsearch: Peak find to dataframe: {(t1-t0)*1e3:2.2f}ms")
         try:
             hits = pd.concat(dfs)
-            logger.debug(hits)
+            #logger.debug(hits)
         except ValueError: # No hits output
             hits = None
         return hits
