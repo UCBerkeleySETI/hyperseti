@@ -100,3 +100,28 @@ Reading from file is also supported:
 dframe = find_et(voyager_h5, config, gulp_size=2**18, filename_out='./hyperseti_hits.csv')
 ```
 
+### Installation
+
+Theoretically, just type:
+
+```
+pip install git+https://github.com/ucberkeleyseti/hyperseti
+```
+
+hyperseti uses the GPU heavily, so a working CUDA environment is needed, and
+requires Python 3.7 or above.
+hyperseti relies upon `cupy`, and currently uses a single function, 
+`argrelmax` from `cusignal`. These are part of [rapids](https://rapids.ai/start.html)
+and are easiest to install using `conda`. If starting from scratch, this should get you most of
+the way there:
+
+```
+conda create -n hyperseti -c rapidsai -c nvidia -c conda-forge \
+    rapids=22.04 python=3.9 cudatoolkit=11.0 dask-sql 
+
+conda activate hyperseti
+conda install pandas astropy
+pip install logbook setigen blimpy hdf5plugin
+pip install git+https://github.com/ucberkeleyseti/hyperseti
+```
+
