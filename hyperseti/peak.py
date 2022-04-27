@@ -30,6 +30,9 @@ def find_peaks_argrelmax(data, metadata, threshold=20, order=100):
         A mask of data > threshold is also computed; any relative maxima above
         threshold are then returned. 
         We can only find a single maxima per frequency channel using this approach.
+
+        A maxima will not be recorded if it's a plateau, eg. 0001111000, as it's not a relative maxima.
+        This means badly-simulated data may not work well.
     """
     t0 = time.time()
     maxvals = data.max(axis=0).squeeze()
