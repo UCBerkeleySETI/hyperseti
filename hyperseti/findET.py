@@ -37,16 +37,8 @@ def cmd_tool(args=None):
     else:
         args = parser.parse_args(args)
 
-    if args.group_level == "debug":
-        int_level = logbook.DEBUG
-    else:
-        if args.group_level == "info":
-            int_level = logbook.INFO
-        else:
-            int_level = logbook.WARNING
-
     # Set the logbook levels for all of the functions.
-    update_levels(int_level, args.debug_list)
+    update_levels(args.group_level, args.debug_list)
     
     # Find E.T.
     time1 = time.time()
