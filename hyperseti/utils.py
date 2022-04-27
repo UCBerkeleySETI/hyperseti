@@ -25,7 +25,7 @@ def attach_gpu_device(new_id):
         logger.info("attach_gpu_device: Using device ID ({})".format(new_id))
     except:
         cur_id = cp.cuda.Device().id
-        logger.error("attach_gpu_device: cp.cuda.Device({}).use() FAILED!".format(new_id))
+        logger.error("attach_gpu_device: attach_gpu_device: cp.cuda.Device({}).use() FAILED!".format(new_id))
         logger.warning("attach_gpu_device: Will continue to use current device ID ({})".format(cur_id))
 
 
@@ -56,18 +56,18 @@ def on_gpu(func):
         for idx, arg in enumerate(args):
             argname = func_params[idx]
             if isinstance(arg, np.ndarray):
-                logger.info(f"<{func_name}> Converting ndarray arg {argname} to cupy..")
+                logger.debug(f"on_gpu inner <{func_name}> Converting ndarray arg {argname} to cupy..")
                 if arg.dtype != np.dtype('float32'):
-                    logger.warning(f"<{func_name}> Arg {argname} is not float32, could cause issues...")
+                    logger.warning(f"on_gpu inner <{func_name}> Arg {argname} is not float32, could cause issues...")
                 arg = cp.asarray(arg)
             elif hasattr(arg, '__array__'):
                 # Duck-type numpy array
-                logger.info(f"<{func_name}> Converting numpy-like arg {argname} to cupy..")
+                logger.debug(f"on_gpu inner <{func_name}> Converting numpy-like arg {argname} to cupy..")
                 if arg.dtype != np.dtype('float32'):
                     warnings.warn(f"<{func_name}> Arg {argname} is not float32, could cause issues...", RuntimeWarning)
                 arg = cp.asarray(arg)                
             if isinstance(arg, DataArray):
-                logger.info(f"<{func_name}> Converting arg {argname}.data to cupy..")
+                logger.debug(f"on_gpu inner <{func_name}> Converting arg {argname}.data to cupy..")
                 if arg.data.dtype != np.dtype('float32'):
                     warnings.warn(f"<{func_name}> Arg {argname}.data is not float32, could cause issues...", RuntimeWarning)
                 arg.data = cp.asarray(arg.data)                
@@ -75,7 +75,7 @@ def on_gpu(func):
             
         return_space = None
         if 'return_space' in kwargs:
-            logger.debug(f"<{func_name}> Return space requested: {kwargs['return_space']}")
+            logger.debug(f"on_gpu inner <{func_name}> Return space requested: {kwargs['return_space']}")
             return_space = kwargs.pop('return_space')
             assert return_space in ('cpu', 'gpu')
         output = func(*new_args, **kwargs)
@@ -83,14 +83,14 @@ def on_gpu(func):
         if return_space == 'gpu':
             if len(output) == 1 or isinstance(output, (np.ndarray, cp.ndarray)):
                 if isinstance(output, np.ndarray):
-                    logger.info(f"<{func_name}> Converting output to cupy")
+                    logger.debug(f"on_gpu inner <{func_name}> Converting output to cupy")
                     output = cp.asarray(output)
                 return output
             else:
                 new_output = []
                 for idx, item in enumerate(output):
                     if isinstance(item, np.ndarray):
-                        logger.info(f"<{func_name}> Converting output {idx} to cupy")
+                        logger.debug(f"on_gpu inner <{func_name}> Converting output {idx} to cupy")
                         item = cp.asarray(item)
                     new_output.append(item)
                 return new_output
@@ -98,14 +98,14 @@ def on_gpu(func):
         elif return_space == 'cpu':
             if len(output) == 1 or isinstance(output, (np.ndarray, cp.ndarray)):
                 if isinstance(output, cp.ndarray):
-                    logger.info(f"<{func_name}> Converting output to numpy")
+                    logger.debug(f"on_gpu inner <{func_name}> Converting output to numpy")
                     output = cp.asnumpy(output)
                 return output
             else:
                 new_output = []
                 for idx, item in enumerate(output):
                     if isinstance(item, cp.ndarray):
-                        logger.info(f"<{func_name}> Converting output {idx} to numpy")
+                        logger.debug(f"on_gpu inner <{func_name}> Converting output {idx} to numpy")
                         item = cp.asnumpy(item)
                     new_output.append(item)
                 return new_output
@@ -178,11 +178,11 @@ def datwrapper(dims=None, *args, **kwargs):
                 return output
             elif isinstance(output, (np.ndarray, cp.ndarray)):
                 if dims is not None:
-                    warnings.warn(f"<{func_name}> dimensions supplied, but function returns bare numpy array (no metadata).", RuntimeWarning)
+                    warnings.warn(f"datwrapper <{func_name}> dimensions supplied, but function returns bare numpy array (no metadata).", RuntimeWarning)
                 return output
             elif isinstance(output, pd.DataFrame):
                 if dims is not None:
-                    warnings.warn(f"<{func_name}> dimensions supplied, but function returns pandas Dataframe (no metadata).", RuntimeWarning)
+                    warnings.warn(f"datwrapper <{func_name}> dimensions supplied, but function returns pandas Dataframe (no metadata).", RuntimeWarning)
                 return output                
             elif isinstance(output, (list, tuple)):
                 # Check to see if we can apply original dimensions
@@ -203,7 +203,7 @@ def datwrapper(dims=None, *args, **kwargs):
                     _dims = dims          
                 # Now, if dims were found, let's use those to generate a DataArray
                 if _dims is not None:
-                    logger.debug(f"<{func_name}> Generating DataArray from function output, {_dims}")
+                    logger.debug(f"datwrapper <{func_name}> Generating DataArray from function output, {_dims}")
                     new_output = []
                     new_data = output[0]
                     new_md   = output[1]
@@ -213,7 +213,7 @@ def datwrapper(dims=None, *args, **kwargs):
                     for d in new_md.pop('input_dims', ('unset',) ):
                         #print(d, new_md['output_dims'])
                         if d not in new_md['output_dims']:
-                            logger.debug(f"<{func_name}> deleting missing output dimension: {d}")
+                            logger.debug(f"datwrapper <{func_name}> deleting missing output dimension: {d}")
                             new_md.pop(f"{d}_start", 0)
                             new_md.pop(f"{d}_step", 0)
                     # TODO: Should we delete any keys ending with _step or _start?
@@ -223,7 +223,7 @@ def datwrapper(dims=None, *args, **kwargs):
                     array_md = copy.deepcopy(new_md)
                     array_md.pop('input_dims', 0)
                     array_md.pop('output_dims', 0)
-                    logger.debug(f"<{func_name}> data shape: {new_data.shape}")
+                    logger.debug(f"datwrapper <{func_name}> data shape: {new_data.shape}")
 
                     scales = {}
                     for dim_idx, dim in enumerate(_dims):
@@ -234,7 +234,7 @@ def datwrapper(dims=None, *args, **kwargs):
                                                nstep, time_format=time_start.format, time_delta_format='sec')
                         else:
                             scale_start, scale_step = array_md.pop(f"{dim}_start", 0), array_md.pop(f"{dim}_step", 0)
-                            logger.debug(f"{dim} {scale_start}")
+                            logger.debug(f"datwrapper dim={dim}, scale_start={scale_start}, scale_step={scale_step}")
                             scale_unit = None if np.isscalar(scale_start) else scale_start.unit
                             scales[dim] = DimensionScale(dim, scale_start, scale_step, 
                                                    nstep, units=scale_unit)
@@ -253,7 +253,7 @@ def datwrapper(dims=None, *args, **kwargs):
             else:
                 if dims is not None:
                     t = type(output)
-                    warnings.warn(f"<{func_name}> dimensions supplied, but function returns {t} which can't be a DataArray.", RuntimeWarning)
+                    warnings.warn(f"dat_wrapper <{func_name}> dimensions supplied, but function returns {t} which can't be a DataArray.", RuntimeWarning)
                 return output   
         return inner
     return _datwrapper
