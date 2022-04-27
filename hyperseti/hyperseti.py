@@ -28,7 +28,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 @datwrapper(dims=(None))
 @on_gpu
-def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_fdistance=None, 
+def run_pipeline(data, metadata, called_count=None, max_dd=4.0, min_dd=0.001, threshold=30.0, min_fdistance=None, 
                  min_ddistance=None, n_boxcar=6, merge_boxcar_trials=True, apply_normalization=True,
                  kernel='dedoppler', gpu_id=0):
     """ Run dedoppler + hitsearch pipeline 
@@ -54,7 +54,8 @@ def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_f
     """
     
     t0 = time.time()
-    attach_gpu_device(gpu_id)
+    if gpu_id is not None:
+        attach_gpu_device(gpu_id)
     logger.debug(data.shape)
     N_timesteps = data.shape[0]
     _threshold = threshold * np.sqrt(N_timesteps)
@@ -68,7 +69,7 @@ def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_f
     
     boxcar_trials = map(int, 2**np.arange(0, n_boxcar))
     for boxcar_size in boxcar_trials:
-        logger.info(f"--- Boxcar size: {boxcar_size} ---")
+        logger.debug(f"run_pipeline: --- Boxcar size: {boxcar_size} ---")
         dedopp, md = dedoppler(data, metadata, boxcar_size=boxcar_size,  boxcar_mode='sum', kernel=kernel,
                                      max_dd=max_dd, min_dd=min_dd, return_space='gpu')
         
@@ -84,8 +85,12 @@ def run_pipeline(data, metadata, max_dd=4.0, min_dd=0.001, threshold=30.0, min_f
     if merge_boxcar_trials:
         peaks = merge_hits(peaks)
     t1 = time.time()
-    
-    logger.info(f"Pipeline runtime: {(t1-t0):2.2f}s")
+
+    if called_count is None:    
+        logger.info(f"run_pipeline: Elapsed time: {(t1-t0):2.2f}s; {len(peaks)} hits found")
+    else:
+        logger.info(f"run_pipeline #{called_count}: Elapsed time: {(t1-t0):2.2f}s; {len(peaks)} hits found")
+
     return peaks
             
 
@@ -114,7 +119,7 @@ def find_et(filename, filename_out='hits.csv', gulp_size=2**19, max_dd=4.0, min_
         Passes keyword arguments on to run_pipeline(). Same as find_et but doesn't use dask parallelization.
     """
     t0 = time.time()
-    logger.debug("find_et: At entry, filename_out={}, gulp_size={}, max_dd={}, min_dd={}, threshold={}, n_boxcar={}, kernel={}, gpu_id={}"
+    logger.info("find_et: At entry, filename_out={}, gulp_size={}, max_dd={}, min_dd={}, threshold={}, n_boxcar={}, kernel={}, gpu_id={}"
                  .format(filename_out, gulp_size, max_dd, min_dd, threshold, n_boxcar, kernel, gpu_id))
     ds = from_h5(filename)
 
@@ -122,23 +127,24 @@ def find_et(filename, filename_out='hits.csv', gulp_size=2**19, max_dd=4.0, min_
         deltaf = ds.frequency.to('Hz').val_step
         deltat = ds.time.to('s').val_step
         min_fdistance = int(np.abs(deltat * ds.time.n_step * max_dd / deltaf))
-        logger.info(f"<find_et>: min_fdistance calculated to be {min_fdistance} bins")
+        logger.info(f"find_et: min_fdistance calculated to be {min_fdistance} bins")
 
     if gulp_size > ds.data.shape[2]:
         logger.warning(f'find_et: gulp_size ({gulp_size}) > Num fine frequency channels ({ds.data.shape[2]}).  Setting gulp_size = {ds.data.shape[2]}')
         gulp_size = ds.data.shape[2]
     out = []
+    attach_gpu_device(gpu_id)
+    counter = 0
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
-        #print(d_arr)
-        hits = run_pipeline(d_arr, max_dd=max_dd, min_dd=min_dd, 
+        counter += 1
+        hits = run_pipeline(d_arr, called_count=counter, max_dd=max_dd, min_dd=min_dd, 
                                 threshold=threshold, n_boxcar=n_boxcar, 
                                 min_fdistance=min_fdistance, min_ddistance=min_ddistance,
-                            kernel=kernel, gpu_id=gpu_id, *args, **kwargs)
+                                kernel=kernel, gpu_id=None, *args, **kwargs)
         out.append(hits)
-        logger.info(f"{len(hits)} hits found")
     
     dframe = pd.concat(out)
     dframe.to_csv(filename_out)
     t1 = time.time()
-    print(f"## TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
+    print(f"find_et: TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
     return dframe
