@@ -1,5 +1,4 @@
 from hyperseti.io import from_fil, from_h5
-from hyperseti.kurtosis import spectral_kurtosis, sk_flag
 from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
 
 import cupy as cp
