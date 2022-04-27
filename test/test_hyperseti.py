@@ -212,8 +212,24 @@ def test_find_et():
     pd = find_et(voyager_h5, config, gulp_size=2**18)
     assert len(pd) == 4
     assert np.allclose(pd['channel_idx'].values, [747930., 756039., 739821., 739935.])
-    
+
+
+
+def test_find_et_cmd_tool():
+    from hyperseti.findET import cmd_tool
+
+    args = [voyager_h5, 
+            "-o", "hits.csv", 
+            "-z", "16", 
+            "-M", "1.0", 
+            "-s", "10", 
+            "-b", "1",
+            "-k", "ddsk"]
+
+    cmd_tool(args)
+
 if __name__ == "__main__":
-    test_hitsearch()
-    test_hitsearch_multi()
-    test_find_et
+    #test_hitsearch()
+    #test_hitsearch_multi()
+    #test_find_et()
+    test_find_et_cmd_tool()
