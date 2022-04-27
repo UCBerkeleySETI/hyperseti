@@ -279,7 +279,7 @@ def find_hits_recursive(data, metadata, max_hits=100, threshold=20, padding=4):
     hv = cp.asarray(np.zeros(shape=(max_hits)), dtype='float32')
     
     while hit_id < max_hits:
-        dd, _md = dedoppler(data, metadata, max_dd=1.0, return_space='gpu')
+        dd = dedoppler(data, metadata, max_dd=1.0, return_space='gpu')
         idx, val = find_max_idx(dd.data)
         if val > threshold:
             
