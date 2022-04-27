@@ -68,13 +68,35 @@ Data can be boxcar averaged to look for wider-band signals, and to retrieve sign
 for signals with large drift rates:
 
 ```python
-dedopp, md, hits = run_pipeline(d, metadata, max_dd=1.0, min_dd=None, threshold=100, 
-                                    n_boxcar=5, merge_boxcar_trials=True)
+    config = {
+        'preprocess': {
+            'sk_flag': True,
+            'normalize': True,
+        },
+        'dedoppler': {
+            'boxcar_mode': 'sum',
+            'kernel': 'ddsk',
+            'max_dd': 4.0,
+            'min_dd': None,
+            'apply_smearing_corr': True,
+            'beam_id': 0
+        },
+        'hitsearch': {
+            'threshold': 20,
+            'min_fdistance': 100
+        },
+        'pipeline': {
+            'n_boxcar': 1,
+            'merge_boxcar_trials': True
+        }
+    }
+    
+    run_pipeline(darray, config)
 ```
 
 Reading from file is also supported:
 
 ```python
-hits = find_et(filename, filename_out='hits.csv', n_parallel=2, gulp_size=2**18, max_dd=1.0, threshold=50)
+dframe = find_et(voyager_h5, config, gulp_size=2**18, filename_out='./hyperseti_hits.csv')
 ```
 
