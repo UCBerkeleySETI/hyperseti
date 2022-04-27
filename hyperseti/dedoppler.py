@@ -63,7 +63,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     if metadata['frequency_step'].to('Hz').value < 0:
         dd_shifts *= -1
 
-    logger.debug("delta_dd={}, N_dopp_upper={}, N_dopp_lower={}, dd_shifts={}"
+    logger.debug("dedoppler: delta_dd={}, N_dopp_upper={}, N_dopp_lower={}, dd_shifts={}"
                  .format(delta_dd, N_dopp_upper, N_dopp_lower, dd_shifts))
 
     dd_shifts_gpu  = cp.asarray(dd_shifts)
@@ -79,7 +79,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     # Allocate GPU memory for dedoppler data
     dedopp_gpu = cp.zeros((N_dopp, N_chan), dtype=cp.float32)
     t1 = time.time()
-    logger.info(f"Dedopp setup time: {(t1-t0)*1e3:2.2f}ms")
+    logger.debug(f"dedoppler: setup time: {(t1-t0)*1e3:2.2f}ms")
     
     # Launch kernel
     t0 = time.time()
@@ -88,7 +88,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     F_block = np.min((N_chan, 1024))
     F_grid  = N_chan // F_block
     #print(dd_shifts)
-    logger.debug(f"Kernel shape (grid, block) {(F_grid, N_dopp), (F_block,)}")
+    logger.debug(f"dedoppler: Kernel shape (grid, block) {(F_grid, N_dopp), (F_block,)}")
     if kernel == 'dedoppler':
         logger.debug(f"{type(d_gpu)}, {type(dedopp_gpu)}, {N_chan}, {N_time}")
         dedoppler_kernel((F_grid, N_dopp), (F_block,), 
@@ -99,8 +99,8 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
          # output must be scaled by N_acc, which can be figured out from df and dt metadata
         samps_per_sec = (1.0 / np.abs(metadata['frequency_step'])).to('s') / 2 # Nyq sample rate for channel
         N_acc = int(metadata['time_step'].to('s') / samps_per_sec)
-        logger.debug(f'rescaling SK by {N_acc}')
-        logger.debug(f"driftrates: {dd_shifts}")
+        logger.debug(f'dedoppler: rescaling SK by {N_acc}')
+        logger.debug(f"dedoppler: driftrates: {dd_shifts}")
         dedoppler_kurtosis_kernel((F_grid, N_dopp), (F_block,), 
                          (d_gpu, dedopp_gpu, dd_shifts_gpu, N_chan, N_time, N_acc)) # grid, block and arguments 
     else:
@@ -108,7 +108,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
         sys.exit(86)
   
     t1 = time.time()
-    logger.info("Dedopp kernel ({}) time: {:2.2f}ms".format(kernel, (t1-t0)*1e3))
+    logger.debug("dedoppler: kernel ({}) time: {:2.2f}ms".format(kernel, (t1-t0)*1e3))
     
     # Compute drift rate values in Hz/s corresponding to dedopp axis=0
     dd_vals = dd_shifts * delta_dd
@@ -126,7 +126,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     dedopp_gpu = cp.expand_dims(dedopp_gpu, axis=1)
 
     if apply_smearing_corr:
-        logger.debug(f"Applying smearing correction")
+        logger.debug(f"dedoppler: Applying smearing correction")
         dedopp_darr, metadata = apply_boxcar_drift(dedopp_gpu, metadata)
         dedopp_gpu = dedopp_darr.data
     return dedopp_gpu, metadata
