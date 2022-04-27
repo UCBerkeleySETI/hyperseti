@@ -30,4 +30,4 @@ htmlcov.tar.gz
 coverage.xml
 test/*.csv
 test/*.log
-test/*.png
+test/test_figs
