@@ -36,22 +36,37 @@ GPU_ID = 0
 def test_with_voyager():
     print("hyperseti find_et from file {} .....".format(voyager_h5))
     update_levels(logbook.INFO, [])
-    dframe = find_et(voyager_h5, 
-                    filename_out='./hyperseti_hits.csv', 
-                    gulp_size=GULP_SIZE, 
-                    max_dd=MAX_DRIFT_RATE, 
-                    min_dd=MIN_DRIFT_RATE,
-                    n_boxcar=N_BOXCAR,
-                    kernel=KERNEL,
-                    gpu_id=GPU_ID,
-                    threshold=SNR_THRESHOLD)
+    config = {
+        'preprocess': {
+            'sk_flag': True,
+            'normalize': True,
+        },
+        'dedoppler': {
+            'boxcar_mode': 'sum',
+            'kernel': 'ddsk',
+            'max_dd': 4.0,
+            'min_dd': None,
+            'apply_smearing_corr': True,
+            'beam_id': 0
+        },
+        'hitsearch': {
+            'threshold': 20,
+            'min_fdistance': 100
+        },
+        'pipeline': {
+            'n_boxcar': 1,
+            'merge_boxcar_trials': True
+        }
+    }
+    dframe = find_et(voyager_h5, config, gulp_size=2**18,
+                    filename_out='./hyperseti_hits.csv')
     
     # dframe column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
     print("Returned dataframe:\n", dframe)
     list_drate = dframe["drift_rate"].tolist()
     for drate in list_drate:
         print("Observed drift rate = {}, should be negative.".format(drate))
-        assert drate < 0.0
+        assert drate <= 0.0
     return dframe
 
 if __name__ == "__main__":

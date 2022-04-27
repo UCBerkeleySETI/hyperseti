@@ -43,7 +43,8 @@ def test_argrelmax():
     d_arr = from_setigen(frame)
     d_arr.data = normalize(d_arr)
 
-    dd, _md = dedoppler(d_arr, max_dd=1.0, return_space='gpu', apply_smearing_corr=False)
+    dd, md = dedoppler(d_arr, max_dd=1.0, return_space='gpu', apply_smearing_corr=False)
+    print(type(dd))
 
     snrs, fidx, ddidx =  find_peaks_argrelmax(dd, threshold=20, order=100)
     assert len(snrs) == 4
