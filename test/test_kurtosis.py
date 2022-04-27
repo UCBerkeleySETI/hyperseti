@@ -1,4 +1,5 @@
-from hyperseti.data_array import from_fil, from_h5
+from hyperseti.io.filterbank import from_fil
+from hyperseti.io.hdf5 import from_h5
 from hyperseti.kurtosis import spectral_kurtosis, sk_flag
 from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
 
@@ -8,10 +9,7 @@ import pylab as plt
 import numpy as np
 import os
 
-import logbook
 import hyperseti
-#hyperseti.dedoppler.logger.level = logbook.DEBUG
-#hyperseti.utils.logger.level = logbook.DEBUG
 
 def test_kurtosis():
     metadata = {'frequency_start': 8421.38671875*u.MHz, 
