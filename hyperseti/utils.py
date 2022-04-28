@@ -6,7 +6,6 @@ from astropy.units import Unit, Quantity
 import numpy as np
 import cupy as cp
 import pandas as pd
-import warnings
 import copy
 
 from .data_array import DataArray
@@ -64,12 +63,12 @@ def on_gpu(func):
                 # Duck-type numpy array
                 logger.debug(f"on_gpu inner <{func_name}> Converting numpy-like arg {argname} to cupy..")
                 if arg.dtype != np.dtype('float32'):
-                    warnings.warn(f"<{func_name}> Arg {argname} is not float32, could cause issues...", RuntimeWarning)
+                    logger.warning(f"<{func_name}> Arg {argname} is not float32, could cause issues...")
                 arg = cp.asarray(arg)                
             if isinstance(arg, DataArray):
                 logger.debug(f"on_gpu inner <{func_name}> Converting arg {argname}.data to cupy..")
                 if arg.data.dtype != np.dtype('float32'):
-                    warnings.warn(f"<{func_name}> Arg {argname}.data is not float32, could cause issues...", RuntimeWarning)
+                    logger.warning(f"<{func_name}> Arg {argname}.data is not float32, could cause issues...")
                 arg.data = cp.asarray(arg.data)                
             new_args.append(arg)
             
@@ -178,11 +177,11 @@ def datwrapper(dims=None, *args, **kwargs):
                 return output
             elif isinstance(output, (np.ndarray, cp.ndarray)):
                 if dims is not None:
-                    warnings.warn(f"datwrapper <{func_name}> dimensions supplied, but function returns bare numpy array (no metadata).", RuntimeWarning)
+                    logger.warning(f"datwrapper <{func_name}> dimensions supplied, but function returns bare numpy array (no metadata).")
                 return output
             elif isinstance(output, pd.DataFrame):
                 if dims is not None:
-                    warnings.warn(f"datwrapper <{func_name}> dimensions supplied, but function returns pandas Dataframe (no metadata).", RuntimeWarning)
+                    logger.warning(f"datwrapper <{func_name}> dimensions supplied, but function returns pandas Dataframe (no metadata).")
                 return output                
             elif isinstance(output, (list, tuple)):
                 # Check to see if we can apply original dimensions
@@ -253,7 +252,7 @@ def datwrapper(dims=None, *args, **kwargs):
             else:
                 if dims is not None:
                     t = type(output)
-                    warnings.warn(f"dat_wrapper <{func_name}> dimensions supplied, but function returns {t} which can't be a DataArray.", RuntimeWarning)
+                    logger.warning(f"dat_wrapper <{func_name}> dimensions supplied, but function returns {t} which can't be a DataArray.")
                 return output   
         return inner
     return _datwrapper
