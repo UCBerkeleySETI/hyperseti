@@ -1,5 +1,4 @@
-from hyperseti.io.filterbank import from_fil
-from hyperseti.io.hdf5 import from_h5
+from hyperseti.io import from_fil, from_h5
 from hyperseti.kurtosis import spectral_kurtosis, sk_flag
 from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
 
