@@ -156,7 +156,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
 
     if apply_smearing_corr:
         # Note: do not apply smearing corr to DDSK
-        logger.info(f"Applying smearing correction")
+        logger.debug(f"dedoppler: Applying smearing correction")
         dedopp_darr, metadata = apply_boxcar_drift(dedopp_gpu, metadata)
         dedopp_gpu = dedopp_darr.data
 
