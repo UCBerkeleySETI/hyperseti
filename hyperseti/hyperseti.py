@@ -58,7 +58,7 @@ def run_pipeline(data, metadata, config, gpu_id=0):
 
         min_fdistance = int(np.abs(deltat * n_int * max_dd / deltaf))
         config['hitsearch']['min_fdistance'] = min_fdistance
-        logger.info(f"<run_pipeline>: min_fdistance calculated to be {min_fdistance} bins")
+        logger.debug(f"run_pipeline: min_fdistance calculated to be {min_fdistance} bins")
 
     # Apply preprocessing normalization
     if config['preprocess'].get('normalize', False):
@@ -75,7 +75,7 @@ def run_pipeline(data, metadata, config, gpu_id=0):
     
     _threshold0 = deepcopy(config['hitsearch']['threshold'])
     for boxcar_size in boxcar_trials:
-        logger.info(f"--- Boxcar size: {boxcar_size} ---")
+        logger.debug(f"run_pipeline: --- Boxcar size: {boxcar_size} ---")
         config['dedoppler']['boxcar_size'] = boxcar_size
         
         # Check if kernel is computing DD + SK
