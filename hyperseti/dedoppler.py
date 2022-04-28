@@ -42,7 +42,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     if min_dd is None:
         min_dd = np.abs(max_dd) * -1
     else:
-        logger.info(f"<dedoppler> Minimum dedoppler rate supplied: {min_dd} Hz/s")
+        logger.debug(f"dedoppler: Minimum dedoppler rate supplied: {min_dd} Hz/s")
     
     # Compute minimum possible drift (delta_dd)
     N_time, N_beam, N_chan = data.shape
@@ -77,7 +77,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     if kernel == 'ddsk':
         dedopp_sk_gpu = cp.zeros((N_dopp, N_beam, N_chan), dtype=cp.float32)
     t1 = time.time()
-    logger.info(f"Dedopp setup time: {(t1-t0)*1e3:2.2f}ms")
+    logger.debug(f"dedoppler: setup time: {(t1-t0)*1e3:2.2f}ms")
 
     # TODO: Candidate for parallelization
     for beam_id in range(N_beam):
@@ -106,7 +106,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
         F_block = np.min((N_chan, 1024))
         F_grid  = N_chan // F_block
         #print(dd_shifts)
-        logger.debug(f"Kernel shape (grid, block) {(F_grid, N_dopp), (F_block,)}")
+        logger.debug(f"dedoppler: Kernel shape (grid, block) {(F_grid, N_dopp), (F_block,)}")
 
         if kernel == 'dedoppler':
             logger.debug(f"{type(d_gpu)}, {type(_dedopp_gpu)}, {N_chan}, {N_time}")
@@ -116,16 +116,16 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
             # output must be scaled by N_acc, which can be figured out from df and dt metadata
             samps_per_sec = (1.0 / np.abs(metadata['frequency_step'])).to('s') / 2 # Nyq sample rate for channel
             N_acc = int(metadata['time_step'].to('s') / samps_per_sec)
-            logger.debug(f'rescaling SK by {N_acc}')
-            logger.debug(f"driftrates: {dd_shifts}")
+            logger.debug(f'dedoppler kurtosis: rescaling SK by {N_acc}')
+            logger.debug(f"dedoppler kurtosis: driftrates: {dd_shifts}")
             dedoppler_kurtosis_kernel((F_grid, N_dopp), (F_block,), 
                             (d_gpu, _dedopp_gpu, dd_shifts_gpu, N_chan, N_time, N_acc)) # grid, block and arguments 
         elif kernel == 'ddsk':
             # output must be scaled by N_acc, which can be figured out from df and dt metadata
             samps_per_sec = (1.0 / np.abs(metadata['frequency_step'])).to('s') / 2 # Nyq sample rate for channel
             N_acc = int(metadata['time_step'].to('s') / samps_per_sec)
-            logger.debug(f'rescaling SK by {N_acc}')
-            logger.debug(f"driftrates: {dd_shifts}")
+            logger.debug(f'dedoppler ddsk: rescaling SK by {N_acc}')
+            logger.debug(f"dedoppler ddsk: driftrates: {dd_shifts}")
             dedoppler_with_kurtosis_kernel((F_grid, N_dopp), (F_block,), 
                             (d_gpu, _dedopp_gpu, _dedopp_sk_gpu, dd_shifts_gpu, N_chan, N_time, N_acc)) 
                             # grid, block and arguments
@@ -134,7 +134,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
             sys.exit(86)
     
         t1 = time.time()
-        logger.info("Dedopp kernel ({}) time {:2.2f}ms".format(kernel, (t1-t0)*1e3))
+        logger.debug("dedoppler: kernel ({}) time {:2.2f}ms".format(kernel, (t1-t0)*1e3))
 
         if N_beam == 1:
             dedopp_gpu = cp.expand_dims(_dedopp_gpu, axis=1)
