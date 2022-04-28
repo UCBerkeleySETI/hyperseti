@@ -4,7 +4,7 @@ logbook
 astropy
 h5py
 hdf5plugin
-cupy>=8.6.0
+cupy>=9.0.0
 cusignal
 setigen
 blimpy
