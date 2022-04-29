@@ -165,6 +165,7 @@ def test_hitsearch_multi():
         },
         'pipeline': {
             'n_boxcar': 5,
+            'n_blank': 2,
             'merge_boxcar_trials': True
         }
     }
@@ -210,9 +211,9 @@ def test_find_et():
     }
 
     pd = find_et(voyager_h5, config, gulp_size=2**18)
-    assert len(pd) == 4
-    assert np.allclose(pd['channel_idx'].values, [747930., 756039., 739821., 739935.])
-
+    assert len(pd) == 5
+    print(pd['channel_idx'].values)
+    assert np.allclose(pd['channel_idx'].values, [747930., 756039., 739821., 739935., 755924.])
 
 
 def test_find_et_cmd_tool():
@@ -229,7 +230,7 @@ def test_find_et_cmd_tool():
     cmd_tool(args)
 
 if __name__ == "__main__":
-    #test_hitsearch()
-    #test_hitsearch_multi()
-    #test_find_et()
+    test_hitsearch()
+    test_hitsearch_multi()
+    test_find_et()
     test_find_et_cmd_tool()

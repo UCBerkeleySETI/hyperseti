@@ -12,7 +12,7 @@ from copy import deepcopy
 
 from .dedoppler import dedoppler
 from .normalize import normalize
-from .hits import hitsearch, merge_hits, create_empty_hits_table
+from .hits import hitsearch, merge_hits, create_empty_hits_table, blank_hits
 from .io import from_fil, from_h5
 from .utils import attach_gpu_device, on_gpu, datwrapper
 from .kurtosis import sk_flag
@@ -75,34 +75,51 @@ def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
     peaks = create_empty_hits_table()
     
     n_boxcar = config['pipeline'].get('n_boxcar', 1)
+    n_blank = config['pipeline'].get('n_blank', 1)
     boxcar_trials = map(int, 2**np.arange(0, n_boxcar))
     
     _threshold0 = deepcopy(config['hitsearch']['threshold'])
-    for boxcar_size in boxcar_trials:
-        logger.debug(f"run_pipeline: --- Boxcar size: {boxcar_size} ---")
-        config['dedoppler']['boxcar_size'] = boxcar_size
-        
-        # Check if kernel is computing DD + SK
-        kernel = config['dedoppler'].get('kernel', None)
-        if kernel == 'ddsk':
-            dedopp, dedopp_sk, _md = dedoppler(data, metadata, return_space='gpu', **config['dedoppler'])
-            config['hitsearch']['sk_data'] = dedopp_sk   # Pass to hitsearch
-        else:
-            dedopp, _md = dedoppler(data, metadata, return_space='gpu', **config['dedoppler'])
-            dedopp_sk = None
-        
-        # Adjust SNR threshold to take into account boxcar size and dedoppler sum
-        # Noise increases by sqrt(N_timesteps * boxcar_size)
-        config['hitsearch']['threshold'] = _threshold0 * np.sqrt(N_timesteps * boxcar_size)
-        _peaks = hitsearch(dedopp, **config['hitsearch'])
-        logger.debug(f"{peaks}")
-        
-        if _peaks is not None:
-            _peaks['snr'] /= np.sqrt(N_timesteps * boxcar_size)
-            peaks = pd.concat((peaks, _peaks), ignore_index=True)
+    n_hits_last_iter = 0
+    for blank_count in range(n_blank):
+        for boxcar_size in boxcar_trials:
+            logger.debug(f"run_pipeline: --- Boxcar size: {boxcar_size} ---")
+            config['dedoppler']['boxcar_size'] = boxcar_size
             
-    if config['pipeline']['merge_boxcar_trials']:
-        peaks = merge_hits(peaks)
+            # Check if kernel is computing DD + SK
+            kernel = config['dedoppler'].get('kernel', None)
+            if kernel == 'ddsk':
+                dedopp, dedopp_sk, _md = dedoppler(data, metadata, return_space='gpu', **config['dedoppler'])
+                config['hitsearch']['sk_data'] = dedopp_sk   # Pass to hitsearch
+            else:
+                dedopp, _md = dedoppler(data, metadata, return_space='gpu', **config['dedoppler'])
+                dedopp_sk = None
+            
+            # Adjust SNR threshold to take into account boxcar size and dedoppler sum
+            # Noise increases by sqrt(N_timesteps * boxcar_size)
+            config['hitsearch']['threshold'] = _threshold0 * np.sqrt(N_timesteps * boxcar_size)
+            _peaks = hitsearch(dedopp, **config['hitsearch'])
+            logger.debug(f"{peaks}")
+            
+            if _peaks is not None:
+                _peaks['snr'] /= np.sqrt(N_timesteps * boxcar_size)
+                peaks = pd.concat((peaks, _peaks), ignore_index=True)   
+            else:
+                peaks = peaks
+
+        if config['pipeline']['merge_boxcar_trials']:
+            peaks = merge_hits(peaks)
+        n_hits_iter = len(peaks) - n_hits_last_iter
+
+        if n_blank > 1:
+            if n_hits_iter > n_hits_last_iter:
+                logger.info(f"run_pipeline: blanking hits, (iteration {blank_count + 1} / {n_blank})")
+                data, metadata = blank_hits(data, metadata, peaks)
+                data = data.data ## Blank hits will return a DataArray
+                n_hits_last_iter = n_hits_iter
+            else:
+                logger.info(f"run_pipeline: No new hits found, breaking! (iteration {blank_count + 1} / {n_blank})")
+                break
+
     t1 = time.time()
 
     if called_count is None:    
