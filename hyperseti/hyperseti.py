@@ -66,7 +66,8 @@ def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
     # Apply preprocessing normalization
     if config['preprocess'].get('normalize', False):
         if config['preprocess'].get('sk_flag', False):
-            mask = sk_flag(data, metadata, return_space='gpu')
+            sk_flag_opts = config.get('sk_flag', {})
+            mask = sk_flag(data, metadata, return_space='gpu', **sk_flag_opts)
         else:
             mask = None
         data = normalize(data, mask=mask, return_space='gpu')
