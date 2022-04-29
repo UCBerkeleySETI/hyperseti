@@ -68,30 +68,34 @@ Data can be boxcar averaged to look for wider-band signals, and to retrieve sign
 for signals with large drift rates:
 
 ```python
-    config = {
-        'preprocess': {
-            'sk_flag': True,
-            'normalize': True,
-        },
-        'dedoppler': {
-            'boxcar_mode': 'sum',
-            'kernel': 'ddsk',
-            'max_dd': 4.0,
-            'min_dd': None,
-            'apply_smearing_corr': True,
-            'beam_id': 0
-        },
-        'hitsearch': {
-            'threshold': 20,
-            'min_fdistance': 100
-        },
-        'pipeline': {
-            'n_boxcar': 1,
-            'merge_boxcar_trials': True
-        }
+config = {
+    'preprocess': {
+        'sk_flag': True,
+        'normalize': True,
+    },
+    'sk_flag': {
+        'n_sigma': 3,
+    },
+    'dedoppler': {
+        'boxcar_mode': 'sum',
+        'kernel': 'ddsk',
+        'max_dd': 4.0,
+        'min_dd': None,
+        'apply_smearing_corr': False,
+        'beam_id': 0
+    },
+    'hitsearch': {
+        'threshold': 3,
+        'min_fdistance': 100
+    },
+    'pipeline': {
+        'n_boxcar': 4,
+        'merge_boxcar_trials': True,
+        'n_blank': 2
     }
-    
-    run_pipeline(darray, config)
+}
+
+run_pipeline(darray, config)
 ```
 
 Reading from file is also supported:
