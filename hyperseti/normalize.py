@@ -70,9 +70,9 @@ def normalize(data,  mask=None, poly_fit=0):
 
     flag_fraction =  N_flagged / N_tot
     flag_correction =  N_tot / (N_tot - N_flagged) 
-    ### logger.info(f"Flagged fraction: {flag_fraction:2.4f}")
-    ### if flag_fraction > 0.2:
-    ###    logger.warning(f"High flagged fraction: {flag_fraction:2.3f}")
+    logger.debug(f"Flagged fraction: {flag_fraction:2.4f}")
+    if flag_fraction > 0.2:
+        logger.warning(f"High flagged fraction: {flag_fraction:2.3f}")
 
     #  Apply to original data
     for ii in range(n_ifs):
