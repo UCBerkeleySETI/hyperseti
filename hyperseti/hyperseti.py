@@ -27,7 +27,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 @datwrapper(dims=(None))
 @on_gpu
-def run_pipeline(data, metadata, config, gpu_id=0):
+def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
     """ Run dedoppler + hitsearch pipeline 
     
     Args:
@@ -35,6 +35,8 @@ def run_pipeline(data, metadata, config, gpu_id=0):
         metadata (dict): Metadata dictionary, should contain 'df' and 'dt'
                          (frequency and time resolution), as astropy quantities
         gpu_id (int): GPU device ID to use.
+        called_count (int): If called in a loop, use this to keep track of how many times the
+                            pipeline is called. 
     
     Returns:
         (dedopp, metadata, peaks): Array of data post dedoppler (at final boxcar width), plus
@@ -42,7 +44,8 @@ def run_pipeline(data, metadata, config, gpu_id=0):
     """
     config = deepcopy(config)
     t0 = time.time()
-    attach_gpu_device(gpu_id)
+    if gpu_id is not None:
+        attach_gpu_device(gpu_id)
     logger.debug(data.shape)
     N_timesteps = data.shape[0]
 
@@ -58,7 +61,7 @@ def run_pipeline(data, metadata, config, gpu_id=0):
 
         min_fdistance = int(np.abs(deltat * n_int * max_dd / deltaf))
         config['hitsearch']['min_fdistance'] = min_fdistance
-        logger.info(f"<run_pipeline>: min_fdistance calculated to be {min_fdistance} bins")
+        logger.debug(f"run_pipeline: min_fdistance calculated to be {min_fdistance} bins")
 
     # Apply preprocessing normalization
     if config['preprocess'].get('normalize', False):
@@ -75,7 +78,7 @@ def run_pipeline(data, metadata, config, gpu_id=0):
     
     _threshold0 = deepcopy(config['hitsearch']['threshold'])
     for boxcar_size in boxcar_trials:
-        logger.info(f"--- Boxcar size: {boxcar_size} ---")
+        logger.debug(f"run_pipeline: --- Boxcar size: {boxcar_size} ---")
         config['dedoppler']['boxcar_size'] = boxcar_size
         
         # Check if kernel is computing DD + SK
@@ -100,8 +103,12 @@ def run_pipeline(data, metadata, config, gpu_id=0):
     if config['pipeline']['merge_boxcar_trials']:
         peaks = merge_hits(peaks)
     t1 = time.time()
-    
-    logger.info(f"Pipeline runtime: {(t1-t0):2.2f}s")
+
+    if called_count is None:    
+        logger.info(f"run_pipeline: Elapsed time: {(t1-t0):2.2f}s; {len(peaks)} hits found")
+    else:
+        logger.info(f"run_pipeline #{called_count}: Elapsed time: {(t1-t0):2.2f}s; {len(peaks)} hits found")
+
     return peaks
             
 
@@ -144,14 +151,15 @@ def find_et(filename, pipeline_config, gulp_size=2**20, filename_out='hits.csv',
         gulp_size = ds.data.shape[2]
     out = []
 
+    attach_gpu_device(gpu_id)
+    counter = 0
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
-        #print(d_arr)
+        counter += 1
         hits = run_pipeline(d_arr, pipeline_config, gpu_id=gpu_id)
         out.append(hits)
-        logger.info(f"{len(hits)} hits found")
     
     dframe = pd.concat(out)
     dframe.to_csv(filename_out)
     t1 = time.time()
-    print(f"## TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
+    print(f"find_et: TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
     return dframe

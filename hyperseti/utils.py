@@ -24,7 +24,7 @@ def attach_gpu_device(new_id):
         logger.info("attach_gpu_device: Using device ID ({})".format(new_id))
     except:
         cur_id = cp.cuda.Device().id
-        logger.error("attach_gpu_device: cp.cuda.Device({}).use() FAILED!".format(new_id))
+        logger.error("attach_gpu_device: attach_gpu_device: cp.cuda.Device({}).use() FAILED!".format(new_id))
         logger.warning("attach_gpu_device: Will continue to use current device ID ({})".format(cur_id))
 
 
@@ -54,22 +54,23 @@ def on_gpu(func):
         logger.debug(f"{func_name} on_gpu inner, args: {args}")
         for idx, arg in enumerate(args):
             argname = func_params[idx]
+
             if isinstance(arg, cp.ndarray):
-                logger.debug(f"<{func_name}> Arg {argname} is already a cupy array..")
+                logger.debug(f"on_gpu inner <{func_name}> Arg {argname} is already a cupy array..")
             elif isinstance(arg, np.ndarray):
-                logger.info(f"<{func_name}> Converting ndarray arg {argname} to cupy..")
+                logger.info(f"on_gpu inner <{func_name}> Converting ndarray arg {argname} to cupy..")
                 if arg.dtype != np.dtype('float32'):
-                    logger.warning(f"<{func_name}> Arg {argname} is not float32, could cause issues...")
+                    logger.warning(f"on_gpu inner <{func_name}> Arg {argname} is not float32, could cause issues...")
                 arg = cp.asarray(arg)
             elif hasattr(arg, '__array__'):
                 # Duck-type numpy array
-                logger.info(f"<{func_name}> Converting numpy-like arg {argname} to cupy..")
+                logger.debug(f"on_gpu inner <{func_name}> Converting numpy-like arg {argname} to cupy..")
                 if arg.dtype != np.dtype('float32'):
-                    logger.warn(f"<{func_name}> Arg {argname} is not float32, could cause issues...")
+                    logger.warning(f"<{func_name}> Arg {argname} is not float32, could cause issues...")
                 arg = cp.asarray(arg)                
             if isinstance(arg, DataArray):
                 if arg.data.dtype != np.dtype('float32'):
-                    logger.warn(f"<{func_name}> Arg {argname}.data is not float32, could cause issues...")
+                    logger.warning(f"<{func_name}> Arg {argname}.data is not float32, could cause issues...")
                 if isinstance(arg.data, cp.ndarray):
                     logger.debug(f"<{func_name}> Arg {argname}.data already cupy array..")
                 else:
@@ -79,7 +80,7 @@ def on_gpu(func):
             
         return_space = None
         if 'return_space' in kwargs:
-            logger.debug(f"<{func_name}> Return space requested: {kwargs['return_space']}")
+            logger.debug(f"on_gpu inner <{func_name}> Return space requested: {kwargs['return_space']}")
             return_space = kwargs.pop('return_space')
             assert return_space in ('cpu', 'gpu')
         output = func(*new_args, **kwargs)
@@ -89,14 +90,14 @@ def on_gpu(func):
                 return output
             if len(output) == 1 or isinstance(output, (np.ndarray, cp.ndarray)):
                 if isinstance(output, np.ndarray):
-                    logger.info(f"<{func_name}> Converting output to cupy")
+                    logger.debug(f"on_gpu inner <{func_name}> Converting output to cupy")
                     output = cp.asarray(output)
                 return output
             else:
                 new_output = []
                 for idx, item in enumerate(output):
                     if isinstance(item, np.ndarray):
-                        logger.info(f"<{func_name}> Converting output {idx} to cupy")
+                        logger.debug(f"on_gpu inner <{func_name}> Converting output {idx} to cupy")
                         item = cp.asarray(item)
                     new_output.append(item)
                 return new_output
@@ -104,14 +105,14 @@ def on_gpu(func):
         elif return_space == 'cpu':
             if len(output) == 1 or isinstance(output, (np.ndarray, cp.ndarray)):
                 if isinstance(output, cp.ndarray):
-                    logger.info(f"<{func_name}> Converting output to numpy")
+                    logger.debug(f"on_gpu inner <{func_name}> Converting output to numpy")
                     output = cp.asnumpy(output)
                 return output
             else:
                 new_output = []
                 for idx, item in enumerate(output):
                     if isinstance(item, cp.ndarray):
-                        logger.info(f"<{func_name}> Converting output {idx} to numpy")
+                        logger.debug(f"on_gpu inner <{func_name}> Converting output {idx} to numpy")
                         item = cp.asnumpy(item)
                     new_output.append(item)
                 return new_output
@@ -174,11 +175,11 @@ def datwrapper(dims=None, *args, **kwargs):
                 return output
             elif isinstance(output, (np.ndarray, cp.ndarray)):
                 if dims is not None:
-                    logger.warning(f"<{func_name}> dimensions supplied, but function returns bare numpy array (no metadata).")
+                    logger.warning(f"datwrapper <{func_name}> dimensions supplied, but function returns bare numpy array (no metadata).")
                 return output
             elif isinstance(output, pd.DataFrame):
                 if dims is not None:
-                    logger.warning(f"<{func_name}> dimensions supplied, but function returns pandas Dataframe (no metadata).")
+                    logger.warning(f"datwrapper <{func_name}> dimensions supplied, but function returns pandas Dataframe (no metadata).")
                 return output                
             elif isinstance(output, (list, tuple)):
                 # Check to see if we can apply original dimensions
@@ -200,7 +201,7 @@ def datwrapper(dims=None, *args, **kwargs):
 
                 # Now, if dims were found, let's use those to generate a DataArray
                 if _dims is not None and not isinstance(output[0], DataArray):
-                    logger.debug(f"<{func_name}> Generating DataArray from function output, {_dims}")
+                    logger.debug(f"datwrapper <{func_name}> Generating DataArray from function output, {_dims}")
                     new_output = []
                     new_data = output[0]
                     
@@ -218,7 +219,7 @@ def datwrapper(dims=None, *args, **kwargs):
                     for d in new_md.pop('input_dims', ('unset',) ):
                         #print(d, new_md['output_dims'])
                         if d not in new_md['output_dims']:
-                            logger.debug(f"<{func_name}> deleting missing output dimension: {d}")
+                            logger.debug(f"datwrapper <{func_name}> deleting missing output dimension: {d}")
                             new_md.pop(f"{d}_start", 0)
                             new_md.pop(f"{d}_step", 0)
                     # TODO: Should we delete any keys ending with _step or _start?
@@ -228,8 +229,8 @@ def datwrapper(dims=None, *args, **kwargs):
                     array_md = copy.deepcopy(new_md)
                     array_md.pop('input_dims', 0)
                     array_md.pop('output_dims', 0)
-                    logger.debug(f"<{func_name}> data shape: {new_data.shape}")
-
+                    logger.debug(f"datwrapper <{func_name}> data shape: {new_data.shape}")
+                    
                     darr = from_metadata(new_data, array_md, dims=_dims)
                     new_output.append(darr)
                     new_output.append(new_md)
@@ -245,7 +246,7 @@ def datwrapper(dims=None, *args, **kwargs):
             else:
                 if dims is not None:
                     t = type(output)
-                    logger.warning(f"<{func_name}> dimensions supplied, but function returns {t} which can't be a DataArray.")
+                    logger.warning(f"dat_wrapper <{func_name}> dimensions supplied, but function returns {t} which can't be a DataArray.")
                 return output   
         return inner
     return _datwrapper

@@ -8,10 +8,7 @@ import pylab as plt
 import numpy as np
 import os
 
-import logbook
 import hyperseti
-#hyperseti.dedoppler.logger.level = logbook.DEBUG
-#hyperseti.utils.logger.level = logbook.DEBUG
 
 def test_kurtosis():
     h5 = from_h5(voyager_h5)
