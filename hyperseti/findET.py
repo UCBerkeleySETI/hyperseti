@@ -88,7 +88,7 @@ def cmd_tool(args=None):
         time1 = time.time()
         dframe = find_et(args.input_path, 
                         pipeline_config,
-                        gulp_size=2**args.gulp_size,
+                        gulp_size=2**args.gulp_exponent,
                         gpu_id=args.gpu_id)
         time2 = time.time()
 
