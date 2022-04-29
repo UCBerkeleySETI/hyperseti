@@ -27,7 +27,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 @datwrapper(dims=(None))
 @on_gpu
-def run_pipeline(data, metadata, config, gpu_id=0):
+def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
     """ Run dedoppler + hitsearch pipeline 
     
     Args:
@@ -35,6 +35,8 @@ def run_pipeline(data, metadata, config, gpu_id=0):
         metadata (dict): Metadata dictionary, should contain 'df' and 'dt'
                          (frequency and time resolution), as astropy quantities
         gpu_id (int): GPU device ID to use.
+        called_count (int): If called in a loop, use this to keep track of how many times the
+                            pipeline is called. 
     
     Returns:
         (dedopp, metadata, peaks): Array of data post dedoppler (at final boxcar width), plus
