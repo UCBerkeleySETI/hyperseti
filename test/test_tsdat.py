@@ -36,15 +36,31 @@ def test_tsdat():
 
     # Run findET
     t1 = time.time()
-    _ = find_et(PATH_H5, 
-                filename_out=PATH_HITS_CSV, 
-                gulp_size=GULP_SIZE, 
-                max_dd=MAX_DRIFT_RATE, 
-                min_dd=MIN_DRIFT_RATE,
-                n_boxcar=N_BOXCAR,
-                kernel=KERNEL,
-                gpu_id=GPU_ID,
-                threshold=SNR_THRESHOLD)
+    config = {
+        'preprocess': {
+            'sk_flag': True,
+            'normalize': True,
+        },
+        'dedoppler': {
+            'boxcar_mode': 'sum',
+            'kernel': 'ddsk',
+            'max_dd': 4.0,
+            'min_dd': None,
+            'apply_smearing_corr': True,
+            'beam_id': 0
+        },
+        'hitsearch': {
+            'threshold': 20,
+            'min_fdistance': 100
+        },
+        'pipeline': {
+            'n_boxcar': 1,
+            'merge_boxcar_trials': True
+        }
+    }
+    
+    dframe = find_et(voyager_h5, config, filename_out=PATH_HITS_CSV, gulp_size=2**18)
+
     et = time.time() - t1
     print(f"findET E.T. is {et:.1f} seconds")
 
