@@ -15,8 +15,8 @@ def cmd_tool(args=None):
     parser.add_argument("input_path", type=str, help="Path of input file.")
     parser.add_argument("--output_csv_path", "-o", type=str, default="./hits.csv",
                         help="Output path of CSV file.  Default: ./hits.csv.")
-    parser.add_argument("--gulp_size", "-z", type=int, default=18,
-                        help="Number of channels 2^N to process at once (e.g. Number of fine channels in a coarse channel). Defaults to 18 (i.e. 2^18=262144).")
+    parser.add_argument("--gulp_exponent", "-z", type=int, default=18,
+                        help="The power of 2 used in calculating the gulp size = number of fine channels to process in one gulp. Defaults to 18 (i.e. 2^18=262144).")
     parser.add_argument("--max_drift_rate", "-M", type=float, default=4.0,
                         help="Maximum doppler drift in Hz/s for searching.  Default: 4.0.")
     parser.add_argument("--min_drift_rate", "-m", type=float, default=0.001,
