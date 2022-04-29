@@ -13,7 +13,7 @@ from .dimension_scale import DimensionScale, TimeScale
 
 # Logging
 from .log import get_logger
-logger = get_logger('hyperseti.data')
+logger = get_logger('hyperseti.data_array')
 
 
 class DataArray(object):

@@ -66,7 +66,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
     if metadata['frequency_step'].to('Hz').value < 0:
         dd_shifts *= -1
 
-    logger.debug("delta_dd={}, N_dopp_upper={}, N_dopp_lower={}, dd_shifts={}"
+    logger.debug("dedoppler: delta_dd={}, N_dopp_upper={}, N_dopp_lower={}, dd_shifts={}"
                  .format(delta_dd, N_dopp_upper, N_dopp_lower, dd_shifts))
 
     dd_shifts_gpu  = cp.asarray(dd_shifts)
@@ -91,6 +91,7 @@ def dedoppler(data, metadata, max_dd, min_dd=None, boxcar_size=1, beam_id=0,
         # Apply boxcar filter
         if boxcar_size > 1:
             d_gpu = apply_boxcar(d_gpu, boxcar_size=boxcar_size, mode='sum', return_space='gpu')
+
         
         # Allocate GPU memory for dedoppler data
         if N_beam > 1:
