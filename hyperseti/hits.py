@@ -61,27 +61,31 @@ def merge_hits(hitlist):
     t0 = time.time()
     p = hitlist.sort_values('snr', ascending=False)
     hits = []
-    while len(p) > 1:
-        # Grab top hit 
-        p0 = p.iloc[0]
+    if len(p) > 1:
+        while len(p) > 0:
+            # Grab top hit 
+            p0 = p.iloc[0]
 
-        # Find channels and driftrates within tolerances
-        q = f"""(abs(driftrate_idx - {p0['driftrate_idx']}) <= boxcar_size + 1  |
-                abs(driftrate_idx - {p0['driftrate_idx']}) <= {p0['boxcar_size']} + 1)
-                & 
-                (abs(channel_idx - {p0['channel_idx']}) <= {p0['boxcar_size']} + 1| 
-                abs(channel_idx - {p0['channel_idx']}) <= boxcar_size + 1)"""
-        q = q.replace('\n', '') # Query must be one line
-        pq = p.query(q)
-        tophit = pq.sort_values("snr", ascending=False).iloc[0]
+            # Find channels and driftrates within tolerances
+            q = f"""(abs(driftrate_idx - {p0['driftrate_idx']}) <= boxcar_size + 1  |
+                    abs(driftrate_idx - {p0['driftrate_idx']}) <= {p0['boxcar_size']} + 1)
+                    & 
+                    (abs(channel_idx - {p0['channel_idx']}) <= {p0['boxcar_size']} + 1| 
+                    abs(channel_idx - {p0['channel_idx']}) <= boxcar_size + 1)"""
+            q = q.replace('\n', '') # Query must be one line
+            pq = p.query(q)
+            tophit = pq.sort_values("snr", ascending=False).iloc[0]
 
-        # Drop all matched rows
-        p = p.drop(pq.index)
-        hits.append(tophit)
+            # Drop all matched rows
+            p = p.drop(pq.index)
+            hits.append(tophit)
+        hits = pd.DataFrame(hits)
+    else:
+        hits = p
     t1 = time.time()
     logger.debug(f"merge_hits: Hit merging time: {(t1-t0)*1e3:2.2f}ms")
     
-    return pd.DataFrame(hits)
+    return hits
 
 @datwrapper(dims=None)
 @on_gpu
@@ -123,7 +127,8 @@ def blank_hit(data, metadata, f0, drate, padding=4):
 def blank_hits(data, metadata, df_hits, padding=4):
     for idx, row in df_hits.iterrows():
         f0, drate = float(row['f_start']), float(row['drift_rate'])
-        data = blank_hit(data, metadata, f0, drate, padding=padding)
+        box_width = int(row['boxcar_size'])
+        data = blank_hit(data, metadata, f0, drate, padding=padding+box_width)
     return data, metadata
 
 @datwrapper(dims=None)
