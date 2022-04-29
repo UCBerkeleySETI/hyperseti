@@ -83,6 +83,44 @@ def merge_hits(hitlist):
     
     return pd.DataFrame(hits)
 
+@datwrapper(dims=None)
+@on_gpu
+def blank_hit(data, metadata, f0, drate, padding=4):
+    """ Blank a hit in an array by setting its value to zero
+    
+    Args:
+        data (cp.array): Data array
+        metadata (dict): Metadata with frequency, time info
+        f0 (astropy.Quantity): Frequency at t=0
+        drate (astropy.Quantity): Drift rate to blank
+        padding (int): number of channels to blank either side. 
+    
+    Returns:
+        data (cp.array): blanked data array
+    
+    TODO: Add check if drate * time_step > padding
+    """
+    n_time, n_pol, n_chans = data.shape
+    i0     = int((f0 - metadata['frequency_start']) / metadata['frequency_step'])
+    i_step =  metadata['time_step'] * drate / metadata['frequency_step']
+    i_off  = (i_step * np.arange(n_time) + i0).astype('int64')
+    
+    min_padding = int(abs(i_step) + 1)  # i_step == frequency smearing
+    padding += min_padding 
+    i_time = np.arange(n_time, dtype='int64')
+    for p_off in range(padding):
+        data[i_time, :, i_off] = 0
+        data[i_time, :, i_off - p_off] = 0
+        data[i_time, :, i_off + p_off] = 0
+    return data
+
+@datwrapper(dims=None)
+@on_gpu
+def blank_hits(data, metadata, df_hits, padding=4):
+    for idx, row in df_hits.iterrows():
+        f0, drate = row['f_start'], row['drift_rate']
+        data = blank_hit(data, metadata, f0, drate, padding=padding)
+    return data, metadata
 
 @datwrapper(dims=None)
 @on_gpu
