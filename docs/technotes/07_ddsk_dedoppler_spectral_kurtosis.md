@@ -22,14 +22,14 @@ The ['ddsk' kernel](https://github.com/UCBerkeleySETI/hyperseti/blob/master/hype
 ```
 
 Here we have found:
-    * the DC bin (6) with a very low ddk at zero drift.
-    * The carrier (8), with a ddsk < 1 (less than chi-squared expectation), meaning it's somewhat stable
-    * The two sidebands (9 and 7), which have high ddsk values, due to the modulation.
+* the DC bin (6) with a very low ddk at zero drift.
+* The carrier (8), with a ddsk < 1 (less than chi-squared expectation), meaning it's somewhat stable
+* The two sidebands (9 and 7), which have high ddsk values, due to the modulation.
 
 A bit of real-world testing will be important here to figure out when it's useful. But the following should hold:
-    * 'drifting squiggles' due to unstable LOs will have high ddsk.
-    * local bright impulsive RFI will have high ddsk.
-    * stable drifting tones will have ddsk < 1
-    * really low values of ddsk probably mean it's local RFI (we would expect some scintillation?).
+* 'drifting squiggles' due to unstable LOs will have high ddsk.
+* local bright impulsive RFI will have high ddsk.
+* stable drifting tones will have ddsk < 1
+* really low values of ddsk probably mean it's local RFI (we would expect some scintillation?).
 
 **Research question: can we learn anything about the ISM from ddsk measurements of Voyager / Mars missions?**
