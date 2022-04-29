@@ -158,7 +158,6 @@ def find_et(filename, pipeline_config, gulp_size=2**20, filename_out='hits.csv',
     print(msg)
     logger.info(pipeline_config)
     t0 = time.time()
-    logger.debug(f"find_et: At entry, filename_out={filename_out}, config={pipeline_config}, gpu_id={gpu_id}")
 
     if h5py.is_hdf5(filename):
         ds = from_h5(filename)
@@ -178,7 +177,7 @@ def find_et(filename, pipeline_config, gulp_size=2**20, filename_out='hits.csv',
     counter = 0
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
         counter += 1
-        hits = run_pipeline(d_arr, pipeline_config, gpu_id=gpu_id, called_count=counter)
+        hits = run_pipeline(d_arr, pipeline_config, gpu_id=None, called_count=counter)
         out.append(hits)
     
     dframe = pd.concat(out)
