@@ -1,12 +1,12 @@
 # Logging setup
 # See https://logbook.readthedocs.io/en/stable/libraries.html
 # Levels are:
-#    critical - for errors that lead to termination
-#    error - for errors that occur, but are handled
-#    warning - for exceptional circumstances that might not be errors
-#    notice - for non-error messages you usually want to see
-#    info - for messages you usually don’t want to see
-#    debug - for debug messages
+#   critical - for errors that lead to termination
+#   error - for errors that occur, but are handled
+#   warning - for exceptional circumstances that might not be errors
+#   notice - for non-error messages you usually want to see
+#   info - for messages you usually don't want to see
+#   debug - for debug messages
 
 import sys
 import logbook
@@ -52,7 +52,7 @@ def update_levels(arg_group_level, arg_debug_name_list):
         'debug': logbook.DEBUG
     }
 
-    if arg_group_level.lower() in levels.keys():
+    if arg_group_level in levels.keys():
         arg_group_level = levels[arg_group_level]
 
     for ix, logger_name in enumerate(logger_name_list):

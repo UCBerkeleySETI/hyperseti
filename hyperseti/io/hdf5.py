@@ -13,7 +13,7 @@ def from_h5(filename):
     """ Create a DataArray from a HDF5 file 
     
     Args:
-        filename (str): Path to h5 file (in blimpy filterbank format)
+        filename (str): Path to h5 file (in filterbank-style format)
     
     Returns a DataArray object with h5py mapped data.
     """

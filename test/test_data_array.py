@@ -1,8 +1,16 @@
 from hyperseti.io import from_fil, from_h5
-from .file_defs import voyager_fil, voyager_h5
+try:
+    from .file_defs import voyager_fil, voyager_h5
+except:
+    from file_defs import voyager_fil, voyager_h5
+
 import numpy as np
 import cupy as cp
 import pytest
+from astropy import units as u
+from astropy.time import Time
+
+from hyperseti.data_array import from_metadata, split_metadata
 
 def test_load_voyager():
     d = from_fil(voyager_fil)
@@ -86,9 +94,39 @@ def test_apply_transform():
     
     with pytest.raises(RuntimeError):
         d.apply_transform('chicken') # This should fail
-    
+
+def test_from_metadata():
+    d = np.zeros(shape=(100, 10, 1000))
+    dims = ('time', 'pol', 'frequency')
+    metadata = {
+        'time_step': 0 * u.s,
+        'time_start': Time('2020-01-01T00:00:00', format='isot'),
+        'frequency_step': 100 * u.Hz,
+        'frequency_start': 1000 * u.MHz,
+        'pol_step': 1, 
+        'pol_start': 0,
+        'chicken': 'this_is_chicken'
+    }
+
+    darr = from_metadata(d, metadata, dims)
+    print(darr)
+    print(darr.dims)
+    print(darr.time)
+    print(darr.frequency)
+    print(darr.attrs)
+    print(darr.attrs['chicken'])
+    with pytest.raises(RuntimeError):
+        from_metadata(d, metadata) # Dims needed!
+
+    metadata["dims"] = dims
+    darr = from_metadata(d, metadata)
+
+    d0, m0 = split_metadata(darr)
+    d0, m0 = darr.split_metadata()
+
 if __name__ == "__main__":
     test_load_voyager()
     test_data_array_basic()
     test_asarray()
     test_apply_transform()
+    test_from_metadata()

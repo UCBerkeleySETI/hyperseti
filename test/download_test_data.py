@@ -3,7 +3,6 @@ from shutil import rmtree
 
 import h5py
 import hdf5plugin
-import blimpy as bl
 
 from file_defs import voyager_fil, voyager_h5, voyager_h5_flipped
 

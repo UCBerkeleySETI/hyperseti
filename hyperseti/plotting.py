@@ -29,7 +29,8 @@ def _get_extent(data, metadata, xaxis, yaxis):
     return (ex_x0, ex_x1, ex_y0, ex_y1)
 
 
-def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True, *args, **kwargs):
+def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True, 
+            beam_id=0, *args, **kwargs):
     """ Generalised imshow function
     
     Args:
@@ -38,9 +39,10 @@ def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True, 
         metadata (dict): Metadata dictionary
         show_labels (bool): Show labels on axes
         show_colorbar (bool): Show colorbar
+        beam_id (int): Which beam to plot
        
     """
-    data = cp.asnumpy(data).squeeze()
+    data = cp.asnumpy(data[:, beam_id]).squeeze()
     plt.imshow(data, aspect='auto',
               extent=_get_extent(data, metadata, xaxis, yaxis), *args, **kwargs)
 

@@ -6,7 +6,10 @@ from hyperseti.data_array import DataArray
 from hyperseti.io import from_h5, from_fil
 from hyperseti.dimension_scale import DimensionScale, TimeScale
 from hyperseti.utils import datwrapper, on_gpu
-from .file_defs import voyager_fil, voyager_h5
+try:
+    from .file_defs import voyager_fil, voyager_h5
+except:
+    from file_defs import voyager_fil, voyager_h5
 import pytest
 
 import logbook
@@ -30,7 +33,7 @@ def test_datwrapper_basic():
     data = cp.array([1,2,3,4])
     metadata = {'frequency_step': 1}
     data_out = do_something(data, metadata)
-    assert isinstance(data_out, cp.core.core.ndarray)
+    assert isinstance(data_out, cp.ndarray)
 
     ## Check DataArray works without metadata
     data_arr = from_fil(voyager_fil)
@@ -44,22 +47,19 @@ def test_datwrapper_warnings():
     @datwrapper(dims=('pork', 'noodles'))
     def do_something_warn_np(data, metadata):
         return data
-    with pytest.warns(RuntimeWarning):
-        do_something_warn_np(data, metadata)
+    do_something_warn_np(data, metadata)
 
     ## Wrapper that will create a RuntimeWarning as it can't create DataArray from pandas dataframe
     @datwrapper(dims=('pork', 'noodles'))
     def do_something_warn_pd(data, metadata):
         return pd.DataFrame() 
-    with pytest.warns(RuntimeWarning):
-        do_something_warn_pd(data, metadata)
+    do_something_warn_pd(data, metadata)
 
     ## Wrapper that will create a RuntimeWarning as it can't create DataArray from pandas dataframe
     @datwrapper(dims=('pork', 'noodles'))
     def do_something_warn_int(data, metadata):
         return 1 
-    with pytest.warns(RuntimeWarning):
-        do_something_warn_int(data, metadata)
+    do_something_warn_int(data, metadata)
 
 def test_datwrapper_create_data_array():
     @datwrapper(dims=('pork', 'noodles'))
@@ -75,6 +75,8 @@ def test_datwrapper_create_data_array():
     data = np.array([1,2,3,4])
     metadata = {'test': 0}
     
+    ## TODO: Tidy this section up.
+    # Do we want output_dims etc to propagate?
     dout, mdout = do_create_data_array(data, metadata)
     assert isinstance(dout, DataArray)
     assert isinstance(mdout, dict)
@@ -90,8 +92,9 @@ def test_datwrapper_create_data_array():
     assert isinstance(mdout2, dict)
     assert dout2.dims == ('pork', 'noodles')
     assert len(dout2.scales.keys()) == 2
-    assert len(mdout2) == 6    # test, pork_start, pork_step, noodles_start, noodles_Step, output_dims ## input_dims
-    assert len(dout2.attrs) == 1   # Check step/stop are parsed as dimensions
+    assert len(mdout2) ==  7   # test, pork_start, pork_step, noodles_start, noodles_Step, output_dims ## input_dims
+    print(dout2.attrs)
+    assert len(dout2.attrs) == 2   # Check step/stop are parsed as dimensions
     
     dout2.attrs['test2'] = 'hi'
     dout3, mdout3 = do_create_data_array(dout2)
@@ -99,8 +102,9 @@ def test_datwrapper_create_data_array():
     assert isinstance(mdout3, dict)
     assert 'test2' in mdout3.keys()
     assert 'test2' in dout3.attrs.keys()
-    assert len(mdout3) == 7    # test, pork_start, pork_step, noodles_start, noodles_Step, output_dims ## input_dims
-    assert len(dout3.attrs) == 2   # Check step/stop are parsed as dimensions    
+    print(mdout3)
+    assert len(mdout3) == 8    # test, pork_start, pork_step, noodles_start, noodles_Step, output_dims ## input_dims, dims output dims
+    assert len(dout3.attrs) == 3   # Check step/stop are parsed as dimensions    
     
 if __name__ == "__main__":
     test_datwrapper_basic()

@@ -3,6 +3,7 @@ import os
 from astropy.coordinates import SkyCoord
 import itertools
 import cupy as cp
+from copy import deepcopy
 
 # Dask SVG HTML plotting
 from dask.array.svg import svg
@@ -243,3 +244,74 @@ class DataArray(object):
         if func is None:
             raise RuntimeError(f"Could not interpret {transform} as cupy/numpy or callable function")
         self.data = func(self.data, *args, **kwargs)
+    
+    def split_metadata(self):
+        return split_metadata(self)
+    
+    def __len__(self):
+        return len(self.data)
+
+
+def from_metadata(darray, metadata, dims=None, units=None):
+    """ Create a data array from an array + metadata 
+    
+    Args:
+        darray (array-like): Data array
+        metadata (dict): Metadata dictionary
+        dims (list): Names for dimensions of darray
+    
+    Returns:
+        d (DataArray): Data array
+    """
+    scales = {}
+    attrs = deepcopy(metadata)
+
+    if dims is None:
+        try:
+            dims = attrs.pop("dims")
+        except:
+            raise RuntimeError("Dimensions must be supplied in metadata or as kwarg")
+
+    for dim_idx, dim in enumerate(dims):
+        nstep = darray.shape[dim_idx]
+        if dim == 'time':
+            time_start, time_step = attrs.pop("time_start"), attrs.pop("time_step")
+            scales[dim] = TimeScale('time', time_start.value, time_step.to('s').value, 
+                                nstep, time_format=time_start.format, time_delta_format='sec')
+        else:
+            scale_start, scale_step = attrs.pop(f"{dim}_start", 0), attrs.pop(f"{dim}_step", 0)
+            logger.debug(f"{dim} {scale_start}")
+            scale_unit = None if np.isscalar(scale_start) else scale_start.unit
+            scales[dim] = DimensionScale(dim, scale_start, scale_step, 
+                                    nstep, units=scale_unit)
+        
+    
+    d = DataArray(darray, dims, scales, attrs, units)
+    return d
+
+def split_metadata(data_array):
+    """ Split off metadata and return array + dict
+    
+    Args:
+        data_array (DataArray): Data array to split
+    
+    Returns:
+        data, metadata (array + dict)
+    """
+    metadata = deepcopy(data_array.attrs)
+    metadata["dims"] = data_array.dims
+
+    for scale_name, scale in data_array.scales.items():        
+        metadata[f"{scale_name}_step"] = scale.val_step
+        metadata[f"{scale_name}_start"] = scale.val_start
+        
+        if scale.units is not None:
+            metadata[f"{scale_name}_step"] *= scale.units
+            metadata[f"{scale_name}_start"] *= scale.units
+    
+    if data_array.slice_info is not None:
+        metadata['slice_info'] = data_array.slice_info
+
+    return data_array.data, metadata
+
+

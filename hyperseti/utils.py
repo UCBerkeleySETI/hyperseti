@@ -8,7 +8,7 @@ import cupy as cp
 import pandas as pd
 import copy
 
-from .data_array import DataArray
+from .data_array import DataArray, from_metadata, split_metadata
 from .dimension_scale import DimensionScale, TimeScale
 
 # Logging
@@ -54,8 +54,11 @@ def on_gpu(func):
         logger.debug(f"{func_name} on_gpu inner, args: {args}")
         for idx, arg in enumerate(args):
             argname = func_params[idx]
-            if isinstance(arg, np.ndarray):
-                logger.debug(f"on_gpu inner <{func_name}> Converting ndarray arg {argname} to cupy..")
+
+            if isinstance(arg, cp.ndarray):
+                logger.debug(f"on_gpu inner <{func_name}> Arg {argname} is already a cupy array..")
+            elif isinstance(arg, np.ndarray):
+                logger.info(f"on_gpu inner <{func_name}> Converting ndarray arg {argname} to cupy..")
                 if arg.dtype != np.dtype('float32'):
                     logger.warning(f"on_gpu inner <{func_name}> Arg {argname} is not float32, could cause issues...")
                 arg = cp.asarray(arg)
@@ -66,10 +69,13 @@ def on_gpu(func):
                     logger.warning(f"<{func_name}> Arg {argname} is not float32, could cause issues...")
                 arg = cp.asarray(arg)                
             if isinstance(arg, DataArray):
-                logger.debug(f"on_gpu inner <{func_name}> Converting arg {argname}.data to cupy..")
                 if arg.data.dtype != np.dtype('float32'):
                     logger.warning(f"<{func_name}> Arg {argname}.data is not float32, could cause issues...")
-                arg.data = cp.asarray(arg.data)                
+                if isinstance(arg.data, cp.ndarray):
+                    logger.debug(f"<{func_name}> Arg {argname}.data already cupy array..")
+                else:
+                    logger.info(f"<{func_name}> Converting arg {argname}.data to cupy..")
+                    arg.data = cp.asarray(arg.data)                
             new_args.append(arg)
             
         return_space = None
@@ -80,6 +86,8 @@ def on_gpu(func):
         output = func(*new_args, **kwargs)
         
         if return_space == 'gpu':
+            if isinstance(output, DataArray):
+                return output
             if len(output) == 1 or isinstance(output, (np.ndarray, cp.ndarray)):
                 if isinstance(output, np.ndarray):
                     logger.debug(f"on_gpu inner <{func_name}> Converting output to cupy")
@@ -135,30 +143,17 @@ def datwrapper(dims=None, *args, **kwargs):
             # INPUT MODIFYING
             if isinstance(args[0], DataArray):
                 args = list(args)
-                d = args[0]
-                metadata = {}
-                # Copy attribute key:values over 
-                for k, v in d.attrs.items():
-                    metadata[k] = v
-                metadata['input_dims']  = d.dims # NB: also only intended to be used by the wrapper
-                                                 # But we do supply this to the function just in case
-                for dim in d.dims:
-                    if dim == 'time':
-                        metadata['time_start']  = d.time.time_start
-                        metadata['time_step'] = d.time.units * d.time.val_step
-                    else:
-                        scale = d.scales[dim]
-                        scale.units = Unit('') if scale.units is None else scale.units
-                        logger.debug(f"{dim} {scale}")
-                        metadata[f"{dim}_start"] = scale.units * scale.val_start
-                        metadata[f"{dim}_step"]  = scale.units * scale.val_step
+                data, metadata = split_metadata(args[0])
+                metadata['input_dims']  = args[0].dims # NB: also only intended to be used by the wrapper
+                                                      # But we do supply this to the function just in case
 
                 # Replace DataArray with underlying data
-                args[0] = d.data
+                args[0] = data
 
                 # Check if metadata is an argument of the function to be called
                 if 'metadata' in signature(func).parameters:
-                    kwargs['metadata'] = metadata
+                    args.insert(1, metadata)
+                    #kwargs['metadata'] = metadata
             else:
                 try:
                     metadata = kwargs['metadata']
@@ -174,6 +169,9 @@ def datwrapper(dims=None, *args, **kwargs):
             output = func(*args, **kwargs)
             # First, check if the function returns nothing, a bare numpy/cupy array, or pandas array
             if output is None:
+                return output
+            elif isinstance(output, DataArray):
+                logger.warning(f"<{func_name}> dimensions supplied, but function natively returns DataArray. No action taken")
                 return output
             elif isinstance(output, (np.ndarray, cp.ndarray)):
                 if dims is not None:
@@ -200,12 +198,21 @@ def datwrapper(dims=None, *args, **kwargs):
                                 _dims = args[0].dims
                 else:
                     _dims = dims          
+
                 # Now, if dims were found, let's use those to generate a DataArray
-                if _dims is not None:
+                if _dims is not None and not isinstance(output[0], DataArray):
                     logger.debug(f"datwrapper <{func_name}> Generating DataArray from function output, {_dims}")
                     new_output = []
                     new_data = output[0]
-                    new_md   = output[1]
+                    
+                    # Find the metadata dictionary. A bit dodgy, it assumes first dict it encounters is metadata
+                    idx = 1
+                    while idx < len(output):
+                        if isinstance(output[idx], dict):
+                            break
+                        else:
+                            idx += 1
+                    new_md   = output[idx]
                     new_md['output_dims'] = _dims  # Add output_dims to metadata out
                     
                     # Get rid of input dims that aren't used anymore
@@ -223,21 +230,8 @@ def datwrapper(dims=None, *args, **kwargs):
                     array_md.pop('input_dims', 0)
                     array_md.pop('output_dims', 0)
                     logger.debug(f"datwrapper <{func_name}> data shape: {new_data.shape}")
-
-                    scales = {}
-                    for dim_idx, dim in enumerate(_dims):
-                        nstep = new_data.shape[dim_idx]
-                        if dim == 'time':
-                            time_start, time_step = array_md.pop("time_start"), array_md.pop("time_step")
-                            scales[dim] = TimeScale('time', time_start.value, time_step.to('s').value, 
-                                               nstep, time_format=time_start.format, time_delta_format='sec')
-                        else:
-                            scale_start, scale_step = array_md.pop(f"{dim}_start", 0), array_md.pop(f"{dim}_step", 0)
-                            logger.debug(f"datwrapper dim={dim}, scale_start={scale_start}, scale_step={scale_step}")
-                            scale_unit = None if np.isscalar(scale_start) else scale_start.unit
-                            scales[dim] = DimensionScale(dim, scale_start, scale_step, 
-                                                   nstep, units=scale_unit)
-                    darr = DataArray(new_data, _dims, scales=scales, attrs=array_md)
+                    
+                    darr = from_metadata(new_data, array_md, dims=_dims)
                     new_output.append(darr)
                     new_output.append(new_md)
                     for op in output[2:]:

@@ -7,17 +7,20 @@ import os
 
 from astropy import units as u
 
-from .peak import prominent_peaks
-from .io import from_fil, from_h5
+from .peak import find_peaks_argrelmax
 from .utils import on_gpu, datwrapper
+from .data_array import DataArray
 
 #logging
 from .log import get_logger
 logger = get_logger('hyperseti.hits')
 
 
-def create_empty_hits_table():
+def create_empty_hits_table(sk_col=False):
     """ Create empty pandas dataframe for hit data
+
+    Args:
+        sk_col (bool): Include a dedoppler spectral kurtosis column (DDSK)
     
     Notes:
         Columns are:
@@ -26,19 +29,24 @@ def create_empty_hits_table():
             snr (float64): Signal to noise ratio for detection.
             driftrate_idx (int): Index of array corresponding to driftrate
             channel_idx (int): Index of frequency channel for f_start
+            beam_idx (int): Index of beam in which found
             boxcar_size (int): Size of boxcar applied to data
     
     Returns:
         hits (pd.DataFrame): Data frame with columns as above.
     """
     # Create empty dataframe
-    hits = pd.DataFrame({'drift_rate': pd.Series([], dtype='float64'),
+    cols = {'drift_rate': pd.Series([], dtype='float64'),
                           'f_start': pd.Series([], dtype='float64'),
                           'snr': pd.Series([], dtype='float64'),
                           'driftrate_idx': pd.Series([], dtype='int'),
                           'channel_idx': pd.Series([], dtype='int'),
+                          'beam_idx': pd.Series([], dtype='int'),
                           'boxcar_size': pd.Series([], dtype='int'),
-                         })
+                         }
+    if sk_col:
+        cols['ddsk'] = pd.Series([], dtype='float64')
+    hits = pd.DataFrame(cols)
     return hits
 
 def merge_hits(hitlist):
@@ -78,16 +86,15 @@ def merge_hits(hitlist):
 
 @datwrapper(dims=None)
 @on_gpu
-def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=None, min_ddistance=None):
-    """ Search for hits using _prominent_peaks method in cupyimg.skimage
+def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=100, sk_data=None):
+    """ Search for hits using argrelmax method in cusignal
     
     Args:
         dedopp (np.array): Dedoppler search array of shape (N_trial, N_beam, N_chan)
-        drift_rates (np.array): List of dedoppler trials corresponding to dedopp N_trial axis
         metadata (dict): Dictionary of metadata needed to convert from indexes to frequencies etc
         threshold (float): Threshold value (absolute) above which a peak can be considered
         min_fdistance (int): Minimum distance in pixels to nearest peak along frequency axis
-        min_ddistance (int): Minimum distance in pixels to nearest peak along doppler axis
+        sk_data (DataArray): array of 
     
     Returns:
         results (pd.DataFrame): Pandas dataframe of results, with columns 
@@ -101,17 +108,13 @@ def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=None, min_ddist
 
     drift_trials = metadata['drift_rates']
     
-    if min_fdistance is None:
-        min_fdistance = metadata['boxcar_size'] * 2
-    
-    if min_ddistance is None:
-        min_ddistance = len(drift_trials) // 4
-    
     t0 = time.time()
     dfs = []
     for beam_idx in range(dedopp_data.shape[1]):
-        imgdata = cp.copy(dedopp_data[:, beam_idx, :].squeeze())
-        intensity, fcoords, dcoords = prominent_peaks(imgdata, min_xdistance=min_fdistance, min_ydistance=min_ddistance, threshold=threshold)
+        imgdata = cp.copy(cp.expand_dims(dedopp_data[:, beam_idx, :].squeeze(), 1))
+        intensity, fcoords, dcoords = find_peaks_argrelmax(imgdata, metadata, 
+                                                           threshold=threshold, order=min_fdistance)
+
         t1 = time.time()
         logger.debug(f"hitsearch: Peak find time: {(t1-t0)*1e3:2.2f}ms")
         t0 = time.time()
@@ -126,7 +129,6 @@ def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=None, min_ddist
             logger.debug(f"hitsearch: {metadata['frequency_start']}, {metadata['frequency_step']}, {fcoords}")
             frequency_peaks = metadata['frequency_start'] + metadata['frequency_step'] * fcoords
 
-
             results = {
                 'drift_rate': driftrate_peaks,
                 'f_start': frequency_peaks,
@@ -135,6 +137,20 @@ def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=None, min_ddist
                 'channel_idx': fcoords, 
                 'beam_idx': beam_idx
             }
+
+            # Check if we have a slice of data. If so, add slice start point
+            # Note: currently assumes slice is only on frequency channel
+            if metadata.get('slice_info', None):
+                ts, bs, fs = metadata['slice_info']
+                results['channel_idx'] += fs.start
+
+            # add in spectral kurtosis if computed
+            if sk_data is not None:
+                if isinstance(sk_data, DataArray):
+                    sk_data = sk_data.data
+                sk_vals = sk_data[dcoords, beam_idx, fcoords]
+                results['ddsk'] = cp.asnumpy(sk_vals)
+
 
             # Append numerical metadata keys
             for key, val in metadata.items():

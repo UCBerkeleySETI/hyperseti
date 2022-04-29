@@ -3,8 +3,6 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 # Filterbank reading
 from blimpy.io import sigproc
-
-
 from hyperseti.dimension_scale import TimeScale, DimensionScale
 from hyperseti.data_array import DataArray
 

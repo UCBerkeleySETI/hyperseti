@@ -68,13 +68,60 @@ Data can be boxcar averaged to look for wider-band signals, and to retrieve sign
 for signals with large drift rates:
 
 ```python
-dedopp, md, hits = run_pipeline(d, metadata, max_dd=1.0, min_dd=None, threshold=100, 
-                                    n_boxcar=5, merge_boxcar_trials=True)
+    config = {
+        'preprocess': {
+            'sk_flag': True,
+            'normalize': True,
+        },
+        'dedoppler': {
+            'boxcar_mode': 'sum',
+            'kernel': 'ddsk',
+            'max_dd': 4.0,
+            'min_dd': None,
+            'apply_smearing_corr': True,
+            'beam_id': 0
+        },
+        'hitsearch': {
+            'threshold': 20,
+            'min_fdistance': 100
+        },
+        'pipeline': {
+            'n_boxcar': 1,
+            'merge_boxcar_trials': True
+        }
+    }
+    
+    run_pipeline(darray, config)
 ```
 
 Reading from file is also supported:
 
 ```python
-hits = find_et(filename, filename_out='hits.csv', n_parallel=2, gulp_size=2**18, max_dd=1.0, threshold=50)
+dframe = find_et(voyager_h5, config, gulp_size=2**18, filename_out='./hyperseti_hits.csv')
+```
+
+### Installation
+
+Theoretically, just type:
+
+```
+pip install git+https://github.com/ucberkeleyseti/hyperseti
+```
+
+hyperseti uses the GPU heavily, so a working CUDA environment is needed, and
+requires Python 3.7 or above.
+hyperseti relies upon `cupy`, and currently uses a single function, 
+`argrelmax` from `cusignal`. These are part of [rapids](https://rapids.ai/start.html)
+and are easiest to install using `conda`. If starting from scratch, this should get you most of
+the way there:
+
+```
+conda create -n hyperseti -c rapidsai -c nvidia -c conda-forge \
+    rapids=22.04 python=3.9 cudatoolkit=11.0 dask-sql 
+
+conda activate hyperseti
+conda install pandas astropy
+pip install logbook setigen blimpy hdf5plugin
+pip install git+https://github.com/ucberkeleyseti/hyperseti
 ```
 
