@@ -1,6 +1,7 @@
 import numpy as np
 import os
 from astropy.coordinates import SkyCoord
+from astropy.units import Quantity
 import itertools
 import cupy as cp
 from copy import deepcopy
@@ -276,8 +277,10 @@ def from_metadata(darray, metadata, dims=None, units=None):
         nstep = darray.shape[dim_idx]
         if dim == 'time':
             time_start, time_step = attrs.pop("time_start"), attrs.pop("time_step")
+            # Handle start time as astropy Quantity, or astropy Time
+            time_format = 'unix' if isinstance(time_start, Quantity) else time_start.format
             scales[dim] = TimeScale('time', time_start.value, time_step.to('s').value, 
-                                nstep, time_format=time_start.format, time_delta_format='sec')
+                                nstep, time_format=time_format, time_delta_format='sec')
         else:
             scale_start, scale_step = attrs.pop(f"{dim}_start", 0), attrs.pop(f"{dim}_step", 0)
             logger.debug(f"{dim} {scale_start}")

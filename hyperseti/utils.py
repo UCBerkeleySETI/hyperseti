@@ -28,7 +28,7 @@ def attach_gpu_device(new_id):
         logger.warning("attach_gpu_device: Will continue to use current device ID ({})".format(cur_id))
 
 
-def on_gpu(func):
+def on_gpu(func, dtype='float32'):
     """ Decorator to automatically copy a numpy array over to cupy.
     
     Checks if input data array is numpy.ndarray and converts it to 
@@ -59,18 +59,22 @@ def on_gpu(func):
                 logger.debug(f"on_gpu inner <{func_name}> Arg {argname} is already a cupy array..")
             elif isinstance(arg, np.ndarray):
                 logger.info(f"on_gpu inner <{func_name}> Converting ndarray arg {argname} to cupy..")
-                if arg.dtype != np.dtype('float32'):
-                    logger.warning(f"on_gpu inner <{func_name}> Arg {argname} is not float32, could cause issues...")
+                if arg.dtype != np.dtype(dtype):
+                    logger.warning(f"on_gpu inner <{func_name}> Arg {argname} is not {dtype}, could cause issues...")
                 arg = cp.asarray(arg)
+            # Looks like a duck, but does not quack...
+            # Pandas dataframe has an __array__ but no dtype, shoudn't be converted automatically
+            elif isinstance(arg, pd.DataFrame):
+                logger.debug(f"on_gpu inner <{func_name}> Not converting pandas dataframe!")
+            # Duck-type numpy array
             elif hasattr(arg, '__array__'):
-                # Duck-type numpy array
                 logger.debug(f"on_gpu inner <{func_name}> Converting numpy-like arg {argname} to cupy..")
-                if arg.dtype != np.dtype('float32'):
-                    logger.warning(f"<{func_name}> Arg {argname} is not float32, could cause issues...")
+                if arg.dtype != np.dtype(dtype):
+                    logger.warning(f"<{func_name}> Arg {argname} is not {dtype}, could cause issues...")
                 arg = cp.asarray(arg)                
             if isinstance(arg, DataArray):
-                if arg.data.dtype != np.dtype('float32'):
-                    logger.warning(f"<{func_name}> Arg {argname}.data is not float32, could cause issues...")
+                if arg.data.dtype != np.dtype(dtype):
+                    logger.warning(f"<{func_name}> Arg {argname}.data is not {dtype}, could cause issues...")
                 if isinstance(arg.data, cp.ndarray):
                     logger.debug(f"<{func_name}> Arg {argname}.data already cupy array..")
                 else:
@@ -196,6 +200,9 @@ def datwrapper(dims=None, *args, **kwargs):
                             # Otherwise, let's use the dimensions of the input DataArray
                             else:
                                 _dims = args[0].dims
+                        elif has_array and has_metadata:
+                            if 'output_dims' in output[1].keys():
+                                _dims = output[1]['output_dims']
                 else:
                     _dims = dims          
 
