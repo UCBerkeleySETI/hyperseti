@@ -16,6 +16,7 @@ from .hits import hitsearch, merge_hits, create_empty_hits_table, blank_hits
 from .io import from_fil, from_h5
 from .utils import attach_gpu_device, on_gpu, datwrapper
 from .kurtosis import sk_flag
+from hyperseti.version import HYPERSETI_VERSION
 
 #logging
 from .log import get_logger
@@ -152,6 +153,10 @@ def find_et(filename, pipeline_config, gulp_size=2**20, filename_out='hits.csv',
     Notes:
         Passes keyword arguments on to run_pipeline(). Same as find_et but doesn't use dask parallelization.
     """
+    msg = f"find_et: hyperseti version {HYPERSETI_VERSION}"
+    logger.info(msg)
+    print(msg)
+    logger.info(pipeline_config)
     t0 = time.time()
     logger.debug(f"find_et: At entry, filename_out={filename_out}, config={pipeline_config}, gpu_id={gpu_id}")
 
@@ -173,11 +178,11 @@ def find_et(filename, pipeline_config, gulp_size=2**20, filename_out='hits.csv',
     counter = 0
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
         counter += 1
-        hits = run_pipeline(d_arr, pipeline_config, gpu_id=gpu_id)
+        hits = run_pipeline(d_arr, pipeline_config, gpu_id=gpu_id, called_count=counter)
         out.append(hits)
     
     dframe = pd.concat(out)
     dframe.to_csv(filename_out)
     t1 = time.time()
-    print(f"find_et: TOTAL TIME: {(t1-t0):2.2f}s ##\n\n")
+    print(f"find_et: TOTAL TIME: {(t1-t0):2.2f}s\n\n")
     return dframe

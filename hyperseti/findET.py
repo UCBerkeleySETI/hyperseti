@@ -1,15 +1,17 @@
-import sys
+""" Command-line utility for hyperseti find_et """
+
 import time
 from datetime import timedelta
 from argparse import ArgumentParser
 import logbook
 from .log import update_levels
 from hyperseti import find_et
+from hyperseti.version import HYPERSETI_VERSION
 
 
 def cmd_tool(args=None):
     r"""Coomand line parser"""
-    parser = ArgumentParser(description="Make waterfall plots from a single file.")
+    parser = ArgumentParser(description=f"Hyperseti findET command-line utility, version {HYPERSETI_VERSION}.")
     parser.add_argument("input_path", type=str, help="Path of input file.")
     parser.add_argument("--output_csv_path", "-o", type=str, default="./hits.csv",
                         help="Output path of CSV file.  Default: ./hits.csv.")
@@ -91,7 +93,7 @@ def cmd_tool(args=None):
         time2 = time.time()
 
         time_delta = timedelta(seconds=(time2 - time1))
-        print("\nfindET: Elapsed hh:mm:ss = {}".format(time_delta))
+        print(f"\nfindET: Elapsed hh:mm:ss = {time_delta}")
         print("findET: Output dataframe:\n", dframe)
 
 
