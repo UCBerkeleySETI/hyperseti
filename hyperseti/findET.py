@@ -26,7 +26,7 @@ def cmd_tool(args=None):
     parser.add_argument("--num_boxcars", "-b", type=int, default=1,
                         help="Number of boxcar trials to do, width 2^N e.g. trials=(1,2,4,8,16).  Default: 1.")
     parser.add_argument("--kernel", "-k", type=str, default="ddsk", choices=["dedoppler", "kurtosis", "ddsk"],
-                        help="Kernel to be used by the dedoppler module.  Default: dedoppler.")
+                        help="Kernel to be used by the dedoppler module.  Default: ddsk.")
     parser.add_argument("--gpu_id", "-g", type=int, default=0,
                         help="ID of GPU device.  Default: 0.")
     parser.add_argument("--group_level", "-l", type=str, default="info", choices=["debug", "info", "warning"],
