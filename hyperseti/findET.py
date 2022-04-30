@@ -23,8 +23,8 @@ def cmd_tool(args=None):
                         help="Minimum doppler drift in Hz/s for searching.  Default: 0.001.")
     parser.add_argument("--snr_threshold", "-s", type=float, default=30.0,
                         help="Minimum SNR value for searching.  Default: 30.0.")
-    parser.add_argument("--num_boxcars", "-b", type=int, default=1,
-                        help="Number of boxcar trials to do, width 2^N e.g. trials=(1,2,4,8,16).  Default: 1.")
+    parser.add_argument("--boxcar_exponent", "-b", type=int, default=1,
+                        help="The power of 2 used in calculating the number of boxcar trials to do. Default: 1.")
     parser.add_argument("--kernel", "-k", type=str, default="ddsk", choices=["dedoppler", "kurtosis", "ddsk"],
                         help="Kernel to be used by the dedoppler module.  Default: dedoppler.")
     parser.add_argument("--gpu_id", "-g", type=int, default=0,
@@ -73,7 +73,7 @@ def cmd_tool(args=None):
             'threshold': args.snr_threshold
         },
         'pipeline': {
-            'n_boxcar': args.num_boxcars,
+            'n_boxcar': args.boxcar_exponent,
             'merge_boxcar_trials': not args.nomergeboxcar
         }
     }
@@ -93,7 +93,6 @@ def cmd_tool(args=None):
         time2 = time.time()
 
         time_delta = timedelta(seconds=(time2 - time1))
-        print(f"\nfindET: Elapsed hh:mm:ss = {time_delta}")
         print("findET: Output dataframe:\n", dframe)
 
 

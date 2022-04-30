@@ -47,8 +47,8 @@ def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
     t0 = time.time()
     if gpu_id is not None:
         attach_gpu_device(gpu_id)
-    logger.debug(data.shape)
     N_timesteps = data.shape[0]
+    logger.debug(f"run_pipeline: data.shape={data.shape}, metadata={metadata}")
 
     # Check if we have a slice 
     
@@ -183,5 +183,7 @@ def find_et(filename, pipeline_config, gulp_size=2**20, filename_out='hits.csv',
     dframe = pd.concat(out)
     dframe.to_csv(filename_out)
     t1 = time.time()
-    print(f"find_et: TOTAL TIME: {(t1-t0):2.2f}s\n\n")
+    msg = f"find_et: TOTAL ELAPSED TIME: {(t1-t0):2.2f}s"
+    logger.info(msg)
+    print(msg)
     return dframe
