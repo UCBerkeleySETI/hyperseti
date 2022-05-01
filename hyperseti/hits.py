@@ -60,6 +60,7 @@ def merge_hits(hitlist):
     """
     t0 = time.time()
     p = hitlist.sort_values('snr', ascending=False)
+    logger.debug(f"merge_hits: sorted hitlist: {p}")
     hits = []
     if len(p) > 1:
         while len(p) > 0:
@@ -83,7 +84,7 @@ def merge_hits(hitlist):
     else:
         hits = p
     t1 = time.time()
-    logger.debug(f"merge_hits: Hit merging time: {(t1-t0)*1e3:2.2f}ms")
+    logger.debug(f"merge_hits: Merged {len(hits)}, elapsed time: {(t1-t0)*1e3:2.2f}ms")
     
     return hits
 

@@ -2,16 +2,33 @@
 
 import time
 from datetime import timedelta
-from argparse import ArgumentParser
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import logbook
 from .log import update_levels
 from hyperseti import find_et
 from hyperseti.version import HYPERSETI_VERSION
 
 
+HELP_EPILOGUE = \
+"""
+Parameters expressed as exponents
+---------------------------------
+The --gulp_exponent (-z) parameter value is an integer N such that the actual gulp size used is 2^N.
+For example, if the -z value is 4, then the gulp size used by hyperseti is 16.
+The --boxcar_exponent (-b) parameter has a similar function.
+
+Command-line note about --debug_list (-d)
+-----------------------------------------
+This parameter is a variable-length list. As such, it should be specified at the end of the command line (E.g. bash).
+Specified at the end would avoid confusion on the part of argument parsing (Python ArgParser).
+E.g. findET Voyager1.single_coarse.fine_res.h5 -M 4 -s 25 -g 3 -d hyperseti.hits hyperseti.normalize
+"""
+
 def cmd_tool(args=None):
     r"""Coomand line parser"""
-    parser = ArgumentParser(description=f"Hyperseti findET command-line utility, version {HYPERSETI_VERSION}.")
+    parser = ArgumentParser(description=f"Hyperseti findET command-line utility, version {HYPERSETI_VERSION}.",
+                formatter_class=RawDescriptionHelpFormatter,
+                epilog=HELP_EPILOGUE)
     parser.add_argument("input_path", type=str, help="Path of input file.")
     parser.add_argument("--output_csv_path", "-o", type=str, default="./hits.csv",
                         help="Output path of CSV file.  Default: ./hits.csv.")
