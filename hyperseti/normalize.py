@@ -25,6 +25,7 @@ def normalize(data,  mask=None, poly_fit=0):
     Returns: d_gpu (cp.array): Normalized data
     """
     # Normalise
+    logger.debug(f"Poly fit = {poly_fit}")
     t0 = time.time()
 
     d_flag = cp.copy(data)
@@ -66,10 +67,10 @@ def normalize(data,  mask=None, poly_fit=0):
         d_std_ifs[ii]  = dstd
 
     t1p = time.time()
-    ### logger.info(f"Poly fit time: {(t1p-t0p)*1e3:2.2f}ms")
+    logger.debug(f"Mean+Std time: {(t1p-t0p)*1e3:2.2f}ms")
 
     flag_fraction =  N_flagged / N_tot
-    flag_correction =  N_tot / (N_tot - N_flagged) 
+    ## flag_correction =  N_tot / (N_tot - N_flagged) # <---------------------- unused
     logger.debug(f"Flagged fraction: {flag_fraction:2.4f}")
     if flag_fraction > 0.2:
         logger.warning(f"High flagged fraction: {flag_fraction:2.3f}")
@@ -78,6 +79,6 @@ def normalize(data,  mask=None, poly_fit=0):
     for ii in range(n_ifs):
         data[:, ii] = ((data[:, ii] - d_mean_ifs[ii]) / d_std_ifs[ii])
     t1 = time.time()
-    ### logger.info(f"Normalisation time: {(t1-t0)*1e3:2.2f}ms")
+    logger.debug(f"Normalisation time: {(t1-t0)*1e3:2.2f}ms")
     
     return data

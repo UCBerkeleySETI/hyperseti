@@ -33,8 +33,9 @@ def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
     
     Args:
         data (np.array): Numpy array with shape (N_timestep, N_channel)
-        metadata (dict): Metadata dictionary, should contain 'df' and 'dt'
+        metadata (dict): Metadata dictionary, should contain 'frequency_step' and 'time_step'
                          (frequency and time resolution), as astropy quantities
+        config (dict): See findET.py command-line parameters.
         gpu_id (int): GPU device ID to use.
         called_count (int): If called in a loop, use this to keep track of how many times the
                             pipeline is called. 
@@ -66,12 +67,13 @@ def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
 
     # Apply preprocessing normalization
     if config['preprocess'].get('normalize', False):
+        poly_fit = config['preprocess'].get('poly_fit', 0)
         if config['preprocess'].get('sk_flag', False):
             sk_flag_opts = config.get('sk_flag', {})
             mask = sk_flag(data, metadata, return_space='gpu', **sk_flag_opts)
         else:
             mask = None
-        data = normalize(data, mask=mask, return_space='gpu')
+        data = normalize(data, mask=mask, return_space='gpu', poly_fit=poly_fit)
     
     peaks = create_empty_hits_table()
     
@@ -131,20 +133,16 @@ def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
     return peaks
             
 
-def find_et(filename, pipeline_config, gulp_size=2**20, filename_out='hits.csv', gpu_id=0, *args, **kwargs):
+def find_et(filename, pipeline_config, filename_out='hits.csv', gulp_size=2**20, gpu_id=0, *args, **kwargs):
     """ Find ET, serial version
     
     Wrapper for reading from a file and running run_pipeline() on all subbands within the file.
     
     Args:
         filename (str): Name of input HDF5 file.
+        pipeline_config (dict): See findET.py command-line parameters.
         filename_out (str): Name of output CSV file.
         gulp_size (int): Number of channels to process at once (e.g. N_chan in a coarse channel)
-        max_dd (float): Maximum doppler drift in Hz/s to search out to.
-        min_dd (float): Minimum doppler drift to search.
-        threshold (float): Minimum SNR value to use in a search.
-        n_boxcar (int): Number of boxcar trials to do, width 2^N e.g. trials=(1,2,4,8,16).
-        kernel (str): which GPU kernel to employ for searching.
         gpu_id (int): GPU device ID to use.
    
     Returns:

@@ -1,5 +1,6 @@
 """ Command-line utility for hyperseti find_et """
 
+import sys
 import time
 from datetime import timedelta
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
@@ -24,12 +25,15 @@ Specified at the end would avoid confusion on the part of argument parsing (Pyth
 E.g. findET Voyager1.single_coarse.fine_res.h5 -M 4 -s 25 -g 3 -d hyperseti.hits hyperseti.normalize
 """
 
+brief_desc = f"Hyperseti findET command-line utility, version {HYPERSETI_VERSION}."
+
+
 def cmd_tool(args=None):
     r"""Coomand line parser"""
-    parser = ArgumentParser(description=f"Hyperseti findET command-line utility, version {HYPERSETI_VERSION}.",
+    parser = ArgumentParser(description=brief_desc,
                 formatter_class=RawDescriptionHelpFormatter,
                 epilog=HELP_EPILOGUE)
-    parser.add_argument("input_path", type=str, help="Path of input file.")
+    parser.add_argument("input_path", type=str, help="Path of input file.", nargs="?", default=None)
     parser.add_argument("--output_csv_path", "-o", type=str, default="./hits.csv",
                         help="Output path of CSV file.  Default: ./hits.csv.")
     parser.add_argument("--gulp_exponent", "-z", type=int, default=18,
@@ -46,6 +50,8 @@ def cmd_tool(args=None):
                         help="Kernel to be used by the dedoppler module.  Default: ddsk.")
     parser.add_argument("--gpu_id", "-g", type=int, default=0,
                         help="ID of GPU device.  Default: 0.")
+    parser.add_argument("--poly_fit", "-t", type=int, default=0,
+                        help="Degree of least-squares fit polynomial used in hyperseti/normalize.  Default: 0 (unused).")
     parser.add_argument("--group_level", "-l", type=str, default="info", choices=["debug", "info", "warning"],
                         help="Level for all functions that are not being debugged.  Default: info.")
     parser.add_argument("--debug_list", "-d", nargs="+", default=[],
@@ -60,11 +66,21 @@ def cmd_tool(args=None):
                         help="Do NOT merge boxcar trials.")
     parser.add_argument("--logfile", "-L", type=str, default="hits.log",
                         help="Name of logfile to write to")
+    parser.add_argument("--version", "-v", default=False, action="store_true",
+                        help="Display version ID and exit to O/S.")
 
     if args is None:
         args = parser.parse_args()
     else:
         args = parser.parse_args(args)
+
+    if args.version:
+        print(brief_desc)
+        sys.exit(0)
+
+    if args.input_path is None:
+        print("*** An input file path must be supplied !")
+        sys.exit(1)
 
     if args.group_level == "debug":
         int_level = logbook.DEBUG
@@ -74,11 +90,12 @@ def cmd_tool(args=None):
         else:
             int_level = logbook.WARNING
 
-
+    # Create pipeline configuration object for find_et.
     pipeline_config = {
         'preprocess': {
             'sk_flag': not args.noskflag,
             'normalize': not args.nonormalize,
+            'poly_fit': args.poly_fit
         },
         'dedoppler': {
             'kernel': args.kernel,
