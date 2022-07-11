@@ -151,10 +151,10 @@ def cmd_tool(args=None):
         df = pd.read_csv(path_csv_file, encoding="utf-8", engine="python")
         df = df[DFCOLS]
         nrows = len(df)
-        if nrows < 1:
-            print("*** Expected at least 1 row in the CSV file but its empty !")
-            sys.exit(1)
         write_header_lines(fd, path_h5_file, h5.header, args.max_drift_rate, args.obs_len)
+        if nrows < 1:
+            print("*** Empty .dat file written !")
+            sys.exit(0)
         for row in df.itertuples():
             tophit_count += 1
             drift_rate = float(row[1])
