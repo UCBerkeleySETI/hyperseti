@@ -64,6 +64,8 @@ def cmd_tool(args=None):
                         help="Do NOT apply doppler smearing correction.")
     parser.add_argument("--nomergeboxcar", "-X", default=False, action="store_true",
                         help="Do NOT merge boxcar trials.")
+    parser.add_argument("--n_blank", "-n", type=int, default="2",
+                        help="Number of iterative blanking steps to apply. Defaults to 2")
     parser.add_argument("--logfile", "-L", type=str, default="hits.log",
                         help="Name of logfile to write to")
     parser.add_argument("--version", "-v", default=False, action="store_true",
@@ -108,7 +110,8 @@ def cmd_tool(args=None):
         },
         'pipeline': {
             'n_boxcar': args.boxcar_exponent,
-            'merge_boxcar_trials': not args.nomergeboxcar
+            'merge_boxcar_trials': not args.nomergeboxcar,
+            'n_blank': args.n_blank
         }
     }
 
