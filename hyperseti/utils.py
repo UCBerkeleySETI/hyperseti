@@ -51,7 +51,7 @@ def on_gpu(func, dtype='float32'):
     @wraps(func)
     def inner(*args, **kwargs):
         new_args = []
-        logger.debug(f"{func_name} on_gpu inner, args: {args}")
+        logger.debug(f"{func_name} on_gpu inner")
         for idx, arg in enumerate(args):
             argname = func_params[idx]
 

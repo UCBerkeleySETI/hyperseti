@@ -26,9 +26,7 @@ logger = get_logger('hyperseti.hyperseti')
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 
-@datwrapper(dims=(None))
-@on_gpu
-def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
+def run_pipeline(data_array, config, gpu_id=0, called_count=None):
     """ Run dedoppler + hitsearch pipeline 
     
     Args:
@@ -48,7 +46,10 @@ def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
     t0 = time.time()
     if gpu_id is not None:
         attach_gpu_device(gpu_id)
+    data = data_array.data
+    metadata = data_array.metadata
     N_timesteps = data.shape[0]
+
     logger.debug(f"run_pipeline: data.shape={data.shape}, metadata={metadata}")
 
     # Check if we have a slice 
@@ -91,10 +92,10 @@ def run_pipeline(data, metadata, config, gpu_id=0, called_count=None):
             # Check if kernel is computing DD + SK
             kernel = config['dedoppler'].get('kernel', None)
             if kernel == 'ddsk':
-                dedopp, dedopp_sk, _md = dedoppler(data, metadata, return_space='gpu', **config['dedoppler'])
+                dedopp, dedopp_sk = dedoppler(data_array, **config['dedoppler'])
                 config['hitsearch']['sk_data'] = dedopp_sk   # Pass to hitsearch
             else:
-                dedopp, _md = dedoppler(data, metadata, return_space='gpu', **config['dedoppler'])
+                dedopp = dedoppler(data_array,  **config['dedoppler'])
                 dedopp_sk = None
             
             # Adjust SNR threshold to take into account boxcar size and dedoppler sum
@@ -173,7 +174,7 @@ def find_et(filename, pipeline_config, filename_out='hits.csv', gulp_size=2**20,
 
     attach_gpu_device(gpu_id)
     counter = 0
-    for d_arr in ds.iterate_through_data({'frequency': gulp_size}):
+    for d_arr in ds.iterate_through_data({'frequency': gulp_size}, space='gpu'):
         counter += 1
         hits = run_pipeline(d_arr, pipeline_config, gpu_id=None, called_count=counter)
         out.append(hits)

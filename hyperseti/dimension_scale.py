@@ -116,6 +116,10 @@ class DimensionScale(object):
         self.shape = (n_step,)
         self.ndim  = 1
         self.dtype = np.dtype('float64')
+    
+    @property
+    def step(self):
+        return Quantity(self.val_step, unit=self.units)
 
     def _generate_array(self, start_idx=None, stop_idx=None):
         """ Generate an numpy array from this DimensionScale object
@@ -295,6 +299,11 @@ class TimeScale(DimensionScale):
     def time_delta(self):
         t = TimeDelta(self.val_step, format='sec')
         t.format = self.time_delta_format
+        return t
+    
+    @property
+    def elapsed(self):
+        t = TimeDelta(self.val_step * self.n_step, format='sec').to('s')
         return t
     
     def generate(self, start_idx=None, stop_idx=None):

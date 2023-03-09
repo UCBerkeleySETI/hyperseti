@@ -77,6 +77,32 @@ class DataArray(object):
     def dtype(self):
         return self.data.dtype
     
+    @property
+    def metadata(self):
+        """ Split off metadata and return array + dict
+        
+        Args:
+            data_array (DataArray): Data array to split
+        
+        Returns:
+            data, metadata (array + dict)
+        """
+        metadata = deepcopy(self.attrs)
+        metadata["dims"] = self.dims
+
+        for scale_name, scale in self.scales.items():        
+            metadata[f"{scale_name}_step"] = scale.val_step
+            metadata[f"{scale_name}_start"] = scale.val_start
+            
+            if scale.units is not None:
+                metadata[f"{scale_name}_step"] *= scale.units
+                metadata[f"{scale_name}_start"] *= scale.units
+        
+        if self.slice_info is not None:
+            metadata['slice_info'] = self.slice_info
+
+        return metadata
+        
     def __repr__(self):
         r = f"<DataArray: shape={self.shape}, dims={self.dims}>"
         return r
@@ -157,7 +183,7 @@ class DataArray(object):
         """
         return self.data    
     
-    def isel(self, sel):
+    def isel(self, sel, space=None):
         """ Select subset of data using slices along specified dimension.
         
         Args:
@@ -179,9 +205,16 @@ class DataArray(object):
         slices = tuple(slices)
         data = self.data[slices]
         logger.debug(f"isel data shape: {data.shape}")
+        if space == 'cpu':
+            data = cp.asnumpy(data)
+        elif space == 'gpu':
+            data = cp.asarray(data)
+        else:
+            pass   
         return DataArray(data, self.dims, new_scales, self.attrs, slice_info=slices)
+    
 
-    def iterate_through_data(self, dims, overlap={}):
+    def iterate_through_data(self, dims, overlap={}, space=None):
         """ Generator to iterate through chunks of data
         
         Args:
@@ -221,7 +254,7 @@ class DataArray(object):
         
         for slices in itertools.product(*dim_slices):
             selector = {key: slice for key, slice in zip(dims, slices)}
-            yield self.isel(selector)
+            yield self.isel(selector, space=space)
 
     def apply_transform(self, transform, *args, **kwargs):
         """ Apply a tranformation function (e.g. np.log) to the data 

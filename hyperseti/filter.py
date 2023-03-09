@@ -46,7 +46,6 @@ def apply_boxcar(data, boxcar_size=1, axis=1, mode='mean'):
     
     return data
 
-@datwrapper(dims=('drift_rate', 'feed_id', 'frequency'))
 @on_gpu
 def apply_boxcar_drift(data, metadata):
     """ Apply boxcar filter to compensate for doppler smearing
