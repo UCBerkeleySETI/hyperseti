@@ -46,6 +46,7 @@ def run_pipeline(data_array, config, gpu_id=0, called_count=None):
     t0 = time.time()
     if gpu_id is not None:
         attach_gpu_device(gpu_id)
+
     data = data_array.data
     metadata = data_array.metadata
     N_timesteps = data.shape[0]
@@ -71,10 +72,10 @@ def run_pipeline(data_array, config, gpu_id=0, called_count=None):
         poly_fit = config['preprocess'].get('poly_fit', 0)
         if config['preprocess'].get('sk_flag', False):
             sk_flag_opts = config.get('sk_flag', {})
-            mask = sk_flag(data, metadata, return_space='gpu', **sk_flag_opts)
+            mask = sk_flag(data_array, **sk_flag_opts)
         else:
             mask = None
-        data = normalize(data, mask=mask, return_space='gpu', poly_fit=poly_fit)
+        data_array = normalize(data_array, mask=mask, poly_fit=poly_fit)
     
     peaks = create_empty_hits_table()
     

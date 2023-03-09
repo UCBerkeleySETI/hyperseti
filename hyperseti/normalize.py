@@ -10,8 +10,7 @@ from .log import get_logger
 logger = get_logger('hyperseti.normalize')
 
 
-@on_gpu
-def normalize(data,  mask=None, poly_fit=0):
+def normalize(data_array,  mask=None, poly_fit=0):
     """ Apply normalization on GPU
     
     Applies normalisation (data - mean) / stdev
@@ -28,9 +27,9 @@ def normalize(data,  mask=None, poly_fit=0):
     logger.debug(f"Poly fit = {poly_fit}")
     t0 = time.time()
 
-    d_flag = cp.copy(data)
+    d_flag = cp.copy(data_array.data)
 
-    n_int, n_ifs, n_chan = data.shape
+    n_int, n_ifs, n_chan = data_array.data.shape
 
     # Setup 1D channel mask -- used for polynomial fitting
     if mask is None: 
@@ -41,7 +40,7 @@ def normalize(data,  mask=None, poly_fit=0):
 
     N_masked = mask.sum()
     N_flagged = N_masked * n_ifs * n_int
-    N_tot     = np.product(data.shape)
+    N_tot     = np.product(data_array.data.shape)
     N_unflagged = (N_tot - N_flagged)
 
     t0p = time.time()
@@ -49,18 +48,18 @@ def normalize(data,  mask=None, poly_fit=0):
     for ii in range(n_ifs):
         x    = cp.arange(n_chan, dtype='float64') 
         xc   = cp.compress(~mask, x)
-        dfit = cp.compress(~mask, data[:, ii].mean(axis=0))
+        dfit = cp.compress(~mask, data_array.data[:, ii].mean(axis=0))
 
         if poly_fit > 0:
             # WAR: int64 dtype causes issues in cupy 10 (19.04.2022)
             p    = cp.poly1d(cp.polyfit(xc, dfit, poly_fit))
             fit   = p(x)
             dfit  -=  p(xc)
-            data[:, ii] = data[:, ii] - fit
+            data_array.data[:, ii] = data_array.data[:, ii] - fit
 
         # compute mean and stdev
         dmean = dfit.mean()
-        dvar  = ((data[:, ii] - dmean)**2).mean(axis=0)
+        dvar  = ((data_array.data[:, ii] - dmean)**2).mean(axis=0)
         dvar  = cp.compress(~mask, dvar).mean()
         dstd  = cp.sqrt(dvar)
         d_mean_ifs[ii] = dmean
@@ -77,8 +76,8 @@ def normalize(data,  mask=None, poly_fit=0):
 
     #  Apply to original data
     for ii in range(n_ifs):
-        data[:, ii] = ((data[:, ii] - d_mean_ifs[ii]) / d_std_ifs[ii])
+        data_array.data[:, ii] = ((data_array.data[:, ii] - d_mean_ifs[ii]) / d_std_ifs[ii])
     t1 = time.time()
     logger.debug(f"Normalisation time: {(t1-t0)*1e3:2.2f}ms")
     
-    return data
+    return data_array

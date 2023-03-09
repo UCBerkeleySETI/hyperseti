@@ -132,9 +132,9 @@ def blank_hits(data, metadata, df_hits, padding=4):
         data = blank_hit(data, metadata, f0, drate, padding=padding+box_width)
     return data, metadata
 
-@datwrapper(dims=None)
-@on_gpu
-def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=100, sk_data=None):
+
+
+def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None):
     """ Search for hits using argrelmax method in cusignal
     
     Args:
@@ -152,9 +152,10 @@ def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=100, sk_data=No
                                     driftrate_idx: Index in driftrate array
                                     channel_idx: Index in frequency array
     """
-    metadata = deepcopy(metadata)
-
-    drift_trials = metadata['drift_rates']
+    metadata = deepcopy(dedopp_array.metadata)
+    dedopp_data = dedopp_array.data
+    
+    drift_trials = np.asarray(dedopp_array.drift_rate)
     
     t0 = time.time()
     dfs = []
