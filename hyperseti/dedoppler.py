@@ -54,18 +54,88 @@ def apply_boxcar_drift(data_array):
     return data_array
 
 
+def plan_stepped(N_time, N_dopp_lower, N_dopp_upper):
+    """ Create dedoppler plan where step size doubles after N_time
+    
+    This plan is good for large drift rate search ranges, as it requires
+    log2(N) fewer trials.  
+    
+    Args:
+        N_time (int): Number of time integrations in data array
+        N_dopp_lower (int): Minimum drift rate correction in # channels
+        N_dopp_upper (int): Maximum drift rate correction in # channels
+    """
+    reverse = False
+    if N_dopp_lower > N_dopp_upper:
+        reverse = True
+        N_dopp_lower, N_dopp_upper = N_dopp_upper, N_dopp_lower
+    N_stages, step, curval = 0, 1, 0
+    steps_upper = []
+    while curval < N_dopp_upper:
+        if curval >= N_dopp_lower:
+            steps_upper.append(np.arange(N_time) * step + curval)
+        curval += N_time * step
+        #print(curval, step, N_stages)
+        step *=2
+        N_stages += 1
+        
+    steps_lower = []
+    N_stages, step, curval = 0, 1, 0
+    while curval > N_dopp_lower:
+        if curval <= N_dopp_upper:
+            steps_lower.append(-np.arange(N_time) * step + curval)
+        curval -= N_time * step
+        #print(curval, step, N_stages)
+        step *= 2
+        N_stages += 1
+    
+    if len(steps_upper) > 0:
+        steps = steps_upper
+        if len(steps_lower) > 0:
+            steps += steps_lower 
+    elif len(steps_lower) > 0:
+        steps = steps_lower
+    else:
+        raise RuntimeError("No steps!")
+    steps = np.unique(np.concatenate(steps))
+    steps.sort()
+    if reverse:
+        steps = steps[::-1]
+    return steps
+
+
+def plan_full(N_time, N_dopp_lower, N_dopp_upper):
+    """ Basic dedoppler plan to check every possible drift correction 
+    
+    Args:
+        N_time (int): Number of time integrations in data array
+        N_dopp_lower (int): Minimum drift rate correction in # channels
+        N_dopp_upper (int): Maximum drift rate correction in # channels
+    """
+    if N_dopp_upper > N_dopp_lower:
+        dd_shifts      = np.arange(N_dopp_lower, N_dopp_upper + 1, dtype='int32')
+    else:
+        dd_shifts      = np.arange(N_dopp_upper, N_dopp_lower + 1, dtype='int32') [::-1]
+    return dd_shifts
+
+
 def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1, 
-              boxcar_mode='sum', kernel='dedoppler', apply_smearing_corr=True):
+              boxcar_mode='sum', kernel='dedoppler', apply_smearing_corr=True, plan='stepped'):
     """ Apply brute-force dedoppler kernel to data
     
     Args:
-        data (np.array): Numpy array with shape (N_timestep, N_channel)
-        metadata (dict): Metadata dictionary, should contain 'df' and 'dt'
-                         (frequency and time resolution)
+        data_array (DataArray): DataArray with shape (N_timestep, N_beam, N_channel)
         max_dd (float): Maximum doppler drift in Hz/s to search out to.
-        min_dd (float): Minimum doppler drift to search.
+        min_dd (float): Minimum doppler drift to search. 
+                        If set to None (default), it will use -max_dd (not 0)!
         boxcar_mode (str): Boxcar mode to apply. mean/sum/gaussian.
         kernel (str): 'dedoppler' or 'kurtosis' or 'ddsk'
+        plan (str): Dedoppler plan to use. One of 'full' or 'stepped'
+    
+    Dedoppler plans:
+        'full':    Does every possible trial between min_dd and max_dd
+        'stepped': Doubles trial after every N_time, based on data_array shape 
+                   E.g. for N_time = 2 trials are [0, 1, 2, 4, 8, 16, ..]
     
     Returns:
         dd_vals, dedopp_gpu (np.array, np/cp.array): 
@@ -82,7 +152,6 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
     
     # Compute minimum possible drift (delta_dd)
     N_time, N_beam, N_chan = data_array.data.shape
-
     obs_len  = data_array.time.elapsed.to('s').value
     delta_dd = data_array.frequency.step.to('Hz').value / obs_len  # e.g. 2.79 Hz / 300 s = 0.0093 Hz/s
     
@@ -92,11 +161,12 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
 
     if max_dd == 0 and min_dd is None:
         dd_shifts = np.array([0], dtype='int32')
-    elif N_dopp_upper > N_dopp_lower:
-        dd_shifts      = np.arange(N_dopp_lower, N_dopp_upper + 1, dtype='int32')
-        
     else:
-        dd_shifts      = np.arange(N_dopp_upper, N_dopp_lower + 1, dtype='int32') [::-1]
+        plans = {'full': plan_full,
+                 'stepped': plan_stepped}
+
+        plan_func = plans.get(plan)
+        dd_shifts = plan_func(N_time, N_dopp_lower, N_dopp_upper)
     
     # Correct for negative frequency step
     if data_array.frequency.val_step < 0:
@@ -182,6 +252,7 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
     output_dims = ('drift_rate', 'feed_id', 'frequency')
     output_units = data_array.units
 
+    # TODO: Fix this for stepped drift rates
     output_scales = {
         'drift_rate': DimensionScale('drift_rate', dd_shifts[0] * delta_dd, delta_dd, len(dd_shifts), 'Hz/s'),
         'feed_id': data_array.feed_id,
