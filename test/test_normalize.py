@@ -1,4 +1,4 @@
-from hyperseti import normalize
+from hyperseti.normalize import normalize
 from hyperseti.io import from_setigen
 
 import cupy as cp
@@ -16,7 +16,7 @@ def test_normalize_basic():
     d = np.random.normal(size=n_chan*n_int*n_ifs, loc=10, scale=17).astype('float32')
     d = d.reshape([n_int, n_ifs, n_chan])**2
 
-    d_norm = normalize(d, return_space='cpu')
+    d_norm = normalize(d)
     print(d_norm.mean(), d_norm.std())
     assert np.isclose(d_norm.mean(), 0, atol=1e-6)
     assert np.isclose(d_norm.std(), 1.0, atol=1e-6)
@@ -33,7 +33,7 @@ def test_normalize_bandpass(plot=False):
     if plot:
         plt.plot(d.mean(axis=0).squeeze())
 
-    d_norm = normalize(d, poly_fit=2, return_space='cpu')
+    d_norm = normalize(d, poly_fit=2)
     print(d_norm.mean(), d_norm.std())
     if plot:
         plt.plot(d_norm.mean(axis=0).squeeze())
@@ -59,7 +59,7 @@ def test_normalize_multi_if(plot=False):
         plt.plot(d[:, 2].mean(axis=0))
         plt.plot(d[:, 2].mean(axis=0))
 
-    d_norm = normalize(d, poly_fit=2, return_space='cpu')
+    d_norm = normalize(d, poly_fit=2)
     print(d_norm.mean(), d_norm.std())
     if plot:
         plt.subplot(2,1,2)
@@ -94,7 +94,7 @@ def test_normalize_mask(plot=False):
     
     # Over 20% of data will be masked
     mask = d.data.mean(axis=0).squeeze() > 15
-    d_norm = normalize(d, mask=mask, return_space='cpu')
+    d_norm = normalize(d, mask=mask)
     #print(d_norm.mean(), d_norm.std())
     
     plt.figure()
