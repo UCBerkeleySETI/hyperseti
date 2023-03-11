@@ -58,29 +58,35 @@ class GulpPipeline(object):
     def preprocess(self):
         # Apply preprocessing normalization and blanking
         if self.config['preprocess'].get('blank_edges', 0):
+            logger.info(f"GulpPipeline.preprocess: Applying edge blanking")
             self.data_array = blank_edges(self.data_array, **self.config['preprocess']['blank_edges'])
         
         if self.config['preprocess'].get('normalize', False):
             poly_fit = self.config['preprocess'].get('poly_fit', 0)
             if self.config['preprocess'].get('sk_flag', False):
+                logger.info(f"GulpPipeline.preprocess: Applying sk_flag before normalization")
                 sk_flag_opts = self.config.get('sk_flag', {})
                 mask = sk_flag(self.data_array, **sk_flag_opts)
             else:
                 mask = None
+
+            logger.info(f"GulpPipeline.preprocess: Normalizing data")
             self.data_array = normalize(self.data_array, mask=mask, poly_fit=poly_fit)
             self.mask = mask
 
         # Extrema blanking is done *after* normalization
         if self.config['preprocess'].get('blank_extrema'):
+            logger.info(f"GulpPipeline.preprocess: Blanking extremely bright signals")
             self.data_array = blank_extrema(self.data_array, **self.config['preprocess']['blank_extrema'])
             
-    
     def dedoppler(self):
             # Check if kernel is computing DD + SK
             kernel = self.config['dedoppler'].get('kernel', None)
             if kernel == 'ddsk':
+                logger.info("GulpPipeline.dedoppler: Running DDSK dedoppler kernel")
                 self.dedopp, self.dedopp_sk = self.dedoppler(self.data_array, **self.config['dedoppler'])
             else:
+                logger.info("GulpPipeline.dedoppler: Running standard dedoppler kernel")
                 self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'])
                 self.dedopp_sk = None
     
@@ -99,7 +105,6 @@ class GulpPipeline(object):
             _peaks['snr'] /= np.sqrt(self.N_timesteps * boxcar_size)
             self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
         
-    
     def run(self, called_count=None):
         t0 = time.time()
 
@@ -133,8 +138,6 @@ class GulpPipeline(object):
                 else:
                     logger.info(f"GulpPipeline.run: No new hits found, breaking! (iteration {blank_count + 1} / {n_blank})")
                     break
-
-
 
         t1 = time.time()
 
