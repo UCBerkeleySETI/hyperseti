@@ -11,12 +11,27 @@ from cupyx.scipy.ndimage import uniform_filter1d
 from .kernels.dedoppler import dedoppler_kernel, dedoppler_kurtosis_kernel, dedoppler_with_kurtosis_kernel
 from .filter import apply_boxcar
 from .data_array import from_metadata, DataArray
-from .dimension_scale import DimensionScale
+from .dimension_scale import DimensionScale, ArrayBasedDimensionScale
 
 #logging
 from .log import get_logger
 logger = get_logger('hyperseti.dedoppler')
-  
+
+def calc_ndrift(data_array, max_dd):
+    """ Calculate the number of channels a drifting signal will cross 
+
+    Args:
+        data_array (DataArray): Data array with 'frequency' and 'time' dimensions)
+        max_dd (astropy.units.Quantity): Maximum drift rate to consider (in Hz/s)
+
+    """
+    deltaf = data_array.frequency.step.to('Hz').value
+    deltat = data_array.time.step.to('s').value
+    max_dd = max_dd.to('Hz/s').value if isinstance(max_dd, u.Quantity) else max_dd
+    n_int  = data_array.shape[0]
+
+    min_fdistance = int(np.abs(deltat * n_int * max_dd / deltaf))
+    return min_fdistance
 
 def apply_boxcar_drift(data_array):
     """ Apply boxcar filter to compensate for doppler smearing
@@ -35,10 +50,9 @@ def apply_boxcar_drift(data_array):
     logger.debug(f"apply_boxcar_drift: Applying moving average based on drift rate.")
     metadata = data_array.metadata
     # Compute drift rates from metadata
-    dr0, ddr = metadata['drift_rate_start'].value, metadata['drift_rate_step'].value
-    df = metadata['frequency_step'].to('Hz').value
+    drates = cp.asarray(data_array.drift_rate.data)
+    df = data_array.frequency.step.to('Hz').value
     dt = metadata['integration_time'].to('s').value
-    drates =  dr0  + ddr * cp.arange(data_array.data.shape[0])
     
     # Compute smearing (array of n_channels smeared for given driftrate)
     smearing_nchan = cp.abs(dt * drates / df).astype('int32')
@@ -73,7 +87,7 @@ def plan_stepped(N_time, N_dopp_lower, N_dopp_upper):
     steps_upper = []
     while curval < N_dopp_upper:
         if curval >= N_dopp_lower:
-            steps_upper.append(np.arange(N_time) * step + curval)
+            steps_upper.append(np.arange(N_time, dtype='int32') * step + curval)
         curval += N_time * step
         #print(curval, step, N_stages)
         step *=2
@@ -83,7 +97,7 @@ def plan_stepped(N_time, N_dopp_lower, N_dopp_upper):
     N_stages, step, curval = 0, 1, 0
     while curval > N_dopp_lower:
         if curval <= N_dopp_upper:
-            steps_lower.append(-np.arange(N_time) * step + curval)
+            steps_lower.append(-np.arange(N_time, dtype='int32') * step + curval)
         curval -= N_time * step
         #print(curval, step, N_stages)
         step *= 2
@@ -104,7 +118,7 @@ def plan_stepped(N_time, N_dopp_lower, N_dopp_upper):
     return steps
 
 
-def plan_full(N_time, N_dopp_lower, N_dopp_upper):
+def plan_optimal(N_time, N_dopp_lower, N_dopp_upper):
     """ Basic dedoppler plan to check every possible drift correction 
     
     Args:
@@ -133,7 +147,7 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
         plan (str): Dedoppler plan to use. One of 'full' or 'stepped'
     
     Dedoppler plans:
-        'full':    Does every possible trial between min_dd and max_dd
+        'optimal':    Does every possible trial between min_dd and max_dd
         'stepped': Doubles trial after every N_time, based on data_array shape 
                    E.g. for N_time = 2 trials are [0, 1, 2, 4, 8, 16, ..]
     
@@ -162,7 +176,7 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
     if max_dd == 0 and min_dd is None:
         dd_shifts = np.array([0], dtype='int32')
     else:
-        plans = {'full': plan_full,
+        plans = {'optimal': plan_optimal,
                  'stepped': plan_stepped}
 
         plan_func = plans.get(plan)
@@ -254,7 +268,7 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
 
     # TODO: Fix this for stepped drift rates
     output_scales = {
-        'drift_rate': DimensionScale('drift_rate', dd_shifts[0] * delta_dd, delta_dd, len(dd_shifts), 'Hz/s'),
+        'drift_rate': ArrayBasedDimensionScale('drift_rate', dd_shifts * delta_dd, 'Hz/s'),
         'feed_id': data_array.feed_id,
         'frequency': data_array.frequency
         }
