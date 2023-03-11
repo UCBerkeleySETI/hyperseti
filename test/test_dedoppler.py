@@ -2,12 +2,16 @@ from hyperseti.dedoppler import dedoppler
 from hyperseti.filter import apply_boxcar
 from hyperseti.normalize import normalize
 from hyperseti.hits import hitsearch, merge_hits
-from hyperseti import run_pipeline, find_et
-from hyperseti.io import from_fil
+from hyperseti import find_et
+from hyperseti.io import from_fil, from_metadata
 from hyperseti.log import set_log_level
+from hyperseti.data_array import split_metadata
 import cupy as cp
 
 from astropy import units as u
+from astropy.time import Time
+from datetime import datetime
+
 import setigen as stg
 import pylab as plt
 import numpy as np
@@ -21,6 +25,7 @@ import os
 
 import logbook
 import hyperseti
+
 #hyperseti.dedoppler.logger.level = logbook.DEBUG
 #hyperseti.utils.logger.level = logbook.DEBUG
 
@@ -31,15 +36,18 @@ def test_dedoppler():
     test_data = np.ones(shape=(32, 1, 1024), dtype='float32')
     test_data[:, :, 511] = 10
     
-    metadata_in = {'frequency_start': 1000*u.MHz, 
+    metadata_in = {'frequency_start': 1000*u.MHz,
+                'time_start': Time(datetime.now()),
                 'time_step': 1.0*u.s, 
-                'frequency_step': 1.0*u.Hz}
+                'frequency_step': 1.0*u.Hz,
+                'dims': ('time', 'beam_id', 'frequency')}
+
+    dedopp_array = from_metadata(cp.asarray(test_data), metadata_in)
     
-    dedopp, metadata = dedoppler(test_data, metadata_in, boxcar_size=1,
-                                 max_dd=1.0)
-    print("type(dedopp):", type(dedopp))
-    print("dedopp.data:", dedopp.data)
-    print("np.max(dedopp.data):", np.max(dedopp.data), ", np.sum(test_data[:, :, 511]):", np.sum(test_data[:, :, 511]))
+    dedopp_array = dedoppler(dedopp_array, boxcar_size=1, max_dd=1.0)
+    print("type(dedopp):", type(dedopp_array))
+    print("dedopp.data:", dedopp_array.data)
+    print("np.max(dedopp.data):", np.max(dedopp_array.data), ", np.sum(test_data[:, :, 511]):", np.sum(test_data[:, :, 511]))
     
     #TODO: Recalculate
     #assert np.max(dedopp.data) == np.sum(test_data[:, :, 511])
@@ -67,19 +75,26 @@ def test_dedoppler():
 
         frame.save_fil(filename=synthetic_fil)
         darray = from_fil(synthetic_fil)
+        darray.data = cp.asarray(darray.data[:])
 
-        dedopp, metadata = dedoppler(darray, boxcar_size=1, max_dd=1.0, return_space='cpu')
+        dedopp_array = dedoppler(darray, boxcar_size=1, max_dd=1.0, plan='optimal')
+
+        dedopp, metadata = split_metadata(dedopp_array)
 
         # Manual dedoppler search -- just find max channel (only works if S/N is good)
         manual_dd_tot = 0
         for ii in range(darray.data.shape[0]):
-            manual_dd_tot += np.max(darray.data[ii])
-        imshow_dedopp(dedopp, show_colorbar=False)
+            manual_dd_tot += np.max(cp.asnumpy(darray.data[ii]))
+        plt.clf()
+        imshow_dedopp(dedopp_array, show_colorbar=False)
+        plt.colorbar()
+        plt.savefig(os.path.join(test_fig_dir, f'test_dedoppler_{dr_test}.png'))
 
-        maxpixel = np.argmax(dedopp.data)
+        maxpixel = np.argmax(dedopp_array.data)
         mdrift, mchan = (maxpixel // 1024, maxpixel % 1024)
-        optimal_drift = metadata['drift_rates'][mdrift]
-        maxpixel_val = np.max(dedopp.data)
+        drates = cp.asnumpy(dedopp_array.drift_rate.data)
+        optimal_drift = drates[int(mdrift)]
+        maxpixel_val = np.max(cp.asnumpy(dedopp_array.data))
         
         frac_recovered = (maxpixel_val / manual_dd_tot)
 
@@ -91,15 +106,14 @@ def test_dedoppler():
         #assert np.abs(mchan - 500) <= 1
         
         # Drift rate should be detected +/- 1 drift resolution
-        assert np.abs(optimal_drift - dr_test) <= 1.01*np.abs(metadata['drift_rate_step'].value)
+        drift_rate_step = 0.03125
+        assert np.abs(optimal_drift - dr_test) <= 1.01*np.abs(drift_rate_step)
 
         # TODO: Fix stats for this
         # Recovered signal sum should be close to manual method
         #assert 1.001 >= frac_recovered >= 0.825
 
     # Finish off figure plotting
-    plt.colorbar()
-    plt.savefig(os.path.join(test_fig_dir, 'test_dedoppler.png'))
     plt.show()
 
 def test_dedoppler_boxcar():
@@ -127,7 +141,12 @@ def test_dedoppler_boxcar():
 
     # Drift rate of 2 channels / integration
     # To simulate channel smearing
-    metadata = {'frequency_start': 1000*u.MHz, 'time_step': 1.0*u.s, 'frequency_step': 1.0*u.Hz}
+    metadata_in = {'frequency_start': 1000*u.MHz,
+                'time_start': Time(datetime.now()),
+                'time_step': 1.0*u.s, 
+                'frequency_step': 1.0*u.Hz,
+                'dims': ('time', 'beam_id', 'frequency')}
+
     bg = generate_drifting_tone(n_chan=256, n_timesteps=32, n_drift_per_step=2, sigval=10)
     print(f"Total power in frame: {np.sum(bg)}")
 
@@ -136,22 +155,21 @@ def test_dedoppler_boxcar():
     print(f"MAXHOLD recovered power: {maxhold_res}")
 
     # With boxcar_size = 1 we should recover 160
-    dedopp, metadata = dedoppler(bg, metadata, boxcar_size=1,
-                                 max_dd=2.0, return_space='gpu')
+    dedopp_array = dedoppler(from_metadata(cp.asarray(bg), metadata_in), boxcar_size=1,
+                                 max_dd=2.0, plan='optimal')
 
-    maxpixel = np.argmax(cp.asnumpy(dedopp.data))
+    maxpixel = np.argmax(cp.asnumpy(dedopp_array.data))
     mdrift, mchan = (maxpixel // 1024, maxpixel % 1024)
-    maxpixel_val = np.max(cp.asnumpy(dedopp.data))
+    maxpixel_val = np.max(cp.asnumpy(dedopp_array.data))
     print(f"dedopp recovered power (boxcar 1): {maxpixel_val}")
     
     #TODO: FIX assertion
     #assert maxpixel_val == maxhold_res
 
     # With boxcar_size = 2 we should recover 320 (full amount)
-    metadata = {'frequency_start': 1000*u.MHz, 'time_step': 1.0*u.s, 'frequency_step': 1.0*u.Hz}
     bg = generate_drifting_tone(n_chan=256, n_timesteps=32, n_drift_per_step=2, sigval=10)
-    dedopp, metadata = dedoppler(bg, metadata, boxcar_size=2, 
-                                 max_dd=4.0, return_space='cpu')
+    dedopp = dedoppler(from_metadata(cp.asarray(bg), metadata_in), boxcar_size=2, 
+                                 max_dd=4.0, plan='optimal')
 
     maxpixel = np.argmax(cp.asnumpy(dedopp.data))
     mdrift, mchan = (maxpixel // 1024, maxpixel % 1024) # <----------- UNUSED
@@ -164,9 +182,9 @@ def test_dedoppler_boxcar():
     # plot
     plt.figure(figsize=(10, 4))
     plt.subplot(1,2,1)
-    imshow_waterfall(bg, metadata)
+    imshow_waterfall(from_metadata(bg, metadata_in))
     plt.subplot(1,2,2)
-    imshow_dedopp(dedopp.data, metadata, 'channel', 'driftrate')
+    imshow_dedopp(dedopp, 'channel', 'driftrate')
     plt.savefig(os.path.join(test_fig_dir, 'test_dedoppler_boxcar.png'))
     plt.show()
     

@@ -3,7 +3,6 @@ import numpy as np
 import time
 import os
 
-from .utils import on_gpu, datwrapper
 
 #logging
 from .log import get_logger

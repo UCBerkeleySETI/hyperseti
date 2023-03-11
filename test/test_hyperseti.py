@@ -2,7 +2,7 @@ from hyperseti.dedoppler import dedoppler
 from hyperseti.filter import apply_boxcar
 from hyperseti.normalize import normalize
 from hyperseti.hits import hitsearch, merge_hits
-from hyperseti import run_pipeline, find_et
+from hyperseti.pipeline import find_et, GulpPipeline
 from hyperseti.io import from_fil, from_h5, from_setigen
 from hyperseti.log import set_log_level
 import cupy as cp
@@ -82,7 +82,8 @@ def test_hitsearch():
             'merge_boxcar_trials': False
         }
     }
-    hits = run_pipeline(darray, config)
+    pipeline = GulpPipeline(darray, config)
+    hits = pipeline.run()
 
     for rid, hit in hits.iterrows():
          assert(np.abs(hit['channel_idx'] - 2048) < np.max((signal_bw, hit['boxcar_size'])))
@@ -97,7 +98,8 @@ def test_hitsearch():
 
     print("--- run_pipeline with merge --- ")
     config['pipeline']['merge_boxcar_trials'] = True
-    hits2 = run_pipeline(darray, config)
+    pipeline.config = config
+    hits2 = pipeline.run()
     hits2
     print(hits2)
     assert hits2.iloc[0]['boxcar_size'] == signal_bw

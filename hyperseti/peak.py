@@ -3,7 +3,6 @@ import numpy as np
 from cusignal import argrelmax
 import time
 
-from .utils import on_gpu, datwrapper
 
 # Logging
 from .log import get_logger

@@ -8,7 +8,6 @@ import os
 from astropy import units as u
 
 from .peak import find_peaks_argrelmax
-from .utils import on_gpu, datwrapper
 from .data_array import DataArray
 from .blanking import blank_hit, blank_hits
 

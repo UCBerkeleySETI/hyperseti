@@ -341,14 +341,17 @@ def split_metadata(data_array):
     metadata = deepcopy(data_array.attrs)
     metadata["dims"] = data_array.dims
 
-    for scale_name, scale in data_array.scales.items():        
-        metadata[f"{scale_name}_step"] = scale.val_step
-        metadata[f"{scale_name}_start"] = scale.val_start
+    for scale_name, scale in data_array.scales.items():
+        if not isinstance(scale, ArrayBasedDimensionScale):       
+            metadata[f"{scale_name}_step"] = scale.val_step
+            metadata[f"{scale_name}_start"] = scale.val_start
         
-        if scale.units is not None:
-            metadata[f"{scale_name}_step"] *= scale.units
-            metadata[f"{scale_name}_start"] *= scale.units
-    
+            if scale.units is not None:
+                metadata[f"{scale_name}_step"] *= scale.units
+                metadata[f"{scale_name}_start"] *= scale.units
+        else:
+            metadata[scale_name] = scale.data
+            
     if data_array.slice_info is not None:
         metadata['slice_info'] = data_array.slice_info
 

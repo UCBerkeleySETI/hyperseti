@@ -18,9 +18,9 @@ Try to get results that are similar to those of turbo_seti with our standard Voy
 import pandas as pd
 import setigen as stg
 import astropy.units as u
-from hyperseti.hits import blank_hits
+from hyperseti.blanking import blank_hits
 from hyperseti.io import from_setigen
-from hyperseti import run_pipeline
+from hyperseti.pipeline import GulpPipeline
 
 def test_blank_hits():
     metadata = {'fch1': 6095.214842353016*u.MHz, 
@@ -77,9 +77,10 @@ def test_blank_hits():
             'merge_boxcar_trials': True
         }
     }
+    pipeline = GulpPipeline(d, config)
+    df = pipeline.run()
+    db = blank_hits(d, df)
 
-    df = run_pipeline(d, config)
-    db, metadata = blank_hits(d, df, return_space='cpu')
     for idx in start_idxs:
         assert db.data[0,0, idx] == 0
     print("Hits blanked!")

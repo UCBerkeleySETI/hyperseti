@@ -1,8 +1,6 @@
 import cupy as cp
 import numpy as np
 
-from .utils import on_gpu, datwrapper
-
 #logging
 from .log import get_logger
 logger = get_logger('hyperseti.kurtosis')

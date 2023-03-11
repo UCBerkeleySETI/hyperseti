@@ -6,7 +6,7 @@ from datetime import timedelta
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import logbook
 from .log import update_levels
-from hyperseti import find_et
+from .pipeline import find_et
 from hyperseti.version import HYPERSETI_VERSION
 
 

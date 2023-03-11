@@ -1,7 +1,6 @@
 import pylab as plt
 import cupy as cp
 
-from .utils import on_gpu, datwrapper
 
 def _get_extent(data_array, xaxis, yaxis):
     """ Generate extents for imshow axis 
@@ -72,9 +71,9 @@ def imshow_dedopp(data_array, xaxis='channel', yaxis='driftrate', *args, **kwarg
     _imshow(data_array, xaxis, yaxis, *args, **kwargs)
 
  
-def imshow_waterfall(data, metadata, xaxis='channel', yaxis='timestep', *args, **kwargs):
+def imshow_waterfall(data_array, xaxis='channel', yaxis='timestep', *args, **kwargs):
     """ Do imshow for spectral data """
-    _imshow(data, metadata, xaxis, yaxis, *args, **kwargs)
+    _imshow(data_array, xaxis, yaxis, *args, **kwargs)
 
     
 def overlay_hits(hits, xaxis='channel', yaxis='driftrate', marker='x', c='red'):

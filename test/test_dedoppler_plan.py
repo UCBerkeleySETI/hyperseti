@@ -1,11 +1,12 @@
-from hyperseti.dedoppler import plan_full, plan_stepped
+from hyperseti.dedoppler import plan_optimal, plan_stepped
+import numpy as np
 
-def test_plan_full():
+def test_plan_optimal():
     """ Test that plan_full() works as intended """ 
-    assert len(plan_full(16, -500, 500)) == 1001
-    assert len(plan_full(16, 0, 500)) == 501
-    assert len(plan_full(16, -500, 0)) == 501
-    assert np.allclose(plan_full(16, -500, 0), plan_full(16, 0, -500)[::-1])
+    assert len(plan_optimal(16, -500, 500)) == 1001
+    assert len(plan_optimal(16, 0, 500)) == 501
+    assert len(plan_optimal(16, -500, 0)) == 501
+    assert np.allclose(plan_optimal(16, -500, 0), plan_optimal(16, 0, -500)[::-1])
 
 def test_plan_stepped():
     """ Test that plan_stepped() works as intended """

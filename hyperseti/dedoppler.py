@@ -134,7 +134,7 @@ def plan_optimal(N_time, N_dopp_lower, N_dopp_upper):
 
 
 def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1, 
-              boxcar_mode='sum', kernel='dedoppler', apply_smearing_corr=True, plan='stepped'):
+            kernel='dedoppler', apply_smearing_corr=False, plan='stepped'):
     """ Apply brute-force dedoppler kernel to data
     
     Args:
@@ -142,7 +142,6 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
         max_dd (float): Maximum doppler drift in Hz/s to search out to.
         min_dd (float): Minimum doppler drift to search. 
                         If set to None (default), it will use -max_dd (not 0)!
-        boxcar_mode (str): Boxcar mode to apply. mean/sum/gaussian.
         kernel (str): 'dedoppler' or 'kurtosis' or 'ddsk'
         plan (str): Dedoppler plan to use. One of 'full' or 'stepped'
     
@@ -262,13 +261,13 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
             dedopp_gpu[:, beam_id] = _dedopp_gpu
     
     # Create output DataArray
-    output_dims = ('drift_rate', 'feed_id', 'frequency')
+    output_dims = ('drift_rate', 'beam_id', 'frequency')
     output_units = data_array.units
 
     # TODO: Fix this for stepped drift rates
     output_scales = {
         'drift_rate': ArrayBasedDimensionScale('drift_rate', dd_shifts * delta_dd, 'Hz/s'),
-        'feed_id': data_array.feed_id,
+        'beam_id': data_array.beam_id,
         'frequency': data_array.frequency
         }
 

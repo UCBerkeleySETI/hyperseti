@@ -14,7 +14,6 @@ from .dedoppler import dedoppler, calc_ndrift
 from .normalize import normalize
 from .hits import hitsearch, merge_hits, create_empty_hits_table, blank_hits
 from .io import from_fil, from_h5, from_setigen
-from .utils import attach_gpu_device, on_gpu, datwrapper
 from .kurtosis import sk_flag
 from .blanking import blank_edges, blank_extrema
 from hyperseti.version import HYPERSETI_VERSION

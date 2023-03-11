@@ -6,7 +6,6 @@ from copy import deepcopy
 
 from cupyx.scipy.ndimage import uniform_filter1d
 
-from .utils import on_gpu, datwrapper
 
 #logging
 from .log import get_logger
