@@ -10,7 +10,7 @@ from copy import deepcopy
 from dask.array.svg import svg
 
 # hyperseti
-from .dimension_scale import DimensionScale, TimeScale
+from .dimension_scale import DimensionScale, TimeScale, ArrayBasedDimensionScale
 
 # Logging
 from .log import get_logger
@@ -90,13 +90,14 @@ class DataArray(object):
         metadata = deepcopy(self.attrs)
         metadata["dims"] = self.dims
 
-        for scale_name, scale in self.scales.items():        
-            metadata[f"{scale_name}_step"] = scale.val_step
-            metadata[f"{scale_name}_start"] = scale.val_start
+        for scale_name, scale in self.scales.items():
+            if not isinstance(scale, ArrayBasedDimensionScale):       
+                metadata[f"{scale_name}_step"] = scale.val_step
+                metadata[f"{scale_name}_start"] = scale.val_start
             
-            if scale.units is not None:
-                metadata[f"{scale_name}_step"] *= scale.units
-                metadata[f"{scale_name}_start"] *= scale.units
+                if scale.units is not None:
+                    metadata[f"{scale_name}_step"] *= scale.units
+                    metadata[f"{scale_name}_start"] *= scale.units
         
         if self.slice_info is not None:
             metadata['slice_info'] = self.slice_info
@@ -140,10 +141,13 @@ class DataArray(object):
             attrs_table.append(f"<tr><th>{k}</th> <td>{str(v).strip('<>')}</td> </tr>")
         attrs_table.append("</tbody></table>")
         
-        dims_table = ["<table>", "<thead><tr> <td></td><th>Dimension Scales</th></tr></thead>"]
+        dims_table = ["<table>", "<thead><tr> <td></td><th>Dimension Scales (start, step) </th></tr></thead>"]
         for k, v in self.scales.items():
             v_units = '' if v.units is None else v.units
-            dims_table.append(f"<tr><th>{k}</th> <td>{v.val_start, v.val_step} {v_units}</td> </tr>")
+            if not isinstance(v, ArrayBasedDimensionScale): 
+                dims_table.append(f"<tr><th>{k}</th> <td>{v.val_start, v.val_step} {v_units}</td> </tr>")
+            else:
+                 dims_table.append(f"<tr><th>{k}</th> <td>{v.data[0], 'non-uniform'} {v_units}</td> </tr>")
         dims_table.append("</tbody></table>")
         
         table = "\n".join(table)
