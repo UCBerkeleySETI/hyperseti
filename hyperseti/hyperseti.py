@@ -10,7 +10,7 @@ import setigen as stg
 from blimpy.io import sigproc
 from copy import deepcopy
 
-from .dedoppler import dedoppler
+from .dedoppler import dedoppler, calc_ndrift
 from .normalize import normalize
 from .hits import hitsearch, merge_hits, create_empty_hits_table, blank_hits
 from .io import from_fil, from_h5
@@ -24,7 +24,6 @@ logger = get_logger('hyperseti.hyperseti')
 
 # Max threads setup 
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
-
 
 def run_pipeline(data_array, config, gpu_id=0, called_count=None):
     """ Run dedoppler + hitsearch pipeline 
@@ -59,11 +58,7 @@ def run_pipeline(data_array, config, gpu_id=0, called_count=None):
     min_fdistance = config['hitsearch'].get('min_fdistance', None)
     max_dd = config['dedoppler']['max_dd']
     if min_fdistance is None:
-        deltaf = metadata['frequency_step'].to('Hz').value
-        deltat = metadata['time_step'].to('s').value
-        n_int  = data.shape[0]
-
-        min_fdistance = int(np.abs(deltat * n_int * max_dd / deltaf))
+        min_fdistance = calc_ndrift(data_array, max_dd)
         config['hitsearch']['min_fdistance'] = min_fdistance
         logger.debug(f"run_pipeline: min_fdistance calculated to be {min_fdistance} bins")
 
@@ -118,8 +113,7 @@ def run_pipeline(data_array, config, gpu_id=0, called_count=None):
         if n_blank > 1:
             if n_hits_iter > n_hits_last_iter:
                 logger.info(f"run_pipeline: blanking hits, (iteration {blank_count + 1} / {n_blank})")
-                data, metadata = blank_hits(data, metadata, peaks)
-                data = data.data ## Blank hits will return a DataArray
+                data_array = blank_hits(data_array, peaks)
                 n_hits_last_iter = n_hits_iter
             else:
                 logger.info(f"run_pipeline: No new hits found, breaking! (iteration {blank_count + 1} / {n_blank})")

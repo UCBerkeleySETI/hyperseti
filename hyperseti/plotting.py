@@ -3,7 +3,7 @@ import cupy as cp
 
 from .utils import on_gpu, datwrapper
 
-def _get_extent(data, metadata, xaxis, yaxis):
+def _get_extent(data_array, xaxis, yaxis):
     """ Generate extents for imshow axis 
     
     Args:
@@ -11,25 +11,28 @@ def _get_extent(data, metadata, xaxis, yaxis):
         yaxis (str): 'driftrate', 'driftidx' or 'time_elapsed', 'timestep' supported
         metadata (dict): Metadata dictionary
     """
+    data = data_array.data
     if xaxis == 'channel':
         ex_x0, ex_x1 = 0, data.shape[1]    
     elif xaxis == 'frequency':
-        ex_x0, ex_x1 = metadata['frequency_start'].value, metadata['frequency_start'].value + metadata['frequency_step'].value * data.shape[1]
+        f = data_array.frequency
+        ex_x0, ex_x1 = f.step.value, f.val_start + f.step.value * data.shape[1]
         
     if yaxis == 'driftrate':
-        ex_y1, ex_y0 = metadata['drift_rate_start'].value, metadata['drift_rate_start'].value + metadata['drift_rate_step'].value * data.shape[0]
+        dr = data_array.drift_rate
+        ex_y1, ex_y0 = dr.data[-1], dr.data[0]
     elif yaxis == 'driftidx':
         ex_y0, ex_y1 = data.shape[0], 0
     
     if yaxis == 'timestep':
         ex_y0, ex_y1 = data.shape[0], 0
     elif yaxis == 'time_elapsed':
-        ex_y0, ex_y1 = metadata['time_step'].value * data.shape[0], 0
+        ex_y0, ex_y1 = data_array.time.step.value * data.shape[0], 0
         
     return (ex_x0, ex_x1, ex_y0, ex_y1)
 
 
-def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True, 
+def _imshow(data_array, xaxis, yaxis, show_labels=True, show_colorbar=True, 
             beam_id=0, *args, **kwargs):
     """ Generalised imshow function
     
@@ -42,9 +45,9 @@ def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True,
         beam_id (int): Which beam to plot
        
     """
-    data = cp.asnumpy(data[:, beam_id]).squeeze()
+    data = cp.asnumpy(data_array.data[:, beam_id]).squeeze()
     plt.imshow(data, aspect='auto',
-              extent=_get_extent(data, metadata, xaxis, yaxis), *args, **kwargs)
+              extent=_get_extent(data_array, xaxis, yaxis), *args, **kwargs)
 
     if show_colorbar:
         plt.colorbar()
@@ -54,8 +57,8 @@ def _imshow(data, metadata, xaxis, yaxis, show_labels=True, show_colorbar=True,
         plt.ylabel(yaxis)
 
         
-@datwrapper(dims=None)     
-def imshow_dedopp(dedopp, metadata, xaxis='channel', yaxis='driftrate', *args, **kwargs):
+ 
+def imshow_dedopp(data_array, xaxis='channel', yaxis='driftrate', *args, **kwargs):
     """ Do imshow for dedoppler data 
     
     Args:
@@ -66,10 +69,9 @@ def imshow_dedopp(dedopp, metadata, xaxis='channel', yaxis='driftrate', *args, *
         show_colorbar (bool): Show colorbar
         
     """
-    _imshow(dedopp, metadata, xaxis, yaxis, *args, **kwargs)
+    _imshow(data_array, xaxis, yaxis, *args, **kwargs)
 
-    
-@datwrapper(dims=None)      
+ 
 def imshow_waterfall(data, metadata, xaxis='channel', yaxis='timestep', *args, **kwargs):
     """ Do imshow for spectral data """
     _imshow(data, metadata, xaxis, yaxis, *args, **kwargs)
