@@ -210,9 +210,8 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
 
         # Apply boxcar filter
         if boxcar_size > 1:
-            d_gpu = apply_boxcar(d_gpu, boxcar_size=boxcar_size, mode='sum', return_space='gpu')
+            d_gpu = apply_boxcar(d_gpu, boxcar_size=boxcar_size, mode='sum')
 
-        
         # Allocate GPU memory for dedoppler data
         if N_beam > 1:
             _dedopp_gpu = cp.zeros((N_dopp, N_chan), dtype=cp.float32)
