@@ -16,6 +16,7 @@ from .hits import hitsearch, merge_hits, create_empty_hits_table, blank_hits
 from .io import from_fil, from_h5, from_setigen
 from .utils import attach_gpu_device, on_gpu, datwrapper
 from .kurtosis import sk_flag
+from .blanking import blank_edges, blank_extrema
 from hyperseti.version import HYPERSETI_VERSION
 
 #logging
@@ -55,7 +56,10 @@ class GulpPipeline(object):
             logger.warning("GulpPipeline: combining dedoppler/apply_smearing_corr and pipeline/n_boxcar > 1 may produce strange results. Or it may not. Not sure yet.")
 
     def preprocess(self):
-        # Apply preprocessing normalization
+        # Apply preprocessing normalization and blanking
+        if self.config['preprocess'].get('blank_edges', 0):
+            self.data_array = blank_edges(self.data_array, **self.config['preprocess']['blank_edges'])
+        
         if self.config['preprocess'].get('normalize', False):
             poly_fit = self.config['preprocess'].get('poly_fit', 0)
             if self.config['preprocess'].get('sk_flag', False):
@@ -65,6 +69,11 @@ class GulpPipeline(object):
                 mask = None
             self.data_array = normalize(self.data_array, mask=mask, poly_fit=poly_fit)
             self.mask = mask
+
+        # Extrema blanking is done *after* normalization
+        if self.config['preprocess'].get('blank_extrema'):
+            self.data_array = blank_extrema(self.data_array, **self.config['preprocess']['blank_extrema'])
+            
     
     def dedoppler(self):
             # Check if kernel is computing DD + SK
@@ -83,7 +92,7 @@ class GulpPipeline(object):
         _threshold0 = conf['hitsearch']['threshold']
         conf['hitsearch']['threshold'] = _threshold0 * np.sqrt(self.N_timesteps * boxcar_size)
         _peaks = hitsearch(self.dedopp, **conf['hitsearch'])
-        
+
         #logger.debug(f"{self.peaks}")
         
         if _peaks is not None:
@@ -103,13 +112,13 @@ class GulpPipeline(object):
         n_hits_last_iter = 0
         for blank_count in range(n_blank):
             for boxcar_idx, boxcar_size in enumerate(boxcar_trials):
-                logger.info(f"GulpPipeline.run: boxcar_size {boxcar_size}, ({boxcar_idx + 1} / {len(boxcar_trials)})")
+                logger.debug(f"GulpPipeline.run: boxcar_size {boxcar_size}, ({boxcar_idx + 1} / {len(boxcar_trials)})")
                 self.config['dedoppler']['boxcar_size'] = boxcar_size
                 self.dedoppler()
                 self.hitsearch()
 
             n_hits_iter = len(self.peaks) - n_hits_last_iter
-            logger.info(f"GulpPipeline.run: New hits: {n_hits_iter}")
+            logger.debug(f"GulpPipeline.run: New hits: {n_hits_iter}")
 
             if self.config['hitsearch']['merge_boxcar_trials']:
                 logger.info(f"GulpPipeline.run: merging hits")
@@ -178,7 +187,8 @@ def find_et(filename, pipeline_config, filename_out='hits.csv', gulp_size=2**20,
     counter = 0
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}, space='gpu'):
         counter += 1
-        hits = run_pipeline(d_arr, pipeline_config, gpu_id=None, called_count=counter)
+        pipeline = GulpPipeline(d_arr, pipeline_config, gpu_id=gpu_id)
+        hits = pipeline.run()
         out.append(hits)
     
     dframe = pd.concat(out)

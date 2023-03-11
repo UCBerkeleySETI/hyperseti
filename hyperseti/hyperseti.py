@@ -13,7 +13,7 @@ from copy import deepcopy
 from .dedoppler import dedoppler, calc_ndrift
 from .normalize import normalize
 from .hits import hitsearch, merge_hits, create_empty_hits_table, blank_hits
-from .io import from_fil, from_h5
+from .io import from_fil, from_h5, from_setigen
 from .utils import attach_gpu_device, on_gpu, datwrapper
 from .kurtosis import sk_flag
 from hyperseti.version import HYPERSETI_VERSION
@@ -106,7 +106,7 @@ def run_pipeline(data_array, config, gpu_id=0, called_count=None):
             else:
                 peaks = peaks
 
-        if config['pipeline']['merge_boxcar_trials']:
+        if config['hitsearch']['merge_boxcar_trials']:
             peaks = merge_hits(peaks)
         n_hits_iter = len(peaks) - n_hits_last_iter
 
@@ -158,7 +158,7 @@ def find_et(filename, pipeline_config, filename_out='hits.csv', gulp_size=2**20,
     elif sigproc.is_filterbank(filename):
         ds = from_fil(filename)
     elif isinstance(stg.Frame, filename):
-        ds = filename 
+        ds = from_setigen(filename) 
     else:
         raise RuntimeError("Only HDF5 and filterbank files currently supported")
 
