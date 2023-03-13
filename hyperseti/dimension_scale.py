@@ -42,7 +42,20 @@ def check_lengths(a, b):
     if not issamelength(a, b):
         raise ValueError(f"Lengths of DimensionScales do not match: {len(a)} vs {len(b)}")
 
-        
+class ArrayBasedDimensionScale(object):
+    """ TODO """
+    def __init__(self, name, np_array, units=None):
+        self.name = name
+        self.data = np_array
+        self.units     = Unit(units) if isinstance(units, str) else units
+        self.shape = np_array.shape
+        self.ndim  = np_array.ndim
+        self.dtype = np_array.dtype
+
+    def __getitem__(self, i):
+        """ Allow indexing with scale[i] """
+        return self.data[i]
+
 class DimensionScale(object):
     """ Dimension Scale 'duck array' with basic numpy/astropy array support 
     
@@ -116,6 +129,14 @@ class DimensionScale(object):
         self.shape = (n_step,)
         self.ndim  = 1
         self.dtype = np.dtype('float64')
+    
+    @property
+    def step(self):
+        return Quantity(self.val_step, unit=self.units)
+    
+    @property
+    def start(self):
+        return Quantity(self.val_start, unit=self.units)
 
     def _generate_array(self, start_idx=None, stop_idx=None):
         """ Generate an numpy array from this DimensionScale object
@@ -295,6 +316,15 @@ class TimeScale(DimensionScale):
     def time_delta(self):
         t = TimeDelta(self.val_step, format='sec')
         t.format = self.time_delta_format
+        return t
+    
+    @property
+    def step(self):
+        return Quantity(self.val_step, unit='s')
+    
+    @property
+    def elapsed(self):
+        t = TimeDelta(self.val_step * self.n_step, format='sec').to('s')
         return t
     
     def generate(self, start_idx=None, stop_idx=None):

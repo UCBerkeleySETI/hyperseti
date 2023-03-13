@@ -77,7 +77,6 @@ config = {
         'n_sigma': 3,
     },
     'dedoppler': {
-        'boxcar_mode': 'sum',
         'kernel': 'ddsk',
         'max_dd': 4.0,
         'min_dd': None,

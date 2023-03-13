@@ -10,7 +10,7 @@ from copy import deepcopy
 from dask.array.svg import svg
 
 # hyperseti
-from .dimension_scale import DimensionScale, TimeScale
+from .dimension_scale import DimensionScale, TimeScale, ArrayBasedDimensionScale
 
 # Logging
 from .log import get_logger
@@ -59,7 +59,8 @@ class DataArray(object):
         for dim in dims:
             self.__dict__[dim] = self.scales[dim]
         
-        self.slice_info = slice_info
+        self.slice_info   = slice_info
+        self.parent_shape = parent_shape
         self._is_slice = False if slice_info is None else True
     
     @property
@@ -77,6 +78,33 @@ class DataArray(object):
     def dtype(self):
         return self.data.dtype
     
+    @property
+    def metadata(self):
+        """ Split off metadata and return array + dict
+        
+        Args:
+            data_array (DataArray): Data array to split
+        
+        Returns:
+            data, metadata (array + dict)
+        """
+        metadata = deepcopy(self.attrs)
+        metadata["dims"] = self.dims
+
+        for scale_name, scale in self.scales.items():
+            if not isinstance(scale, ArrayBasedDimensionScale):       
+                metadata[f"{scale_name}_step"] = scale.val_step
+                metadata[f"{scale_name}_start"] = scale.val_start
+            
+                if scale.units is not None:
+                    metadata[f"{scale_name}_step"] *= scale.units
+                    metadata[f"{scale_name}_start"] *= scale.units
+        
+        if self.slice_info is not None:
+            metadata['slice_info'] = self.slice_info
+
+        return metadata
+        
     def __repr__(self):
         r = f"<DataArray: shape={self.shape}, dims={self.dims}>"
         return r
@@ -114,10 +142,13 @@ class DataArray(object):
             attrs_table.append(f"<tr><th>{k}</th> <td>{str(v).strip('<>')}</td> </tr>")
         attrs_table.append("</tbody></table>")
         
-        dims_table = ["<table>", "<thead><tr> <td></td><th>Dimension Scales</th></tr></thead>"]
+        dims_table = ["<table>", "<thead><tr> <td></td><th>Dimension Scales (start, step) </th></tr></thead>"]
         for k, v in self.scales.items():
             v_units = '' if v.units is None else v.units
-            dims_table.append(f"<tr><th>{k}</th> <td>{v.val_start, v.val_step} {v_units}</td> </tr>")
+            if not isinstance(v, ArrayBasedDimensionScale): 
+                dims_table.append(f"<tr><th>{k}</th> <td>{v.val_start, v.val_step} {v_units}</td> </tr>")
+            else:
+                 dims_table.append(f"<tr><th>{k}</th> <td>{v.data[0], 'non-uniform'} {v_units}</td> </tr>")
         dims_table.append("</tbody></table>")
         
         table = "\n".join(table)
@@ -157,7 +188,7 @@ class DataArray(object):
         """
         return self.data    
     
-    def isel(self, sel):
+    def isel(self, sel, space=None):
         """ Select subset of data using slices along specified dimension.
         
         Args:
@@ -179,9 +210,16 @@ class DataArray(object):
         slices = tuple(slices)
         data = self.data[slices]
         logger.debug(f"isel data shape: {data.shape}")
+        if space == 'cpu':
+            data = cp.asnumpy(data)
+        elif space == 'gpu':
+            data = cp.asarray(data)
+        else:
+            pass   
         return DataArray(data, self.dims, new_scales, self.attrs, slice_info=slices)
+    
 
-    def iterate_through_data(self, dims, overlap={}):
+    def iterate_through_data(self, dims, overlap={}, space=None):
         """ Generator to iterate through chunks of data
         
         Args:
@@ -221,7 +259,7 @@ class DataArray(object):
         
         for slices in itertools.product(*dim_slices):
             selector = {key: slice for key, slice in zip(dims, slices)}
-            yield self.isel(selector)
+            yield self.isel(selector, space=space)
 
     def apply_transform(self, transform, *args, **kwargs):
         """ Apply a tranformation function (e.g. np.log) to the data 
@@ -304,14 +342,17 @@ def split_metadata(data_array):
     metadata = deepcopy(data_array.attrs)
     metadata["dims"] = data_array.dims
 
-    for scale_name, scale in data_array.scales.items():        
-        metadata[f"{scale_name}_step"] = scale.val_step
-        metadata[f"{scale_name}_start"] = scale.val_start
+    for scale_name, scale in data_array.scales.items():
+        if not isinstance(scale, ArrayBasedDimensionScale):       
+            metadata[f"{scale_name}_step"] = scale.val_step
+            metadata[f"{scale_name}_start"] = scale.val_start
         
-        if scale.units is not None:
-            metadata[f"{scale_name}_step"] *= scale.units
-            metadata[f"{scale_name}_start"] *= scale.units
-    
+            if scale.units is not None:
+                metadata[f"{scale_name}_step"] *= scale.units
+                metadata[f"{scale_name}_start"] *= scale.units
+        else:
+            metadata[scale_name] = scale.data
+            
     if data_array.slice_info is not None:
         metadata['slice_info'] = data_array.slice_info
 

@@ -3,16 +3,14 @@ import numpy as np
 from cusignal import argrelmax
 import time
 
-from .utils import on_gpu, datwrapper
 
 # Logging
 from .log import get_logger
 logger = get_logger('hyperseti.peak')
 
 
-@datwrapper(dims=None)
-@on_gpu
-def find_peaks_argrelmax(data, metadata, threshold=20, order=100):
+
+def find_peaks_argrelmax(data, threshold=20, order=100):
     """ Find peaks using argrelmax on 1D data 
     
     Args:

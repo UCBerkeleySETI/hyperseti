@@ -8,8 +8,8 @@ import os
 from astropy import units as u
 
 from .peak import find_peaks_argrelmax
-from .utils import on_gpu, datwrapper
 from .data_array import DataArray
+from .blanking import blank_hit, blank_hits
 
 #logging
 from .log import get_logger
@@ -48,6 +48,7 @@ def create_empty_hits_table(sk_col=False):
         cols['ddsk'] = pd.Series([], dtype='float64')
     hits = pd.DataFrame(cols)
     return hits
+
 
 def merge_hits(hitlist):
     """ Group hits corresponding to different boxcar widths and return hit with max SNR 
@@ -88,53 +89,8 @@ def merge_hits(hitlist):
     
     return hits
 
-@datwrapper(dims=None)
-@on_gpu
-def blank_hit(data, metadata, f0, drate, padding=4):
-    """ Blank a hit in an array by setting its value to zero
-    
-    Args:
-        data (cp.array): Data array
-        metadata (dict): Metadata with frequency, time info
-        f0 (astropy.Quantity): Frequency at t=0
-        drate (astropy.Quantity): Drift rate to blank
-        padding (int): number of channels to blank either side. 
-    
-    Returns:
-        data (cp.array): blanked data array
-    
-    TODO: Add check if drate * time_step > padding
-    """
-    n_time, n_pol, n_chans = data.shape
-    f_start = metadata['frequency_start'].to('Hz').value
-    f_step  = metadata['frequency_step'].to('Hz').value
-    t_step  = metadata['time_step'].to('s').value
 
-    i0     = int((f0 - f_start) / f_step)
-    i_step =  t_step * drate / f_step
-    i_off  = (i_step * cp.arange(n_time) + i0).astype('int64')
-    
-    min_padding = int(abs(i_step) + 1)  # i_step == frequency smearing
-    padding += min_padding 
-    i_time = cp.arange(n_time, dtype='int64')
-    for p_off in range(padding):
-        data[i_time, :, i_off] = 0
-        data[i_time, :, i_off - p_off] = 0
-        data[i_time, :, i_off + p_off] = 0
-    return data
-
-@datwrapper(dims=('time', 'beam_id', 'frequency'))
-@on_gpu
-def blank_hits(data, metadata, df_hits, padding=4):
-    for idx, row in df_hits.iterrows():
-        f0, drate = float(row['f_start']), float(row['drift_rate'])
-        box_width = int(row['boxcar_size'])
-        data = blank_hit(data, metadata, f0, drate, padding=padding+box_width)
-    return data, metadata
-
-@datwrapper(dims=None)
-@on_gpu
-def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=100, sk_data=None):
+def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwargs):
     """ Search for hits using argrelmax method in cusignal
     
     Args:
@@ -152,16 +108,17 @@ def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=100, sk_data=No
                                     driftrate_idx: Index in driftrate array
                                     channel_idx: Index in frequency array
     """
-    metadata = deepcopy(metadata)
-
-    drift_trials = metadata['drift_rates']
+    metadata = deepcopy(dedopp_array.metadata)
+    dedopp_data = dedopp_array.data
+    
+    drift_trials = np.asarray(dedopp_array.drift_rate.data)
     
     t0 = time.time()
     dfs = []
     for beam_idx in range(dedopp_data.shape[1]):
+        # TODO: Can we get rid of this copy?
         imgdata = cp.copy(cp.expand_dims(dedopp_data[:, beam_idx, :].squeeze(), 1))
-        intensity, fcoords, dcoords = find_peaks_argrelmax(imgdata, metadata, 
-                                                           threshold=threshold, order=min_fdistance)
+        intensity, fcoords, dcoords = find_peaks_argrelmax(imgdata, threshold=threshold, order=min_fdistance)
 
         t1 = time.time()
         logger.debug(f"hitsearch: Peak find time: {(t1-t0)*1e3:2.2f}ms")
@@ -188,7 +145,7 @@ def hitsearch(dedopp_data, metadata, threshold=10, min_fdistance=100, sk_data=No
 
             # Check if we have a slice of data. If so, add slice start point
             # Note: currently assumes slice is only on frequency channel
-            if metadata.get('slice_info', None):
+            if dedopp_array.slice_info is not None:
                 ts, bs, fs = metadata['slice_info']
                 results['channel_idx'] += fs.start
 
