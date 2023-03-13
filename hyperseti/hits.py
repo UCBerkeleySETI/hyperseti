@@ -145,7 +145,7 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
 
             # Check if we have a slice of data. If so, add slice start point
             # Note: currently assumes slice is only on frequency channel
-            if metadata.get('slice_info', None):
+            if dedopp_array.slice_info is not None:
                 ts, bs, fs = metadata['slice_info']
                 results['channel_idx'] += fs.start
 

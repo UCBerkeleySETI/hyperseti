@@ -59,7 +59,8 @@ class DataArray(object):
         for dim in dims:
             self.__dict__[dim] = self.scales[dim]
         
-        self.slice_info = slice_info
+        self.slice_info   = slice_info
+        self.parent_shape = parent_shape
         self._is_slice = False if slice_info is None else True
     
     @property

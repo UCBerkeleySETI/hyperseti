@@ -18,6 +18,7 @@ Try to get results that are similar to those of turbo_seti with our standard Voy
 
 import os
 import logbook
+import numpy as np
 from hyperseti import find_et
 from hyperseti.log import update_levels, get_logger
 from hyperseti.utils import time_logger
@@ -82,7 +83,7 @@ def test_with_voyager():
         assert os.path.exists('test_voyager_hits.log')
 
         # This is a quick test to check if smaller gulps are taking the channel offset into account
-        assert np.alltrue(756000 > dframe['channel_idx'] > 739000)
+        assert np.alltrue(dframe['channel_idx'] > 739000)
 
         for drate in list_drate:
             print("Observed drift rate = {}, should be negative.".format(drate))

@@ -264,7 +264,6 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
     output_dims = ('drift_rate', 'beam_id', 'frequency')
     output_units = data_array.units
 
-    # TODO: Fix this for stepped drift rates
     output_scales = {
         'drift_rate': ArrayBasedDimensionScale('drift_rate', dd_shifts * delta_dd, 'Hz/s'),
         'beam_id': data_array.beam_id,
@@ -276,7 +275,11 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
     output_attrs['n_integration'] = N_time
     output_attrs['integration_time'] = data_array.time.elapsed
 
-    dedopp_array = DataArray(dedopp_gpu, output_dims, output_scales, output_attrs, units=output_units)
+    # need to pass on slice_info and parent_shape if they are set on the input array
+    slice_info   = data_array.slice_info
+    parent_shape = data_array.parent_shape
+    dedopp_array = DataArray(dedopp_gpu, output_dims, output_scales, output_attrs,
+                             units=output_units, slice_info=slice_info, parent_shape=parent_shape)
 
     #logger.debug("metadata={}".format(metadata))
 
@@ -286,7 +289,8 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
         dedopp_array = apply_boxcar_drift(dedopp_array)
 
     if kernel == 'ddsk':
-        dedopp_sk_array = DataArray(dedopp_sk_gpu, output_dims, output_scales, output_attrs, units=output_units)
+        dedopp_sk_array = DataArray(dedopp_sk_gpu, output_dims, output_scales, output_attrs, 
+                                    units=output_units, slice_info=slice_info, parent_shape=parent_shape)
         return dedopp_array, dedopp_sk_array
     else:
         return dedopp_array

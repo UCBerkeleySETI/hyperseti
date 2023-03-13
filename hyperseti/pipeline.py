@@ -66,6 +66,10 @@ class GulpPipeline(object):
         self.data_array = data_array
         self.config = deepcopy(config)
         self._called_count = 0
+
+        if not isinstance(self.data_array.data, cp.ndarray):
+            logger.warning(f"GulpPipeline init: Data not in cupy.ndarray, attempting to copy data to GPU")
+            self.data_array.data = cp.asarray(self.data_array.data)
         
         if gpu_id is not None:
             attach_gpu_device(gpu_id)
