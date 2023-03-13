@@ -4,16 +4,60 @@ A brute-force GPU dedoppler code and hit search package for technosignature sear
 
 _In beta_
 
-#### Example usage:
+#### Example 1: running the search pipeline on voyager data
+
+```python
+from hyperseti.pipeline import find_et
+
+voyager_h5 = '../test/test_data/Voyager1.single_coarse.fine_res.h5'
+
+config = {
+    'preprocess': {
+        'sk_flag': True,                        # Apply spectral kurtosis flagging
+        'normalize': True,                      # Normalize data
+        'blank_edges': {'n_chan': 32},          # Blank edges channels
+        'blank_extrema': {'threshold': 100000}  # Blank ridiculously bright signals before search
+    },
+    'dedoppler': {
+        'kernel': 'ddsk',                       # Doppler + kurtosis doppler (ddsk)
+        'max_dd': 5.0,                          # Maximum dedoppler delay, 5 Hz/s
+        'min_dd': None,                         # 
+        'apply_smearing_corr': False,           # Correct  for smearing within dedoppler kernel 
+                                                # Note: set to False if using multiple boxcars 
+        'plan': 'stepped'                       # Dedoppler trial spacing plan (stepped = less memory)
+    },
+    'hitsearch': {
+        'threshold': 20,                        # SNR threshold above which to consider a hit
+        'min_fdistance': None                   # Automatic calculation of min. channel spacing between hits
+    },
+    'pipeline': {
+        'n_boxcar': 10,                         # Number of boxcar trials to apply (10 stages, 2^10=1024 channels)
+                                                # Boxcar is a moving average to compensate for smearing / broadband
+        'merge_boxcar_trials': True             # Merge hits at same frequency that are found in multiple boxcars
+    }
+}
+
+dframe = find_et(voyager_h5, config, 
+                gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
+                filename_out='./test_voyager_hits.csv',
+                log_output=True,
+                log_config=True
+                )
+
+print(dframe)
+```
+
+#### Example 2: Inspecting a setigen Frame
 
 ```python
 import numpy as np
+import cupy as cp
 import pylab as plt
 from astropy import units as u
 
 import setigen as stg
 from hyperseti.io import from_setigen
-from hyperseti import dedoppler
+from hyperseti.dedoppler import dedoppler
 from hyperseti.plotting import imshow_waterfall, imshow_dedopp
 
 # Create data using setigen
@@ -31,16 +75,17 @@ signal = frame.add_signal(stg.constant_path(f_start=frame.get_frequency(index=20
 
 # Convert data into hyperseti DataArray
 d = from_setigen(frame)
+d.data = cp.asarray(d.data) # Copy to GPU
 
 # Run dedoppler
-dedopp, md = dedoppler(d, boxcar_size=1, max_dd=8.0)
+dedopp_array = dedoppler(d, boxcar_size=1, max_dd=8.0, plan='optimal')
 
 # Plot waterfall / dedoppler
 plt.figure(figsize=(8, 3))
 plt.subplot(1,2,1)
 imshow_waterfall(d)
 plt.subplot(1,2,2)
-imshow_dedopp(dedopp)
+imshow_dedopp(dedopp_array)
 plt.tight_layout()
 ```
 
@@ -63,45 +108,6 @@ overlay_hits(hits)
 
 ![image](https://user-images.githubusercontent.com/713251/164058051-9b511f50-d0d0-4058-b512-c062cc7d7964.png)
 
-Or the dedoppler and hitsearch can be done in one line with `run_pipeline()`. 
-Data can be boxcar averaged to look for wider-band signals, and to retrieve signal-to-noise
-for signals with large drift rates:
-
-```python
-config = {
-    'preprocess': {
-        'sk_flag': True,
-        'normalize': True,
-    },
-    'sk_flag': {
-        'n_sigma': 3,
-    },
-    'dedoppler': {
-        'kernel': 'ddsk',
-        'max_dd': 4.0,
-        'min_dd': None,
-        'apply_smearing_corr': False,
-        'beam_id': 0
-    },
-    'hitsearch': {
-        'threshold': 3,
-        'min_fdistance': 100
-    },
-    'pipeline': {
-        'n_boxcar': 4,
-        'merge_boxcar_trials': True,
-        'n_blank': 2
-    }
-}
-
-run_pipeline(darray, config)
-```
-
-Reading from file is also supported:
-
-```python
-dframe = find_et(voyager_h5, config, gulp_size=2**18, filename_out='./hyperseti_hits.csv')
-```
 
 ### Installation
 
@@ -127,4 +133,3 @@ conda install pandas astropy
 pip install logbook setigen blimpy hdf5plugin
 pip install git+https://github.com/ucberkeleyseti/hyperseti
 ```
-
