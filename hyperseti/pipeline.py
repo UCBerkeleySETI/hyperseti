@@ -15,9 +15,11 @@ from .normalize import normalize
 from .hits import hitsearch, merge_hits, create_empty_hits_table, blank_hits
 from .io import from_fil, from_h5, from_setigen
 from .kurtosis import sk_flag
-from .utils import attach_gpu_device
+from .utils import attach_gpu_device, timeme
 from .blanking import blank_edges, blank_extrema
 from hyperseti.version import HYPERSETI_VERSION
+
+from hyperseti.data_array import DataArray
 
 #logging
 from .log import get_logger
@@ -27,9 +29,43 @@ logger = get_logger('hyperseti.pipeline')
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 class GulpPipeline(object):
-    def __init__(self, data_array, config, gpu_id=None):
+    """ Pipeline class for a single channel or 'gulp' 
+
+    This class is called 
+    
+    Provides the following methods:
+        pipeline.preprocess() - Preprocess data
+        pipeline.dedoppler()  - Apply dedoppler transform
+        pipeline.hitsearch()  - Search dedoppler space for hits 
+        pipeline.run()        - Run all pipeline stages 
+                                This loops over boxcar trials / blanking iterations
+    
+    Inputs/outputs can be accessed via:
+        pipeline.config       - Input dict to configure pipeline at init
+        pipeline.data_array   - Input data array
+        pipeline.dedopp       - Output dedoppler array
+        pipeline.dedopp_sk    - Output ddsk array (if selected)
+        pipeline.peaks        - Local maxima (hits) output of hitsearch()
+
+    Example usage:
+        ```
+        pipeline = GulpPipeline(d_arr, config)
+        pipeline.run()
+        ```
+    """
+
+    def __init__(self, data_array: DataArray, config: dict, gpu_id: int=None):
+        """ Pipeline class to run on a gulp of data (e.g. a coarse channel)
+
+        Args:
+            data_array (DataArray): Data Array object with dims (time, beam_id, frequency)
+            config (dict): Dictionary of config values. Dictionary values are passed as 
+                           keyword arguments to called functions. 
+            gpu_id (int): Choose GPU to run pipeline on by integer ID (default None)
+        """
         self.data_array = data_array
         self.config = deepcopy(config)
+        self._called_count = 0
         
         if gpu_id is not None:
             attach_gpu_device(gpu_id)
@@ -55,7 +91,16 @@ class GulpPipeline(object):
         if config['dedoppler']['apply_smearing_corr'] and config['pipeline']['n_boxcar'] > 1:
             logger.warning("GulpPipeline: combining dedoppler/apply_smearing_corr and pipeline/n_boxcar > 1 may produce strange results. Or it may not. Not sure yet.")
 
+    @timeme
     def preprocess(self):
+        """ Apply preprocessing steps 
+        
+        Preprocessing steps:
+            1) Blank edge channels of gulp (optional)
+            2) Flag non-gaussian data before computing stats (optional)
+            3) Normalize data (subtract mean and convert into units of SNR)
+            4) Blank any stupidly bright channels (optional)
+        """
         # Apply preprocessing normalization and blanking
         if self.config['preprocess'].get('blank_edges', 0):
             logger.info(f"GulpPipeline.preprocess: Applying edge blanking")
@@ -78,19 +123,27 @@ class GulpPipeline(object):
         if self.config['preprocess'].get('blank_extrema'):
             logger.info(f"GulpPipeline.preprocess: Blanking extremely bright signals")
             self.data_array = blank_extrema(self.data_array, **self.config['preprocess']['blank_extrema'])
-            
+
+    @timeme        
     def dedoppler(self):
-            # Check if kernel is computing DD + SK
-            kernel = self.config['dedoppler'].get('kernel', None)
-            if kernel == 'ddsk':
-                logger.info("GulpPipeline.dedoppler: Running DDSK dedoppler kernel")
-                self.dedopp, self.dedopp_sk = dedoppler(self.data_array, **self.config['dedoppler'])
-            else:
-                logger.info("GulpPipeline.dedoppler: Running standard dedoppler kernel")
-                self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'])
-                self.dedopp_sk = None
+        """ Apply dedoppler transform to gulp """
+        # Check if kernel is computing DD + SK
+        kernel = self.config['dedoppler'].get('kernel', None)
+        if kernel == 'ddsk':
+            logger.info("GulpPipeline.dedoppler: Running DDSK dedoppler kernel")
+            self.dedopp, self.dedopp_sk = dedoppler(self.data_array, **self.config['dedoppler'])
+        else:
+            logger.info("GulpPipeline.dedoppler: Running standard dedoppler kernel")
+            self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'])
+            self.dedopp_sk = None
     
+    @timeme
     def hitsearch(self):
+        """ Run search for hits above threshold in dedoppler space.
+        
+        Notes:
+            self.dedoppler() must be called first, otherwise there's nothing to search.
+        """
         # Adjust SNR threshold to take into account boxcar size and dedoppler sum
         # Noise increases by sqrt(N_timesteps * boxcar_size)
         conf = deepcopy(self.config)        # This deepcopy avoids overwriting original threshold value
@@ -104,8 +157,16 @@ class GulpPipeline(object):
         if _peaks is not None:
             _peaks['snr'] /= np.sqrt(self.N_timesteps * boxcar_size)
             self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
+
+    @timeme   
+    def run(self) -> pd.DataFrame:
+        """ Main pipeline runner 
         
-    def run(self, called_count=None):
+        Returns:
+            self.peaks (pd.DataFrame): Table of all hits
+        """
+
+        self._called_count += 1
         t0 = time.time()
 
         self.preprocess()
@@ -141,14 +202,20 @@ class GulpPipeline(object):
 
         t1 = time.time()
 
-        if called_count is None:    
+        if self._called_count == 1:    
             logger.info(f"GulpPipeline.run: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
         else:
-            logger.info(f"GulpPipeline.run #{called_count}: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
-
+            logger.info(f"GulpPipeline.run #{self._called_count}: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
         return self.peaks
 
-def find_et(filename, pipeline_config, filename_out='hits.csv', gulp_size=2**20, gpu_id=0, *args, **kwargs):
+def find_et(filename: str, 
+            pipeline_config: dict, 
+            filename_out: str='hits.csv', 
+            log_config: bool=False,
+            log_output: bool=False,
+            gulp_size: int=2**20, 
+            gpu_id: int=0, 
+            *args, **kwargs) -> pd.DataFrame:
     """ Find ET, serial version
     
     Wrapper for reading from a file and running run_pipeline() on all subbands within the file.
@@ -157,15 +224,31 @@ def find_et(filename, pipeline_config, filename_out='hits.csv', gulp_size=2**20,
         filename (str): Name of input HDF5 file.
         pipeline_config (dict): See findET.py command-line parameters.
         filename_out (str): Name of output CSV file.
-        gulp_size (int): Number of channels to process at once (e.g. N_chan in a coarse channel)
+        log_output (bool): If set, will log pipeline output to TXT file.
+        log_config (bool): If set, will log pipeline configuration to YAML file.
+        gulp_size (int): Number of channels to process in one 'gulp' ('gulp' can be == 'coarse channel')
         gpu_id (int): GPU device ID to use.
    
     Returns:
         hits (pd.DataFrame): Pandas dataframe of all hits.
     
     Notes:
-        Passes keyword arguments on to run_pipeline(). Same as find_et but doesn't use dask parallelization.
+        Passes keyword arguments on to GulpPipeline.run(). 
     """
+    if log_output:
+        from logbook import FileHandler, NestedSetup
+        from .log import log_to_screen
+        logfile_out = os.path.splitext(filename_out)[0] + '.log'
+        log_to_file = FileHandler(logfile_out)
+        logger_setup = NestedSetup([log_to_screen, log_to_file])
+        logger_setup.push_application()
+    
+    if log_config:
+        import yaml
+        config_out = os.path.splitext(filename_out)[0] + '.yaml'
+        with open(config_out, 'w') as json_out:
+            yaml.dump(pipeline_config, json_out)
+
     msg = f"find_et: hyperseti version {HYPERSETI_VERSION}"
     logger.info(msg)
     print(msg)
@@ -200,6 +283,12 @@ def find_et(filename, pipeline_config, filename_out='hits.csv', gulp_size=2**20,
     msg = f"find_et: TOTAL ELAPSED TIME: {(t1-t0):2.2f}s"
     logger.info(msg)
     print(msg)
+
+    if log_config:
+        print(f"find_et: Pipeline runtime config logged to {config_out}")
+
+    if log_output:
+        print(f"find_et: Output logged to {logfile_out}")
+    
     return dframe
     
-

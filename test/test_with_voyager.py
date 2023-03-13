@@ -19,9 +19,13 @@ Try to get results that are similar to those of turbo_seti with our standard Voy
 import os
 import logbook
 from hyperseti import find_et
-from hyperseti.log import update_levels
+from hyperseti.log import update_levels, get_logger
+from hyperseti.utils import time_logger
 
-from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
+try:
+    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
+except:
+    from file_defs import synthetic_fil, test_fig_dir, voyager_h5
 
 # Other parameters:
 GULP_SIZE = 1048576
@@ -34,38 +38,58 @@ GPU_ID = 0
 
 
 def test_with_voyager():
-    print("hyperseti find_et from file {} .....".format(voyager_h5))
-    update_levels(logbook.INFO, [])
-    config = {
-        'preprocess': {
-            'sk_flag': True,
-            'normalize': True,
-        },
-        'dedoppler': {
-            'kernel': 'ddsk',
-            'max_dd': 4.0,
-            'min_dd': None,
-            'apply_smearing_corr': True,
-        },
-        'hitsearch': {
-            'threshold': 20,
-            'min_fdistance': 100
-        },
-        'pipeline': {
-            'n_boxcar': 1,
-            'merge_boxcar_trials': True
+    try:
+        print("hyperseti find_et from file {} .....".format(voyager_h5))
+        update_levels(logbook.WARNING, [])
+        time_logger.level = logbook.INFO
+
+        config = {
+            'preprocess': {
+                'sk_flag': True,
+                'normalize': True,
+                'blank_edges': {'n_chan': 32}
+            },
+            'dedoppler': {
+                'kernel': 'ddsk',
+                'max_dd': 5.0,
+                'min_dd': None,
+                'apply_smearing_corr': False,
+                'plan': 'stepped'
+            },
+            'hitsearch': {
+                'threshold': 20,
+                'min_fdistance': None
+            },
+            'pipeline': {
+                'n_boxcar': 10,
+                'merge_boxcar_trials': True
+            }
         }
-    }
-    dframe = find_et(voyager_h5, config, gulp_size=2**18,
-                    filename_out='./hyperseti_hits.csv')
+
+        dframe = find_et(voyager_h5, config, 
+                        gulp_size=2**18,
+                        filename_out='./test_voyager_hits.csv',
+                        log_output=True,
+                        log_config=True
+                        )
     
-    # dframe column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
-    print("Returned dataframe:\n", dframe)
-    list_drate = dframe["drift_rate"].tolist()
-    for drate in list_drate:
-        print("Observed drift rate = {}, should be negative.".format(drate))
-        assert drate <= 0.0
-    return dframe
+        # dframe column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
+        print("Returned dataframe:\n", dframe)
+        list_drate = dframe["drift_rate"].tolist()
+
+        assert os.path.exists('test_voyager_hits.csv')
+        assert os.path.exists('test_voyager_hits.yaml')
+        assert os.path.exists('test_voyager_hits.log')
+
+        for drate in list_drate:
+            print("Observed drift rate = {}, should be negative.".format(drate))
+            assert drate <= 0.0
+        return dframe
+
+    finally:
+        os.remove('test_voyager_hits.csv')
+        os.remove('test_voyager_hits.yaml')
+        os.remove('test_voyager_hits.log')
 
 if __name__ == "__main__":
     dframe = test_with_voyager()

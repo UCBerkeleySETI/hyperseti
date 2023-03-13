@@ -11,7 +11,10 @@
 import sys
 import logbook
 from logbook import Logger, StreamHandler
-StreamHandler(sys.stdout).push_application()
+
+# Start logging to screen (stdout)
+log_to_screen = StreamHandler(sys.stdout)
+log_to_screen.push_application()
 
 # Disable verbose hdf5plugin warning 
 # https://github.com/silx-kit/hdf5plugin/issues/157
