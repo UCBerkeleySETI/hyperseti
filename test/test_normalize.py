@@ -1,5 +1,6 @@
 from hyperseti.normalize import normalize
 from hyperseti.io import from_setigen
+from hyperseti.data_array import from_metadata
 
 import cupy as cp
 from astropy import units as u
@@ -7,7 +8,16 @@ import pylab as plt
 import numpy as np
 import os
 import setigen as stg
+from astropy.time import Time 
 
+
+def create_data_array(data):
+    metadata_in = {'frequency_start': 1000*u.MHz,
+                'time_start': Time(60000, format='mjd'),
+                'time_step': 1.0*u.s, 
+                'frequency_step': 1.0*u.Hz,
+                'dims': ('time', 'beam_id', 'frequency')}
+    return from_metadata(cp.asarray(data), metadata_in)
 
 def test_normalize_basic():
     """ Basic test of normalization """
@@ -15,11 +25,12 @@ def test_normalize_basic():
     np.random.seed(1234)
     d = np.random.normal(size=n_chan*n_int*n_ifs, loc=10, scale=17).astype('float32')
     d = d.reshape([n_int, n_ifs, n_chan])**2
+    d = create_data_array(d)
 
     d_norm = normalize(d)
-    print(d_norm.mean(), d_norm.std())
-    assert np.isclose(d_norm.mean(), 0, atol=1e-6)
-    assert np.isclose(d_norm.std(), 1.0, atol=1e-6)
+    print(d_norm.data.mean(), d_norm.data.std())
+    assert np.isclose(d_norm.data.mean(), 0, atol=1e-6)
+    assert np.isclose(d_norm.data.std(), 1.0, atol=1e-6)
 
 def test_normalize_bandpass(plot=False):
     """ Test normalization works with polynomial bandpass included """
@@ -27,18 +38,19 @@ def test_normalize_bandpass(plot=False):
     np.random.seed(1234)
     d = np.random.normal(size=n_chan*n_int*n_ifs, loc=10, scale=17).astype('float32')
     d = d.reshape([n_int, n_ifs, n_chan])**2
-    
-    x = np.arange(n_chan) - n_chan//2
-    d[:, 0] += -1.2e-4*x**2 + 2500
+    d = create_data_array(d)
+
+    x = cp.arange(n_chan) - n_chan//2
+    d.data[:, 0] += -1.2e-4*x**2 + 2500
     if plot:
-        plt.plot(d.mean(axis=0).squeeze())
+        plt.plot(d.data.mean(axis=0).squeeze())
 
     d_norm = normalize(d, poly_fit=2)
-    print(d_norm.mean(), d_norm.std())
+    print(d_norm.data.mean(), d_norm.data.std())
     if plot:
-        plt.plot(d_norm.mean(axis=0).squeeze())
-    assert np.isclose(d_norm.mean(), 0, atol=1e-6)
-    assert np.isclose(d_norm.std(), 1.0, atol=1e-6)
+        plt.plot(d_norm.data.mean(axis=0).squeeze())
+    assert np.isclose(d_norm.data.mean(), 0, atol=1e-6)
+    assert np.isclose(d_norm.data.std(), 1.0, atol=1e-6)
     
 def test_normalize_multi_if(plot=False):
     """ Test normalization on multiple IFs, each with bandpasses"""
@@ -46,30 +58,34 @@ def test_normalize_multi_if(plot=False):
     np.random.seed(1234)
     d = np.random.normal(size=n_chan*n_int*n_ifs, loc=10, scale=17).astype('float32')
     d = d.reshape([n_int, n_ifs, n_chan])**2
-    x = np.arange(n_chan) - n_chan//2
-    d[:, 0] += -1.2e-4*x**2 + 2500
-    d[:, 1] += -1.1e-4*x**2 + 2200
-    d[:, 2] += -1.25e-4*x**2 + 2700
-    d[:, 3] += -1.27e-4*x**2 + 2800
+    d = create_data_array(d)
+
+    x = cp.arange(n_chan) - n_chan//2
+    d.data[:, 0] += -1.2e-4*x**2 + 2500
+    d.data[:, 1] += -1.1e-4*x**2 + 2200
+    d.data[:, 2] += -1.25e-4*x**2 + 2700
+    d.data[:, 3] += -1.27e-4*x**2 + 2800
     
     if plot:
         plt.subplot(2,1,1)
-        plt.plot(d[:, 0].mean(axis=0))
-        plt.plot(d[:, 1].mean(axis=0))
-        plt.plot(d[:, 2].mean(axis=0))
-        plt.plot(d[:, 2].mean(axis=0))
+        plt.plot(d.data[:, 0].mean(axis=0))
+        plt.plot(d.data[:, 1].mean(axis=0))
+        plt.plot(d.data[:, 2].mean(axis=0))
+        plt.plot(d.data[:, 2].mean(axis=0))
 
     d_norm = normalize(d, poly_fit=2)
-    print(d_norm.mean(), d_norm.std())
+    d.data, d_norm.data = cp.asnumpy(d.data), cp.asnumpy(d_norm.data)
+
+    print(d_norm.data.mean(), d_norm.data.std())
     if plot:
         plt.subplot(2,1,2)
-        plt.plot(d_norm[:, 0].mean(axis=0))
-        plt.plot(d_norm[:, 1].mean(axis=0))
-        plt.plot(d_norm[:, 2].mean(axis=0))
-        plt.plot(d_norm[:, 3].mean(axis=0))
+        plt.plot(d_norm.data[:, 0].mean(axis=0))
+        plt.plot(d_norm.data[:, 1].mean(axis=0))
+        plt.plot(d_norm.data[:, 2].mean(axis=0))
+        plt.plot(d_norm.data[:, 3].mean(axis=0))
         
-    assert np.isclose(d_norm.mean(), 0, atol=1e-6)
-    assert np.isclose(d_norm.std(), 1.0, atol=1e-6)
+    assert np.isclose(d_norm.data.mean(), 0, atol=1e-6)
+    assert np.isclose(d_norm.data.std(), 1.0, atol=1e-6)
 
 def test_normalize_mask(plot=False):
     """ Test normalization works when data are masked """
@@ -88,7 +104,7 @@ def test_normalize_mask(plot=False):
                               stg.gaussian_f_profile(width=20*u.Hz),
                               stg.constant_bp_profile(level=1))
     d = from_setigen(frame)
-    d.data = d.data.astype('float32')
+    d.data = cp.asarray(d.data.astype('float32'))
     if plot:
         frame.plot()
     
@@ -102,8 +118,10 @@ def test_normalize_mask(plot=False):
         plt.plot(d_norm.mean(axis=0).squeeze())
     
     mask_cpu = cp.asnumpy(mask)
-    assert np.isclose(d_norm[..., ~mask_cpu].mean(), 0, atol=1e-6)
-    assert np.isclose(d_norm[..., ~mask_cpu].std(), 1.0, atol=1e-6)
+    d_norm.data = cp.asnumpy(d_norm.data)
+    
+    assert np.isclose(d_norm.data[..., ~mask_cpu].mean(), 0, atol=1e-6)
+    assert np.isclose(d_norm.data[..., ~mask_cpu].std(), 1.0, atol=1e-6)
     print("Mask test passed!")
 
 

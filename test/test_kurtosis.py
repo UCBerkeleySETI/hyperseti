@@ -12,6 +12,7 @@ import hyperseti
 
 def test_kurtosis():
     h5 = from_h5(voyager_h5)
+    h5.data = cp.asarray(h5.data[:])
 
     d = spectral_kurtosis(h5)
     print("after spectral_kurtosis, d.shape: {}, d: {}".format(d.shape, d))

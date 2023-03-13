@@ -34,13 +34,11 @@ def sk_flag(data_array, n_sigma=None, n_sigma_upper=5, n_sigma_lower=5,
         data (np.array): Numpy array with shape (N_timestep, N_beam, N_channel)
         metadata (dict): Metadata dictionary, should contain 'df' and 'dt'
                          (frequency and time resolution)
-        boxcar_mode (str): Boxcar mode to apply. mean/sum/gaussian.
         n_sigma (float): Number of std above/below to flag. (Overrides n_sigma_upper and _lower)
         n_sigma_upper (float): Number of stdev above SK estimate to flag (upper bound)
         n_sigma_lower (float): Number of stdev below SK estmate to flag (lower bound)
         flag_upper (bool): Flag channels with large SK (highly variable signals)
         flag_lower (bool): Flag channels with small SK (very stable signals)
-        return_space ('cpu' or 'gpu'): Returns array in CPU or GPU space
     
     Returns:
         mask (np.array, bool): Array of True/False flags per channel

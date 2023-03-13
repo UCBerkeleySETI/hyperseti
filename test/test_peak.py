@@ -1,13 +1,15 @@
 
 import os
 import logbook
-from hyperseti import normalize, dedoppler
+from hyperseti.normalize import normalize
+from hyperseti.dedoppler import dedoppler
 from hyperseti.io import from_setigen
 from hyperseti.log import set_log_level
 from hyperseti.peak import find_peaks_argrelmax
 import numpy as np
 import setigen as stg
 from astropy import units as u
+import cupy as cp
 
 def test_argrelmax():
     """ Test argrelmax works """
@@ -41,12 +43,16 @@ def test_argrelmax():
                             stg.constant_bp_profile(level=1))
 
     d_arr = from_setigen(frame)
-    d_arr.data = normalize(d_arr)
+    d_arr.data = cp.asarray(d_arr.data)
+    d_arr = normalize(d_arr)
 
-    dd, md = dedoppler(d_arr, max_dd=1.0, apply_smearing_corr=False)
+    dd = dedoppler(d_arr, max_dd=1.0, apply_smearing_corr=False, plan='optimal')
     print(type(dd))
 
-    snrs, fidx, ddidx =  find_peaks_argrelmax(dd, threshold=20, order=100)
+    snrs, fidx, ddidx =  find_peaks_argrelmax(dd.data, threshold=20, order=100)
+    print(f"snrs: {snrs}")
+    print(f"fidx: {fidx}")
+    print(f"ddidx: {ddidx}")
     assert len(snrs) == 4
  
     assert np.allclose(snrs, [74.470345, 74.89874,  28.147993, 25.853714])

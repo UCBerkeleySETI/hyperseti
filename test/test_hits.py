@@ -51,6 +51,7 @@ def test_blank_hits():
                             stg.constant_bp_profile(level=1))
 
     d = from_setigen(frame)
+    d = d.isel({'frequency': slice(0, 2**12)}, space='gpu')
 
     config = {
         'preprocess': {
@@ -61,12 +62,10 @@ def test_blank_hits():
             'n_sigma': 1,
         },
         'dedoppler': {
-            'boxcar_mode': 'sum',
             'kernel': 'ddsk',
             'max_dd': 4.0,
             'min_dd': None,
-            'apply_smearing_corr': False,
-            'beam_id': 0
+            'apply_smearing_corr': False
         },
         'hitsearch': {
             'threshold': 3,

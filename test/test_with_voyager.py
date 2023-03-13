@@ -42,12 +42,10 @@ def test_with_voyager():
             'normalize': True,
         },
         'dedoppler': {
-            'boxcar_mode': 'sum',
             'kernel': 'ddsk',
             'max_dd': 4.0,
             'min_dd': None,
             'apply_smearing_corr': True,
-            'beam_id': 0
         },
         'hitsearch': {
             'threshold': 20,

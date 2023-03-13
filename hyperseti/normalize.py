@@ -17,7 +17,6 @@ def normalize(data_array,  mask=None, poly_fit=0):
     Args: 
         data (np/cp.array): Data to preprocess
         mask (np.cp.array): 1D Channel mask for RFI flagging
-        return_space ('cpu' or 'gpu'): Returns array in CPU or GPU space
         poly_fit (int): Fit polynomial of degree N, 0 = no fit.
         
     Returns: d_gpu (cp.array): Normalized data

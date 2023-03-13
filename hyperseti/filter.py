@@ -24,7 +24,6 @@ def apply_boxcar(data, boxcar_size=1, axis=1, mode='mean'):
         mode (str): Choose one of 'mean', 'mode', 'gaussian'
                     Where gaussian multiplies by sqrt(N) to maintain
                     stdev of Gaussian noise
-        return_space ('cpu' or 'gpu'): Return in CPU or GPU space
     
     Returns: 
         data (np/cp.array): Data after boxcar filtering.

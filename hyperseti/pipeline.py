@@ -15,6 +15,7 @@ from .normalize import normalize
 from .hits import hitsearch, merge_hits, create_empty_hits_table, blank_hits
 from .io import from_fil, from_h5, from_setigen
 from .kurtosis import sk_flag
+from .utils import attach_gpu_device
 from .blanking import blank_edges, blank_extrema
 from hyperseti.version import HYPERSETI_VERSION
 
@@ -83,7 +84,7 @@ class GulpPipeline(object):
             kernel = self.config['dedoppler'].get('kernel', None)
             if kernel == 'ddsk':
                 logger.info("GulpPipeline.dedoppler: Running DDSK dedoppler kernel")
-                self.dedopp, self.dedopp_sk = self.dedoppler(self.data_array, **self.config['dedoppler'])
+                self.dedopp, self.dedopp_sk = dedoppler(self.data_array, **self.config['dedoppler'])
             else:
                 logger.info("GulpPipeline.dedoppler: Running standard dedoppler kernel")
                 self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'])
@@ -124,7 +125,7 @@ class GulpPipeline(object):
             n_hits_iter = len(self.peaks) - n_hits_last_iter
             logger.debug(f"GulpPipeline.run: New hits: {n_hits_iter}")
 
-            if self.config['hitsearch']['merge_boxcar_trials']:
+            if self.config['hitsearch'].get('merge_boxcar_trials', True):
                 logger.info(f"GulpPipeline.run: merging hits")
                 self.peaks = merge_hits(self.peaks)
 

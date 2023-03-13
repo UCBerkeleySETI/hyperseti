@@ -134,7 +134,7 @@ def plan_optimal(N_time, N_dopp_lower, N_dopp_upper):
 
 
 def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1, 
-            kernel='dedoppler', apply_smearing_corr=False, plan='stepped'):
+              kernel='dedoppler', apply_smearing_corr=False, plan='stepped'):
     """ Apply brute-force dedoppler kernel to data
     
     Args:

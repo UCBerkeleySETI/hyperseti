@@ -90,9 +90,6 @@ def merge_hits(hitlist):
     return hits
 
 
-
-
-
 def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwargs):
     """ Search for hits using argrelmax method in cusignal
     

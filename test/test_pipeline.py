@@ -23,7 +23,6 @@ config = {
         'blank_extrema': {'threshold': 10000},
     },
     'dedoppler': {
-        'boxcar_mode': 'sum',
         'kernel': 'dedoppler',
         'max_dd': 4.0,
         'min_dd': None,
