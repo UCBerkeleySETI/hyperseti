@@ -67,7 +67,7 @@ def test_with_voyager():
         }
 
         dframe = find_et(voyager_h5, config, 
-                        gulp_size=2**18,
+                        gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
                         filename_out='./test_voyager_hits.csv',
                         log_output=True,
                         log_config=True
@@ -81,15 +81,18 @@ def test_with_voyager():
         assert os.path.exists('test_voyager_hits.yaml')
         assert os.path.exists('test_voyager_hits.log')
 
+        # This is a quick test to check if smaller gulps are taking the channel offset into account
+        assert np.alltrue(756000 > dframe['channel_idx'] > 739000)
+
         for drate in list_drate:
             print("Observed drift rate = {}, should be negative.".format(drate))
             assert drate <= 0.0
         return dframe
 
     finally:
-        os.remove('test_voyager_hits.csv')
-        os.remove('test_voyager_hits.yaml')
-        os.remove('test_voyager_hits.log')
+        for file_ext in ('.log', '.csv', '.yaml'):
+            if os.path.exists('test_voyager_hits' + file_ext):
+                os.remove('test_voyager_hits' + file_ext)
 
 if __name__ == "__main__":
     dframe = test_with_voyager()
