@@ -14,9 +14,9 @@ import numpy as np
 
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
 try:
-    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
+    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_yaml
 except:
-    from file_defs import synthetic_fil, test_fig_dir, voyager_h5
+    from file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_yaml
 import os
 
 import logbook
@@ -213,7 +213,8 @@ def test_find_et():
         }
     }
 
-    pd = find_et(voyager_h5, config, gulp_size=2**20)
+    et_browser = find_et(voyager_h5, config, gulp_size=2**20)
+    pd = et_browser.hit_table
     print(pd)
     print(len(pd))
     
@@ -229,16 +230,13 @@ def test_find_et_cmd_tool():
 
     args = [voyager_h5, 
             "-o", "hits.csv", 
-            "-z", "16", 
-            "-M", "1.0", 
-            "-s", "10", 
-            "-b", "1",
-            "-k", "ddsk"]
+            "-c", voyager_yaml, 
+            ]
 
     cmd_tool(args)
 
 if __name__ == "__main__":
-    test_hitsearch()
-    test_hitsearch_multi()
+    #test_hitsearch()
+    #test_hitsearch_multi()
     test_find_et()
     test_find_et_cmd_tool()

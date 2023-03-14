@@ -1,2 +1,2 @@
 py.test
-../codecov -t $CODECOV_TOKEN
+codecov -t $CODECOV_TOKEN

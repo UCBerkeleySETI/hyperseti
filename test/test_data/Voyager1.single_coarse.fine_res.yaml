@@ -1,0 +1,17 @@
+dedoppler:
+  apply_smearing_corr: false
+  kernel: ddsk
+  max_dd: 5.0
+  min_dd: null
+  plan: stepped
+hitsearch:
+  min_fdistance: null
+  threshold: 20
+pipeline:
+  merge_boxcar_trials: true
+  n_boxcar: 10
+preprocess:
+  blank_edges:
+    n_chan: 32
+  normalize: true
+  sk_flag: true

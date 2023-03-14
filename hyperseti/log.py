@@ -13,7 +13,8 @@ import logbook
 from logbook import Logger, StreamHandler
 
 # Start logging to screen (stdout)
-log_to_screen = StreamHandler(sys.stdout)
+log_to_screen = StreamHandler(sys.stdout, bubble=True)
+log_to_screen.format_string = '[{record.channel}] {record.message}'
 log_to_screen.push_application()
 
 # Disable verbose hdf5plugin warning 

@@ -8,3 +8,4 @@ cupy>=9.0.0
 cusignal
 setigen
 blimpy
+pyyaml
