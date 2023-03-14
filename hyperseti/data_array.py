@@ -216,7 +216,8 @@ class DataArray(object):
             data = cp.asarray(data)
         else:
             pass   
-        return DataArray(data, self.dims, new_scales, self.attrs, slice_info=slices)
+        return DataArray(data, self.dims, new_scales, self.attrs, 
+                         slice_info=slices, parent_shape=self.data.shape)
     
 
     def iterate_through_data(self, dims, overlap={}, space=None):

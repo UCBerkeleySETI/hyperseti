@@ -8,4 +8,7 @@ voyager_h5_flipped = path.join(here, 'test_data/Voyager1.single_coarse.fine_res.
 synthetic_fil = path.join(here, 'test_data/synthetic.fil')
 synthetic_h5 = path.join(here, 'test_data/synthetic.fil')
 
+voyager_csv =  path.join(here, 'test_data/Voyager1.single_coarse.fine_res.csv')
+voyager_yaml =  path.join(here, 'test_data/Voyager1.single_coarse.fine_res.yaml')
+
 test_fig_dir = path.join(here, 'test_figs')

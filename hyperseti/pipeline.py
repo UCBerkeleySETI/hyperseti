@@ -17,6 +17,7 @@ from .io import from_fil, from_h5, from_setigen
 from .kurtosis import sk_flag
 from .utils import attach_gpu_device, timeme
 from .blanking import blank_edges, blank_extrema
+from .hit_browser import HitBrowser
 from hyperseti.version import HYPERSETI_VERSION
 
 from hyperseti.data_array import DataArray
@@ -212,6 +213,7 @@ class GulpPipeline(object):
             logger.info(f"GulpPipeline.run #{self._called_count}: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
         return self.peaks
 
+@timeme
 def find_et(filename: str, 
             pipeline_config: dict, 
             filename_out: str='hits.csv', 
@@ -257,7 +259,6 @@ def find_et(filename: str,
     logger.info(msg)
     print(msg)
     logger.info(pipeline_config)
-    t0 = time.time()
 
     if h5py.is_hdf5(filename):
         ds = from_h5(filename)
@@ -282,11 +283,8 @@ def find_et(filename: str,
         out.append(hits)
     
     dframe = pd.concat(out)
-    dframe.to_csv(filename_out)
-    t1 = time.time()
-    msg = f"find_et: TOTAL ELAPSED TIME: {(t1-t0):2.2f}s"
-    logger.info(msg)
-    print(msg)
+    if filename_out is not None:
+        dframe.to_csv(filename_out, index=False)
 
     if log_config:
         print(f"find_et: Pipeline runtime config logged to {config_out}")
@@ -294,5 +292,5 @@ def find_et(filename: str,
     if log_output:
         print(f"find_et: Output logged to {logfile_out}")
     
-    return dframe
+    return HitBrowser(ds, dframe)
     

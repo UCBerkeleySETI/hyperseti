@@ -2,7 +2,6 @@ from hyperseti.dedoppler import dedoppler
 from hyperseti.filter import apply_boxcar
 from hyperseti.normalize import normalize
 from hyperseti.hits import hitsearch, merge_hits
-from hyperseti import find_et
 from hyperseti.io import from_fil, from_metadata
 from hyperseti.log import set_log_level
 from hyperseti.data_array import split_metadata

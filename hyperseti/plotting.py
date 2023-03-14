@@ -12,10 +12,11 @@ def _get_extent(data_array, xaxis, yaxis):
     """
     data = data_array.data
     if xaxis == 'channel':
-        ex_x0, ex_x1 = 0, data.shape[1]    
+        ex_x0, ex_x1 = -data.shape[2] // 2, data.shape[2] // 2    
     elif xaxis == 'frequency':
         f = data_array.frequency
-        ex_x0, ex_x1 = f.step.value, f.val_start + f.step.value * data.shape[1]
+        f_step = f.step.to('Hz').value
+        ex_x0, ex_x1 = f_step * -data.shape[2] // 2, f_step * data.shape[2] // 2 
         
     if yaxis == 'driftrate':
         dr = data_array.drift_rate
@@ -68,13 +69,12 @@ def imshow_dedopp(data_array, xaxis='channel', yaxis='driftrate', *args, **kwarg
         show_colorbar (bool): Show colorbar
         
     """
+    # TODO: Fix y-axis ticks for stepped (non uniform) plan
     _imshow(data_array, xaxis, yaxis, *args, **kwargs)
 
- 
 def imshow_waterfall(data_array, xaxis='channel', yaxis='timestep', *args, **kwargs):
     """ Do imshow for spectral data """
     _imshow(data_array, xaxis, yaxis, *args, **kwargs)
-
     
 def overlay_hits(hits, xaxis='channel', yaxis='driftrate', marker='x', c='red'):
     if xaxis == 'channel':
