@@ -31,20 +31,24 @@ config = {
         'min_fdistance': None                   # Automatic calculation of min. channel spacing between hits
     },
     'pipeline': {
-        'n_boxcar': 10,                         # Number of boxcar trials to apply (10 stages, 2^10=1024 channels)
+        'n_boxcar': 10,                         # Number of boxcar trials to apply (10 stages, 2^10 channels)
                                                 # Boxcar is a moving average to compensate for smearing / broadband
         'merge_boxcar_trials': True             # Merge hits at same frequency that are found in multiple boxcars
     }
 }
 
-dframe = find_et(voyager_h5, config, 
+hit_browser = find_et(voyager_h5, config, 
                 gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
                 filename_out='./test_voyager_hits.csv',
                 log_output=True,
                 log_config=True
                 )
 
-print(dframe)
+# find_et returns a hit browser object that makes it easy to plot hits 
+print(hit_browser.hit_table)
+
+hit_browser.view_hit(0, padding=128, plot='dual')
+
 ```
 
 #### Example 2: Inspecting a setigen Frame
