@@ -243,7 +243,7 @@ def find_et(filename: str,
         from logbook import FileHandler, NestedSetup
         from .log import log_to_screen
         logfile_out = os.path.splitext(filename_out)[0] + '.log'
-        log_to_file = FileHandler(logfile_out)
+        log_to_file = FileHandler(logfile_out, bubble=True)
         logger_setup = NestedSetup([log_to_screen, log_to_file])
         logger_setup.push_application()
     

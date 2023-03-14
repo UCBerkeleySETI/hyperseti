@@ -54,7 +54,7 @@ def test_with_voyager():
                 'kernel': 'ddsk',
                 'max_dd': 5.0,
                 'min_dd': None,
-                'apply_smearing_corr': False,
+                'apply_smearing_corr': False, # Use either this OR pipeline/merge_boxcar_trials
                 'plan': 'stepped'
             },
             'hitsearch': {
