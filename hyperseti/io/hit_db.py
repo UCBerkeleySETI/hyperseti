@@ -50,6 +50,9 @@ class HitDatabase(object):
 
     def __del__(self):
         self.h5.close()
+    
+    def __repr__(self):
+        return f"< HitDatabase: {self.filename} N_obs: {len(list(self.h5.keys()))} >"
 
     def list_obs(self) -> list:
         """ List all observations in the file

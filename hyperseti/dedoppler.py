@@ -17,13 +17,30 @@ from .dimension_scale import DimensionScale, ArrayBasedDimensionScale
 from .log import get_logger
 logger = get_logger('hyperseti.dedoppler')
 
-def calc_ndrift(data_array, max_dd):
+def calc_delta_dd(data_array: DataArray) -> (float, float):
+    """ Compute minimum dedoppler drift delta (Step size) for a given array
+    
+    Args:
+        data_array (DataArray): Data array with (time, beam_id, frequency) axes
+    
+    Returns:
+        obs_len  (float): Observation length in seconds
+        delta_dd (float): Minimum step size in dedoppler space
+     """
+    obs_len  = data_array.time.elapsed.to('s').value
+    delta_dd = data_array.frequency.step.to('Hz').value / obs_len  # e.g. 2.79 Hz / 300 s = 0.0093 Hz/s
+    return obs_len, delta_dd
+
+def calc_ndrift(data_array: DataArray, max_dd: u.Quantity) -> int:
     """ Calculate the number of channels a drifting signal will cross 
 
     Args:
         data_array (DataArray): Data array with 'frequency' and 'time' dimensions)
         max_dd (astropy.units.Quantity): Maximum drift rate to consider (in Hz/s)
 
+    Returns:
+        min_fdistance (int): Number of frequency channels spanned by a signal with
+                             drift rate equal to max_dd
     """
     deltaf = data_array.frequency.step.to('Hz').value
     deltat = data_array.time.step.to('s').value
@@ -33,7 +50,7 @@ def calc_ndrift(data_array, max_dd):
     min_fdistance = int(np.abs(deltat * n_int * max_dd / deltaf))
     return min_fdistance
 
-def apply_boxcar_drift(data_array):
+def apply_boxcar_drift(data_array: DataArray):
     """ Apply boxcar filter to compensate for doppler smearing
     
     An optimal boxcar is applied per row of drift rate. This retrieves
@@ -41,11 +58,10 @@ def apply_boxcar_drift(data_array):
     (Stil down a sqrt(boxcar_size) compared to no smearing case).
     
     Args:
-        data (np or cp array): 
-        metadata (dict): Dictionary of metadata values
+        data_array (DataArray): Array to apply boxcar filters to
     
     Returns:
-        data, metadata (array and dict): Data array with filter applied.
+         data_array (DataArray): Array with boxcar filters applied.
     """
     logger.debug(f"apply_boxcar_drift: Applying moving average based on drift rate.")
     metadata = data_array.metadata
@@ -68,7 +84,7 @@ def apply_boxcar_drift(data_array):
     return data_array
 
 
-def plan_stepped(N_time, N_dopp_lower, N_dopp_upper):
+def plan_stepped(N_time: int, N_dopp_lower: int, N_dopp_upper: int) -> np.array:
     """ Create dedoppler plan where step size doubles after N_time
     
     This plan is good for large drift rate search ranges, as it requires
@@ -78,6 +94,9 @@ def plan_stepped(N_time, N_dopp_lower, N_dopp_upper):
         N_time (int): Number of time integrations in data array
         N_dopp_lower (int): Minimum drift rate correction in # channels
         N_dopp_upper (int): Maximum drift rate correction in # channels
+    
+    Returns
+        steps (np.array): Numpy array of dedoppler trials as integer steps
     """
     reverse = False
     if N_dopp_lower > N_dopp_upper:
@@ -118,13 +137,16 @@ def plan_stepped(N_time, N_dopp_lower, N_dopp_upper):
     return steps
 
 
-def plan_optimal(N_time, N_dopp_lower, N_dopp_upper):
+def plan_optimal(N_time: int, N_dopp_lower: int, N_dopp_upper: int) -> np.array:
     """ Basic dedoppler plan to check every possible drift correction 
     
     Args:
         N_time (int): Number of time integrations in data array
         N_dopp_lower (int): Minimum drift rate correction in # channels
         N_dopp_upper (int): Maximum drift rate correction in # channels
+    
+    Returns:
+        dd_shifts (np.array): Array of dedoppler trials as integer steps
     """
     if N_dopp_upper > N_dopp_lower:
         dd_shifts      = np.arange(N_dopp_lower, N_dopp_upper + 1, dtype='int32')
@@ -133,15 +155,15 @@ def plan_optimal(N_time, N_dopp_lower, N_dopp_upper):
     return dd_shifts
 
 
-def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1, 
-              kernel='dedoppler', apply_smearing_corr=False, plan='stepped'):
+def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None, boxcar_size: int=1, 
+              kernel: str='dedoppler', apply_smearing_corr: bool=False, plan: str='stepped') -> DataArray:
     """ Apply brute-force dedoppler kernel to data
     
     Args:
         data_array (DataArray): DataArray with shape (N_timestep, N_beam, N_channel)
-        max_dd (float): Maximum doppler drift in Hz/s to search out to.
-        min_dd (float): Minimum doppler drift to search. 
-                        If set to None (default), it will use -max_dd (not 0)!
+        max_dd (astropy.Quantity): Maximum doppler drift in Hz/s to search out to.
+        min_dd (astropy.Quantity): Minimum doppler drift to search. 
+                                   If set to None (default), it will use -max_dd (not 0)!
         kernel (str): 'dedoppler' or 'kurtosis' or 'ddsk'
         plan (str): Dedoppler plan to use. One of 'full' or 'stepped'
     
@@ -151,7 +173,8 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
                    E.g. for N_time = 2 trials are [0, 1, 2, 4, 8, 16, ..]
     
     Returns:
-        dd_vals, dedopp_gpu (np.array, np/cp.array): 
+        dedopp_array (DataArray): Array of dedoppler space data
+        dedopp_sk_array (DataArray): If kernel='ddsk', a dedopp_sk DataArray is also returned
     """
    
     t0 = time.time()
@@ -165,8 +188,7 @@ def dedoppler(data_array, max_dd, min_dd=None, boxcar_size=1,
     
     # Compute minimum possible drift (delta_dd)
     N_time, N_beam, N_chan = data_array.data.shape
-    obs_len  = data_array.time.elapsed.to('s').value
-    delta_dd = data_array.frequency.step.to('Hz').value / obs_len  # e.g. 2.79 Hz / 300 s = 0.0093 Hz/s
+    obs_len, delta_dd = calc_delta_dd(data_array)
     
     # Compute dedoppler shift schedules
     N_dopp_upper   = int(max_dd / delta_dd)

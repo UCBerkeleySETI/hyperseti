@@ -43,9 +43,18 @@ def _imshow(data_array, xaxis, yaxis, show_labels=True, show_colorbar=True,
         show_labels (bool): Show labels on axes
         show_colorbar (bool): Show colorbar
         beam_id (int): Which beam to plot
-       
+    
+    Notes:
+        Can use kwargs['apply_transform'] = np.log (or any other ufunc) to transform data
+        before plotting
     """
+
     data = cp.asnumpy(data_array.data[:, beam_id]).squeeze()
+    
+    if 'apply_transform' in kwargs:
+        transform = kwargs.pop('apply_transform')
+        data = transform(data)
+
     plt.imshow(data, aspect='auto',
               extent=_get_extent(data_array, xaxis, yaxis), *args, **kwargs)
 
