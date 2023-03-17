@@ -71,7 +71,8 @@ class HitBrowser(object):
         return data_sel    
 
     def _overlay_hit(self, hit_idx):
-        hit = self.hit_table.iloc[hit_idx]
+        hit = self.hit_table.iloc[hit_idx].copy()
+        hit['channel_idx'] = 0              # Set to zero as we are plotting offsets
         overlay_hits(hit)
     
     def view_hit(self, hit_idx:int, padding: int=128, 

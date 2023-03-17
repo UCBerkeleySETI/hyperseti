@@ -20,7 +20,7 @@ def _get_extent(data_array, xaxis, yaxis):
         
     if yaxis == 'driftrate':
         dr = data_array.drift_rate
-        ex_y1, ex_y0 = dr.data[-1], dr.data[0]
+        ex_y0, ex_y1 = dr.data[-1], dr.data[0]
     elif yaxis == 'driftidx':
         ex_y0, ex_y1 = data.shape[0], 0
     
