@@ -44,7 +44,6 @@ class HitBrowser(object):
 
         t_elapsed = self.data_array.time.elapsed.to('s').value
         f_step    = self.data_array.frequency.step.to('Hz').value
-        f_start   = self.data_array.frequency.start
 
         chan_idx = int(hit['channel_idx'])
         beam_idx   = int(hit['beam_idx'])
@@ -56,8 +55,8 @@ class HitBrowser(object):
         chan0 = chan_idx - padding - n_box
         chanX = chan_idx + padding + n_box 
 
-        if n_chan_drift * f_step < 0:
-            chan0 += abs(n_chan_drift) 
+        if n_chan_drift * f_step < 0: 
+            chan0 -= abs(n_chan_drift) 
         else:
             chanX += abs(n_chan_drift) 
 
