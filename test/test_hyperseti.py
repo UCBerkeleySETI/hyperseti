@@ -204,7 +204,7 @@ def test_find_et():
             'apply_smearing_corr': False,
         },
         'hitsearch': {
-            'threshold': 20,
+            'threshold': 15,
             'min_fdistance': None
         },
         'pipeline': {
