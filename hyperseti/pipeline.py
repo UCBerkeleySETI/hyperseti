@@ -24,7 +24,11 @@ from hyperseti.data_array import DataArray
 
 #logging
 from .log import get_logger
+import logbook
 logger = get_logger('hyperseti.pipeline')
+
+proglog = get_logger('find_et')
+proglog.level = logbook.INFO
 
 # Max threads setup 
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
@@ -256,10 +260,12 @@ def find_et(filename: str,
             yaml.dump(pipeline_config, json_out)
 
     msg = f"find_et: hyperseti version {HYPERSETI_VERSION}"
-    logger.info(msg)
-    print(msg)
+    proglog.info(msg)
+    #print(msg)
     logger.info(pipeline_config)
 
+    if isinstance(filename, DataArray):
+        ds = filename           # User has actually supplied a DataArray
     if h5py.is_hdf5(filename):
         ds = from_h5(filename)
     elif sigproc.is_filterbank(filename):
@@ -276,8 +282,10 @@ def find_et(filename: str,
 
     attach_gpu_device(gpu_id)
     counter = 0
+    n_gulps = ds.data.shape[-1] // gulp_size
     for d_arr in ds.iterate_through_data({'frequency': gulp_size}, space='gpu'):
         counter += 1
+        proglog.info(f"Progress {counter}/{n_gulps}")
         pipeline = GulpPipeline(d_arr, pipeline_config, gpu_id=gpu_id)
         hits = pipeline.run()
         out.append(hits)
