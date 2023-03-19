@@ -54,7 +54,7 @@ class ArrayBasedDimensionScale(object):
 
     def __getitem__(self, i):
         """ Allow indexing with scale[i] """
-        return self.data[i]
+        return ArrayBasedDimensionScale(self.name, self.data[i], self.units)
 
 class DimensionScale(object):
     """ Dimension Scale 'duck array' with basic numpy/astropy array support 

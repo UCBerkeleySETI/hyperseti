@@ -97,7 +97,9 @@ class GulpPipeline(object):
             logger.info(f"GulpPipeline: min_fdistance calculated to be {min_fdistance} bins")
 
         # TODO: Do rigorous testing of interplay between apply_smearing_corr and boxcar_width
-        if config['dedoppler']['apply_smearing_corr'] and config['pipeline']['n_boxcar'] > 1:
+        n_boxcar = config['pipeline'].get('n_boxcar', 1) 
+        n_boxcar = 1 if n_boxcar is None else n_boxcar
+        if config['dedoppler']['apply_smearing_corr'] and n_boxcar > 1:
             logger.warning("GulpPipeline: combining dedoppler/apply_smearing_corr and pipeline/n_boxcar > 1 may produce strange results. Or it may not. Not sure yet.")
 
     @timeme
@@ -110,11 +112,8 @@ class GulpPipeline(object):
             3) Normalize data (subtract mean and convert into units of SNR)
             4) Blank any stupidly bright channels (optional)
         """
-        # Apply preprocessing normalization and blanking
-        if self.config['preprocess'].get('blank_edges', 0):
-            logger.info(f"GulpPipeline.preprocess: Applying edge blanking")
-            self.data_array = blank_edges(self.data_array, **self.config['preprocess']['blank_edges'])
         
+        # Apply main normalization
         if self.config['preprocess'].get('normalize', False):
             poly_fit = self.config['preprocess'].get('poly_fit', 0)
             if self.config['preprocess'].get('sk_flag', False):
@@ -128,10 +127,21 @@ class GulpPipeline(object):
             self.data_array = normalize(self.data_array, mask=mask, poly_fit=poly_fit)
             self.mask = mask
 
+        # Blank edges 
+        if self.config['preprocess'].get('blank_edges', 0):
+            logger.info(f"GulpPipeline.preprocess: Applying edge blanking")
+            self.data_array = blank_edges(self.data_array, **self.config['preprocess']['blank_edges'])
+
         # Extrema blanking is done *after* normalization
         if self.config['preprocess'].get('blank_extrema'):
             logger.info(f"GulpPipeline.preprocess: Blanking extremely bright signals")
             self.data_array = blank_extrema(self.data_array, **self.config['preprocess']['blank_extrema'])
+
+        # Proglog info
+        pp_dict = self.data_array.attrs['preprocess']
+        proglog.info(f"\tPreprocess mean:       {pp_dict['mean']}")
+        proglog.info(f"\tPreprocess STD:        {pp_dict['std']}")
+        proglog.info(f"\tPreprocess flagged:    {pp_dict['flagged_fraction']:.2f}%")
 
     @timeme        
     def dedoppler(self):
@@ -155,16 +165,16 @@ class GulpPipeline(object):
         """
         # Adjust SNR threshold to take into account boxcar size and dedoppler sum
         # Noise increases by sqrt(N_timesteps * boxcar_size)
+        # sqrt(N_timesteps) is taken into account within dedoppler kernel
         conf = deepcopy(self.config)        # This deepcopy avoids overwriting original threshold value
-        boxcar_size = conf['dedoppler']['boxcar_size']
+        boxcar_size = conf['dedoppler'].get('boxcar_size', 1)
         _threshold0 = conf['hitsearch']['threshold']
-        conf['hitsearch']['threshold'] = _threshold0 * np.sqrt(self.N_timesteps * boxcar_size)
+        conf['hitsearch']['threshold'] = _threshold0 * np.sqrt(boxcar_size)
         _peaks = hitsearch(self.dedopp, **conf['hitsearch'])
-
-        #logger.debug(f"{self.peaks}")
         
         if _peaks is not None:
-            _peaks['snr'] /= np.sqrt(self.N_timesteps * boxcar_size)
+            _peaks['snr'] /= np.sqrt(boxcar_size)
+            proglog.info(f"\t Hits in gulp: {len(_peaks)}")
             self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
 
     @timeme   
@@ -179,9 +189,11 @@ class GulpPipeline(object):
         t0 = time.time()
 
         self.preprocess()
-    
+
         n_boxcar = self.config['pipeline'].get('n_boxcar', 1)
         n_blank  = self.config['pipeline'].get('n_blank', 1)
+        n_boxcar = 1 if n_boxcar is None else n_boxcar     # None value breaks loop
+        n_blank  = 1 if n_blank is None else n_blank       # None value breaks loop
         boxcar_trials = list(map(int, 2**np.arange(0, n_boxcar)))
     
         n_hits_last_iter = 0
@@ -221,9 +233,10 @@ class GulpPipeline(object):
 def find_et(filename: str, 
             pipeline_config: dict, 
             filename_out: str='hits.csv', 
+            gulp_size: int=2**20, 
+            sort_hits: bool=True,
             log_config: bool=False,
             log_output: bool=False,
-            gulp_size: int=2**20, 
             gpu_id: int=0, 
             *args, **kwargs) -> pd.DataFrame:
     """ Find ET, serial version
@@ -236,6 +249,7 @@ def find_et(filename: str,
         filename_out (str): Name of output CSV file.
         log_output (bool): If set, will log pipeline output to TXT file.
         log_config (bool): If set, will log pipeline configuration to YAML file.
+        sort_hits (bool): Sort hits by SNR after hitsearch is complete.
         gulp_size (int): Number of channels to process in one 'gulp' ('gulp' can be == 'coarse channel')
         gpu_id (int): GPU device ID to use.
    
@@ -291,6 +305,10 @@ def find_et(filename: str,
         out.append(hits)
     
     dframe = pd.concat(out)
+
+    if sort_hits:
+        dframe = dframe.sort_values('snr', ascending=False).reset_index(drop=True)
+
     if filename_out is not None:
         dframe.to_csv(filename_out, index=False)
 
@@ -299,6 +317,6 @@ def find_et(filename: str,
 
     if log_output:
         print(f"find_et: Output logged to {logfile_out}")
-    
+
     return HitBrowser(ds, dframe)
     

@@ -167,7 +167,7 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
             t1 = time.time()
             logger.debug(f"hitsearch: Peak find to dataframe: {(t1-t0)*1e3:2.2f}ms")
         try:
-            hits = pd.concat(dfs)
+            hits = pd.concat(dfs, ignore_index=True)
             #logger.debug(hits)
         except ValueError: # No hits output
             hits = None

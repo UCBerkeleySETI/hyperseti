@@ -216,7 +216,7 @@ class DataArray(object):
             data = cp.asarray(data)
         else:
             pass   
-        return DataArray(data, self.dims, new_scales, self.attrs, 
+        return DataArray(data, self.dims, new_scales, self.attrs, units=self.units,
                          slice_info=slices, parent_shape=self.data.shape)
     
 

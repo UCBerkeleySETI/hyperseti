@@ -4,9 +4,7 @@ import numpy as np
 #logging
 from .log import get_logger
 from .data_array import DataArray
-logger = get_logger('hyperseti.kurtosis')
-
-
+logger  = get_logger('hyperseti.kurtosis')
 
 
 def spectral_kurtosis(x: DataArray) -> cp.ndarray:
@@ -87,7 +85,4 @@ def sk_flag(data_array: DataArray, n_sigma: float=None,
         # also mask either side of a masked value
         mask[1:]  = np.logical_or(mask[1:], mask[0:-1])
         mask[:-1] = np.logical_or(mask[:-1], mask[1:])
-    
-    print(f"Flag frac: {np.sum(mask) / len(mask) * 100:.3f}%")
-
     return mask

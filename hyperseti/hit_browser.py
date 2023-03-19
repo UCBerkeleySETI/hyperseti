@@ -3,6 +3,8 @@ import cupy as cp
 import numpy as np
 import pylab as plt
 
+from astropy import units as u
+
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
 from hyperseti.data_array import DataArray
 from hyperseti.dedoppler import dedoppler, calc_delta_dd
@@ -93,18 +95,24 @@ class HitBrowser(object):
                            'dedoppler': {'show_colorbar': False}}
             ```
         """
+        
         hit_darr = self.extract_hit(hit_idx, padding, space='cpu')
-
+        obs_len, delta_dd = calc_delta_dd(hit_darr)
+                    
         if plot not in ('waterfall', 'dedoppler', 'ddsk', 'dual'):
             raise RuntimeError("plot arg not understood, choose waterfall, dedoppler or dual.")
 
         if plot in ('dedoppler', 'dual', 'ddsk'):
             N_DD_MIN = 32                               # Minimum number of dedoppler bins in dedoppler plot
-            obs_len, delta_dd = calc_delta_dd(hit_darr)
+
             DD_MIN = N_DD_MIN * delta_dd                # Compute minimum max_dd for plot
             max_dd = abs(self.hit_table.iloc[hit_idx]['drift_rate'])
             max_dd *= 2
             max_dd = np.max([max_dd, DD_MIN])
+
+            # Reload data so we can pad with maximum dd
+            n_chan_dedopp = abs(int(max_dd / delta_dd))
+            hit_darr = self.extract_hit(hit_idx, padding + n_chan_dedopp, space='cpu')
             hit_darr.data = cp.asarray(hit_darr.data)
             if plot == 'ddsk':
                 hit_dedopp, hit_dedopp_sk = dedoppler(hit_darr, max_dd=max_dd, 
