@@ -50,12 +50,14 @@ def calc_ndrift(data_array: DataArray, max_dd: u.Quantity) -> int:
     min_fdistance = int(np.abs(deltat * n_int * max_dd / deltaf))
     return min_fdistance
 
+from cupyx.scipy.ndimage import uniform_filter1d
+
 def apply_boxcar_drift(data_array: DataArray):
     """ Apply boxcar filter to compensate for doppler smearing
     
     An optimal boxcar is applied per row of drift rate. This retrieves
     a sensitivity increase of sqrt(boxcar_size) for a smeared signal.
-    (Stil down a sqrt(boxcar_size) compared to no smearing case).
+    (Still down a sqrt(boxcar_size) compared to no smearing case).
     
     Args:
         data_array (DataArray): Array to apply boxcar filters to
@@ -65,22 +67,25 @@ def apply_boxcar_drift(data_array: DataArray):
     """
     logger.debug(f"apply_boxcar_drift: Applying moving average based on drift rate.")
     metadata = data_array.metadata
-    # Compute drift rates from metadata
+    
+    # Note: dedoppler array no longer has time dimensions, so need to read
+    # metadata stores in attributes (integration_time and n_integration)
     drates = cp.asarray(data_array.drift_rate.data)
     df = data_array.frequency.step.to('Hz').value
-    dt = metadata['integration_time'].to('s').value
-    
+    dt = metadata['integration_time'].to('s').value / metadata['n_integration']
+
     # Compute smearing (array of n_channels smeared for given driftrate)
     smearing_nchan = cp.abs(dt * drates / df).astype('int32')
     smearing_nchan_max = cp.asnumpy(cp.max(smearing_nchan))
 
     # Apply boxcar filter to compensate for smearing
-    for boxcar_size in range(2, smearing_nchan_max+1):
+    for boxcar_size in cp.unique(smearing_nchan):
         idxs = cp.where(smearing_nchan == boxcar_size)
         # 1. uniform_filter1d computes mean. We want sum, so *= boxcar_size
         # 2. we want noise to stay the same, so divide by sqrt(boxcar_size)
         # combined 1 and 2 give aa sqrt(2) factor
-        data_array.data[idxs] = uniform_filter1d(data_array.data[idxs], size=boxcar_size, axis=2) * np.sqrt(boxcar_size)
+        logger.debug(f"boxcar_size: {boxcar_size}, dedopp idxs: {idxs}")
+        data_array.data[idxs] = uniform_filter1d(data_array.data[idxs], size=int(boxcar_size), axis=2) * np.sqrt(boxcar_size)
     return data_array
 
 
