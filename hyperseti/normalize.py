@@ -3,20 +3,21 @@ import numpy as np
 import time
 import os
 
+from .data_array import DataArray
 
 #logging
 from .log import get_logger
 logger = get_logger('hyperseti.normalize')
 
 
-def normalize(data_array,  mask=None, poly_fit=0):
+def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
     """ Apply normalization on GPU
     
     Applies normalisation (data - mean) / stdev
     
     Args: 
-        data (np/cp.array): Data to preprocess
-        mask (np.cp.array): 1D Channel mask for RFI flagging
+        data (DataArray): Data to preprocess (time, beam_id, frequency)
+        mask (cp.array): 1D Channel mask for RFI flagging
         poly_fit (int): Fit polynomial of degree N, 0 = no fit.
         
     Returns: d_gpu (cp.array): Normalized data
@@ -66,6 +67,8 @@ def normalize(data_array,  mask=None, poly_fit=0):
     t1p = time.time()
     logger.debug(f"Mean+Std time: {(t1p-t0p)*1e3:2.2f}ms")
 
+    
+
     flag_fraction =  N_flagged / N_tot
     ## flag_correction =  N_tot / (N_tot - N_flagged) # <---------------------- unused
     logger.debug(f"Flagged fraction: {flag_fraction:2.4f}")
@@ -75,6 +78,7 @@ def normalize(data_array,  mask=None, poly_fit=0):
     #  Apply to original data
     for ii in range(n_ifs):
         data_array.data[:, ii] = ((data_array.data[:, ii] - d_mean_ifs[ii]) / d_std_ifs[ii])
+    
     t1 = time.time()
     logger.debug(f"Normalisation time: {(t1-t0)*1e3:2.2f}ms")
     
