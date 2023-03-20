@@ -31,6 +31,7 @@ def calc_delta_dd(data_array: DataArray) -> (float, float):
     delta_dd = data_array.frequency.step.to('Hz').value / obs_len  # e.g. 2.79 Hz / 300 s = 0.0093 Hz/s
     return obs_len, delta_dd
 
+
 def calc_ndrift(data_array: DataArray, max_dd: u.Quantity) -> int:
     """ Calculate the number of channels a drifting signal will cross 
 
@@ -50,7 +51,6 @@ def calc_ndrift(data_array: DataArray, max_dd: u.Quantity) -> int:
     min_fdistance = int(np.abs(deltat * n_int * max_dd / deltaf))
     return min_fdistance
 
-from cupyx.scipy.ndimage import uniform_filter1d
 
 def apply_boxcar_drift(data_array: DataArray):
     """ Apply boxcar filter to compensate for doppler smearing
@@ -79,7 +79,8 @@ def apply_boxcar_drift(data_array: DataArray):
     smearing_nchan_max = cp.asnumpy(cp.max(smearing_nchan))
 
     # Apply boxcar filter to compensate for smearing
-    for boxcar_size in cp.unique(smearing_nchan):
+    boxcars = list(cp.asnumpy(cp.unique(smearing_nchan)))
+    for boxcar_size in boxcars:
         idxs = cp.where(smearing_nchan == boxcar_size)
         # 1. uniform_filter1d computes mean. We want sum, so *= boxcar_size
         # 2. we want noise to stay the same, so divide by sqrt(boxcar_size)

@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 with open("hyperseti/version.py", "w") as fh:
     fh.write("HYPERSETI_VERSION = '{}'\n".format(__version__))
