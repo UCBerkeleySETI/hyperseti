@@ -104,7 +104,7 @@ class GulpPipeline(object):
             logger.warning("GulpPipeline: combining dedoppler/apply_smearing_corr and pipeline/n_boxcar > 1 may produce strange results. Or it may not. Not sure yet.")
 
     @timeme
-    def preprocess(self):
+    async def preprocess(self):
         """ Apply preprocessing steps 
         
         Preprocessing steps:
@@ -145,7 +145,7 @@ class GulpPipeline(object):
         proglog.info(f"\tPreprocess flagged:    {pp_dict['flagged_fraction']:.2f}%")
 
     @timeme        
-    def dedoppler(self):
+    async def dedoppler(self):
         """ Apply dedoppler transform to gulp """
         # Check if kernel is computing DD + SK
         kernel = self.config['dedoppler'].get('kernel', None)
@@ -158,7 +158,7 @@ class GulpPipeline(object):
             self.dedopp_sk = None
     
     @timeme
-    def hitsearch(self):
+    async def hitsearch(self):
         """ Run search for hits above threshold in dedoppler space.
         
         Notes:
@@ -179,7 +179,7 @@ class GulpPipeline(object):
             self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
 
     @timeme   
-    def run(self) -> pd.DataFrame:
+    async def run(self) -> pd.DataFrame:
         """ Main pipeline runner 
         
         Returns:
@@ -189,7 +189,7 @@ class GulpPipeline(object):
         self._called_count += 1
         t0 = time.time()
 
-        self.preprocess()
+        await self.preprocess()
 
         n_boxcar = self.config['pipeline'].get('n_boxcar', 1)
         n_blank  = self.config['pipeline'].get('n_blank', 1)
@@ -202,8 +202,8 @@ class GulpPipeline(object):
             for boxcar_idx, boxcar_size in enumerate(boxcar_trials):
                 logger.debug(f"GulpPipeline.run: boxcar_size {boxcar_size}, ({boxcar_idx + 1} / {len(boxcar_trials)})")
                 self.config['dedoppler']['boxcar_size'] = boxcar_size
-                self.dedoppler()
-                self.hitsearch()
+                await self.dedoppler()
+                await self.hitsearch()
 
             n_hits_iter = len(self.peaks) - n_hits_last_iter
             logger.debug(f"GulpPipeline.run: New hits: {n_hits_iter}")
@@ -268,7 +268,7 @@ class AsyncPipeline(object):
         counter = self.reader.counter
         proglog.info(f"Progress {counter}/{self.reader.n_gulp}")
         pipeline = GulpPipeline(d_arr, self.pipeline_config, **self.kwargs)
-        hits = pipeline.run()
+        hits = await pipeline.run()
         return hits
 
     async def pipeline_loop(self):
