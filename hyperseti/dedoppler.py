@@ -79,14 +79,15 @@ def apply_boxcar_drift(data_array: DataArray):
     smearing_nchan_max = cp.asnumpy(cp.max(smearing_nchan))
 
     # Apply boxcar filter to compensate for smearing
-    boxcars = list(cp.asnumpy(cp.unique(smearing_nchan)))
+    boxcars = map(int, list(cp.asnumpy(cp.unique(smearing_nchan))))
     for boxcar_size in boxcars:
         idxs = cp.where(smearing_nchan == boxcar_size)
         # 1. uniform_filter1d computes mean. We want sum, so *= boxcar_size
         # 2. we want noise to stay the same, so divide by sqrt(boxcar_size)
         # combined 1 and 2 give aa sqrt(2) factor
         logger.debug(f"boxcar_size: {boxcar_size}, dedopp idxs: {idxs}")
-        data_array.data[idxs] = uniform_filter1d(data_array.data[idxs], size=int(boxcar_size), axis=2) * np.sqrt(boxcar_size)
+        if boxcar_size > 1:
+            data_array.data[idxs] = uniform_filter1d(data_array.data[idxs], size=boxcar_size, axis=2) * np.sqrt(boxcar_size)
     return data_array
 
 
