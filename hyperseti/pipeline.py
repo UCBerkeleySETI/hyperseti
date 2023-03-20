@@ -4,6 +4,7 @@ import time
 import pandas as pd
 import os
 import h5py
+import asyncio
 
 from astropy import units as u
 import setigen as stg
@@ -229,6 +230,58 @@ class GulpPipeline(object):
             logger.info(f"GulpPipeline.run #{self._called_count}: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
         return self.peaks
 
+
+class AsyncReader(object):
+    def __init__(self, filename: str, gulp_size: int=2**20):
+        self.filename = filename
+        self.gulp_size = gulp_size
+
+        if isinstance(filename, DataArray):
+            ds = filename           # User has actually supplied a DataArray
+        if h5py.is_hdf5(filename):
+            ds = from_h5(filename)
+        elif sigproc.is_filterbank(filename):
+            ds = from_fil(filename)
+        elif isinstance(stg.Frame, filename):
+            ds = filename 
+        else:
+            raise RuntimeError("Only HDF5 and filterbank files currently supported")
+        self.ds = ds
+
+        self.n_gulp = self.ds.shape[-1] // self.gulp_size
+        self.counter = 0
+        self.iterator = self.ds.iterate_through_data({'frequency': self.gulp_size}, space='gpu')
+      
+    async def next_gulp(self):
+        self.counter += 1
+        return next(self.iterator)
+
+
+class AsyncPipeline(object):
+    def __init__(self, reader, pipeline_config, **kwargs):
+        self.reader = reader
+        self.pipeline_config = pipeline_config
+        self.kwargs = kwargs
+
+    async def new_gulp_pipeline(self):
+        d_arr = await self.reader.next_gulp()
+        counter = self.reader.counter
+        proglog.info(f"Progress {counter}/{self.reader.n_gulp}")
+        pipeline = GulpPipeline(d_arr, self.pipeline_config, **self.kwargs)
+        hits = pipeline.run()
+        return hits
+
+    async def pipeline_loop(self):
+        gulp_out = []
+        for g_idx in range(self.reader.n_gulp):
+            r = await self.new_gulp_pipeline()
+            gulp_out.append(r)
+        return gulp_out
+    
+    def run(self):
+        out = asyncio.run(self.pipeline_loop())
+        return out
+
 @timeme
 def find_et(filename: str, 
             pipeline_config: dict, 
@@ -278,32 +331,22 @@ def find_et(filename: str,
     #print(msg)
     logger.info(pipeline_config)
 
-    if isinstance(filename, DataArray):
-        ds = filename           # User has actually supplied a DataArray
-    if h5py.is_hdf5(filename):
-        ds = from_h5(filename)
-    elif sigproc.is_filterbank(filename):
-        ds = from_fil(filename)
-    elif isinstance(stg.Frame, filename):
-        ds = filename 
-    else:
-        raise RuntimeError("Only HDF5 and filterbank files currently supported")
+    reader = AsyncReader(filename, gulp_size)
+    ds = reader.ds
 
     if gulp_size > ds.data.shape[2]:
         logger.warning(f'find_et: gulp_size ({gulp_size}) > Num fine frequency channels ({ds.data.shape[2]}).  Setting gulp_size = {ds.data.shape[2]}')
         gulp_size = ds.data.shape[2]
     out = []
 
+    # Set GPU ID
     attach_gpu_device(gpu_id)
-    counter = 0
-    n_gulps = ds.data.shape[-1] // gulp_size
-    for d_arr in ds.iterate_through_data({'frequency': gulp_size}, space='gpu'):
-        counter += 1
-        proglog.info(f"Progress {counter}/{n_gulps}")
-        pipeline = GulpPipeline(d_arr, pipeline_config, gpu_id=gpu_id)
-        hits = pipeline.run()
-        out.append(hits)
-    
+
+    # DO ASYNC CALL 
+    pipeline = AsyncPipeline(reader, pipeline_config)
+    out = pipeline.run()
+
+    # Convert to dataframe
     dframe = pd.concat(out)
 
     if sort_hits:
