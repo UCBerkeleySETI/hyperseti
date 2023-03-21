@@ -14,6 +14,11 @@ Try to get results that are similar to those of turbo_seti with our standard Voy
 002      -0.373093      1258.281250        8419.297028     8419.297028  72647      8419.298662     8419.295399  0.0           0.000000  0       77634
 003      -0.392226      159.497269         8419.274374     8419.274374  80755      8419.276009     8419.272745  0.0           0.000000  0       77634
 
+DCP NOTE:
+    With manual processing, I find a mean noise level of 1.10575503e+10, std of 1.1497335e+09
+    After normalization, in first time step (time-frequency space), max = 259.43027, std = 1.0 
+    If noise integrates down as sqrt(N_timesteps), we expect S/N to increase by sqrt(16) = 4x
+    So should see an SNR of 1000 
 """
 
 import os
@@ -58,7 +63,7 @@ def test_with_voyager():
                 'plan': 'stepped'
             },
             'hitsearch': {
-                'threshold': 20,
+                'threshold': 100,
                 'min_fdistance': None
             },
             'pipeline': {

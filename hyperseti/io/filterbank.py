@@ -32,4 +32,5 @@ def from_fil(filename):
     }
     
     d = DataArray(data, dims, scales, attrs, units='counts')
+    d._filename = filename
     return d

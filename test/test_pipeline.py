@@ -62,5 +62,16 @@ def test_pipeline():
     hits_et = find_et(voyager_h5, config, gulp_size=2**20)
     print(hits_et)
 
+def test_pipeline_to_db():
+    config['pipeline']['n_boxcar'] = 1
+    hits_et = find_et(voyager_h5, 
+                        config, 
+                        gulp_size=2**20,
+                        filename_out='test_voyager.hitdb'
+                        )
+    print(hits_et)   
+
+
 if __name__ == "__main__":
-    test_pipeline()
+    #test_pipeline()
+    test_pipeline_to_db()

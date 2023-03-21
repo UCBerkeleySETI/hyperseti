@@ -38,7 +38,8 @@ class DataArray(object):
         scales: dict of {dim: DimensionScale}
         attrs: dict of metadata attributes (can be anything)
     """
-    def __init__(self, data, dims, scales, attrs, units=None, slice_info=None, parent_shape=None):
+    def __init__(self, data, dims, scales, attrs, units=None, 
+                 slice_info=None, parent_shape=None):
         
         # Check correct setup
         assert isinstance(attrs, dict)
@@ -55,6 +56,8 @@ class DataArray(object):
         self.dims   = dims
         self.scales = scales
         self.units  = units
+
+        self._filename = None       # Filenames may optionally be added as a hidden value
         
         for dim in dims:
             self.__dict__[dim] = self.scales[dim]

@@ -11,7 +11,7 @@ from .log import get_logger
 logger = get_logger('hyperseti.filter')
 
 
-def apply_boxcar(data: cp.ndarray, boxcar_size: int=1, axis: int=1, mode: str='mean') -> cp.ndarray:
+def apply_boxcar(data: cp.ndarray, boxcar_size: int=1, axis: int=1, mode: str='gaussian') -> cp.ndarray:
     """ Apply moving boxcar filter and renormalise by sqrt(boxcar_size)
     
     Boxcar applies a moving MEAN to the data. 

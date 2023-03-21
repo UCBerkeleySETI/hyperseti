@@ -1,13 +1,15 @@
+from __future__ import annotations  # Treat type hints as strings to avoid circular import
+
 import pandas as pd
 import cupy as cp
 import numpy as np
 import pylab as plt
-
 from astropy import units as u
 
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
 from hyperseti.data_array import DataArray
 from hyperseti.dedoppler import dedoppler, calc_delta_dd
+
 
 class HitBrowser(object):
     """ Class for browsing hits after running pipeline 
@@ -30,6 +32,18 @@ class HitBrowser(object):
     
     def __repr__(self):
         return f"< HitBrowser: {self.data_array.attrs['source']} N_hits: {len(self.hit_table)} >"
+
+    def to_db(self, db: HitDatabase, obs_id: str):
+        """ Write to database 
+        
+        Args:
+            db (HitDatabase or str): HitDatabase object, OR a filename string.
+            obs_id (str): Name of observation within HitDatabase
+        """
+        if isinstance(db, str):
+            from hyperseti.io import hit_db   # Avoid circular import
+            db = hit_db.HitDatabase(db, mode='w')
+        db.add_obs(obs_id, self.hit_table, input_filename=self.data_array._filename)
     
     def extract_hit(self, hit_idx: int, padding: int, space='cpu') -> DataArray:
         """ Extract a hit from the data_array 
@@ -145,8 +159,6 @@ class HitBrowser(object):
         
         if overlay_hit:
             self._overlay_hit(hit_idx)
-
-
 
         
 

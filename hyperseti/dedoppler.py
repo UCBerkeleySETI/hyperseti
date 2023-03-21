@@ -238,7 +238,7 @@ def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None
 
         # Apply boxcar filter
         if boxcar_size > 1:
-            d_gpu = apply_boxcar(d_gpu, boxcar_size=boxcar_size, mode='sum')
+            d_gpu = apply_boxcar(d_gpu, boxcar_size=boxcar_size, mode='gaussian')
 
         # Allocate GPU memory for dedoppler data
         if N_beam > 1:

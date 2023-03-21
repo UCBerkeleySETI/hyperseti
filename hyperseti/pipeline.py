@@ -13,14 +13,14 @@ from copy import deepcopy
 from .dedoppler import dedoppler, calc_ndrift
 from .normalize import normalize
 from .hits import hitsearch, merge_hits, create_empty_hits_table, blank_hits
-from .io import from_fil, from_h5, from_setigen
+from .io import load_data
+from .io.hit_db import HitDatabase
 from .kurtosis import sk_flag
 from .utils import attach_gpu_device, timeme
 from .blanking import blank_edges, blank_extrema
 from .hit_browser import HitBrowser
-from hyperseti.version import HYPERSETI_VERSION
-
-from hyperseti.data_array import DataArray
+from .version import HYPERSETI_VERSION
+from .data_array import DataArray
 
 #logging
 from .log import get_logger
@@ -127,6 +127,11 @@ class GulpPipeline(object):
             self.data_array = normalize(self.data_array, mask=mask, poly_fit=poly_fit)
             self.mask = mask
 
+            pp_dict = self.data_array.attrs['preprocess']    # This is added by normalize()
+            proglog.info(f"\tPreprocess mean:       {pp_dict['mean']}")
+            proglog.info(f"\tPreprocess STD:        {pp_dict['std']}")
+            proglog.info(f"\tPreprocess flagged:    {pp_dict.get('flagged_fraction', 0):.2f}%")
+
         # Blank edges 
         if self.config['preprocess'].get('blank_edges', 0):
             logger.info(f"GulpPipeline.preprocess: Applying edge blanking")
@@ -136,12 +141,7 @@ class GulpPipeline(object):
         if self.config['preprocess'].get('blank_extrema'):
             logger.info(f"GulpPipeline.preprocess: Blanking extremely bright signals")
             self.data_array = blank_extrema(self.data_array, **self.config['preprocess']['blank_extrema'])
-
-        # Proglog info
-        pp_dict = self.data_array.attrs['preprocess']
-        proglog.info(f"\tPreprocess mean:       {pp_dict['mean']}")
-        proglog.info(f"\tPreprocess STD:        {pp_dict['std']}")
-        proglog.info(f"\tPreprocess flagged:    {pp_dict['flagged_fraction']:.2f}%")
+        
 
     @timeme        
     def dedoppler(self):
@@ -169,11 +169,11 @@ class GulpPipeline(object):
         conf = deepcopy(self.config)        # This deepcopy avoids overwriting original threshold value
         boxcar_size = conf['dedoppler'].get('boxcar_size', 1)
         _threshold0 = conf['hitsearch']['threshold']
-        conf['hitsearch']['threshold'] = _threshold0 * np.sqrt(boxcar_size)
+        #conf['hitsearch']['threshold'] = _threshold0 * np.sqrt(boxcar_size)
         _peaks = hitsearch(self.dedopp, **conf['hitsearch'])
         
         if _peaks is not None:
-            _peaks['snr'] /= np.sqrt(boxcar_size)
+            #_peaks['snr'] /= np.sqrt(boxcar_size)
             proglog.info(f"\t Hits in gulp: {len(_peaks)}")
             self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
 
@@ -232,7 +232,8 @@ class GulpPipeline(object):
 @timeme
 def find_et(filename: str, 
             pipeline_config: dict, 
-            filename_out: str='hits.csv', 
+            filename_out: str=None, 
+            filetype_out: str=None,
             gulp_size: int=2**20, 
             sort_hits: bool=True,
             log_config: bool=False,
@@ -244,9 +245,10 @@ def find_et(filename: str,
     Wrapper for reading from a file and running run_pipeline() on all subbands within the file.
     
     Args:
-        filename (str): Name of input HDF5 file.
+        filename (str): Name of input HDF5 file. DataArray/setigen.Frame also supported.
         pipeline_config (dict): See findET.py command-line parameters.
-        filename_out (str): Name of output CSV file.
+        filename_out (str): Name of output CSV file (optional)
+        filetype_out (str): Type of output - either 'csv' or 'hitdb'
         log_output (bool): If set, will log pipeline output to TXT file.
         log_config (bool): If set, will log pipeline configuration to YAML file.
         sort_hits (bool): Sort hits by SNR after hitsearch is complete.
@@ -278,16 +280,7 @@ def find_et(filename: str,
     #print(msg)
     logger.info(pipeline_config)
 
-    if isinstance(filename, DataArray):
-        ds = filename           # User has actually supplied a DataArray
-    if h5py.is_hdf5(filename):
-        ds = from_h5(filename)
-    elif sigproc.is_filterbank(filename):
-        ds = from_fil(filename)
-    elif isinstance(stg.Frame, filename):
-        ds = filename 
-    else:
-        raise RuntimeError("Only HDF5 and filterbank files currently supported")
+    ds = load_data(filename)
 
     if gulp_size > ds.data.shape[2]:
         logger.warning(f'find_et: gulp_size ({gulp_size}) > Num fine frequency channels ({ds.data.shape[2]}).  Setting gulp_size = {ds.data.shape[2]}')
@@ -302,15 +295,33 @@ def find_et(filename: str,
         proglog.info(f"Progress {counter}/{n_gulps}")
         pipeline = GulpPipeline(d_arr, pipeline_config, gpu_id=gpu_id)
         hits = pipeline.run()
+        
+        # Add some runtime info
+        if len(hits) > 0:
+            hits['gulp_idx']     = counter
+            hits['gulp_size']    = gulp_size
+            hits['hits_in_gulp'] = len(hits)
+
+            if 'preprocess' in d_arr.attrs.keys():
+                for beam_idx in range(d_arr.shape[1]):
+                    hits[f'b{beam_idx}_gulp_mean'] = cp.asnumpy(d_arr.attrs['preprocess']['mean'][beam_idx])
+                    hits[f'b{beam_idx}_gulp_std']  = cp.asnumpy(d_arr.attrs['preprocess']['std'][beam_idx])
+                    hits[f'b{beam_idx}_gulp_flag_frac'] = cp.asnumpy(d_arr.attrs['preprocess'].get('flagged_fraction', 0))
+
         out.append(hits)
-    
     dframe = pd.concat(out)
 
     if sort_hits:
         dframe = dframe.sort_values('snr', ascending=False).reset_index(drop=True)
 
     if filename_out is not None:
-        dframe.to_csv(filename_out, index=False)
+        if filetype_out is None:
+            filetype_out = 'csv' if filename_out.endswith('csv') else 'hitdb'
+        if filetype_out.lower() == 'csv':
+            dframe.to_csv(filename_out, index=False)
+        elif filetype_out.lower() in ('h5', 'db', 'hitdb', 'hdf5'):
+            db = HitDatabase(filename_out, mode='w')
+            db.add_obs(os.path.basename(filename), dframe, input_filename=filename)
 
     if log_config:
         print(f"find_et: Pipeline runtime config logged to {config_out}")
