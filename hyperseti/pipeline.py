@@ -170,6 +170,11 @@ class GulpPipeline(object):
         boxcar_size = conf['dedoppler'].get('boxcar_size', 1)
         _threshold0 = conf['hitsearch']['threshold']
         #conf['hitsearch']['threshold'] = _threshold0 * np.sqrt(boxcar_size)
+
+        # Check if in ddsk mode, and if so, pass data on to hitsearch
+        if conf['dedoppler'].get('kernel', 'dedoppler') == 'ddsk':
+            conf['hitsearch']['sk_data'] = self.dedopp_sk
+
         _peaks = hitsearch(self.dedopp, **conf['hitsearch'])
         
         if _peaks is not None:
