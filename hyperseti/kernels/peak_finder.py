@@ -159,6 +159,8 @@ class PeakFinder(object):
         maxidx_t = np.zeros(N_chan // K, dtype='int32')
         
         self.K = K
+        self.N_chan = N_chan
+        self.N_time = N_time
         
         # Allocate on GPU
         self.maxval_gpu = cp.asarray(maxval)
@@ -170,12 +172,16 @@ class PeakFinder(object):
     
     def execute(self, d_gpu: cp.ndarray):
         """ Execute peak finder """
+        try:
+            assert d_gpu.shape == (self.N_time, self.N_chan)
+        except AssertionError:
+            raise RuntimeError("Array dimensions do not match those passed during init()")
         find_max_1D(d_gpu, self.maxval_gpu, self.maxidx_gpu)
         find_max_reduce(self.maxval_gpu, self.maxidx_gpu, self.maxval_k_gpu, 
                         self.maxidx_f_gpu, self.maxidx_t_gpu, self.K)
         return self.maxval_k_gpu, self.maxidx_f_gpu, self.maxidx_t_gpu
     
-    def find_peaks(self, d_gpu: cp.ndarray, return_space='cpu'):
+    def find_peaks(self, d_gpu: cp.ndarray, return_space: str='cpu'):
         """ Find peaks in data 
         
         Args:
@@ -187,8 +193,42 @@ class PeakFinder(object):
         else:
             return cp.asnumpy(self.maxval_k_gpu), cp.asnumpy(self.maxidx_f_gpu), cp.asnumpy(self.maxidx_t_gpu)
 
+    def hitsearch(self, d_arr: cp.ndarray, threshold: float, min_spacing: float, beam_id: int=0, return_space: str='cpu'):
+        """ Find peaks in data above threshold
 
-    
+        Also applies a third-stage filter to ensure hits have a minimum spacing
+        
+        Args:
+            d_gpu (cp.ndarray): 2D data array to search
+        """
+        if d_arr.shape[1] > 1:
+            d_gpu = cp.copy(d_arr[:, beam_id])
+        else:
+            d_gpu = d_arr.squeeze()
+
+        self.execute(d_gpu)
+
+        mask  = self.maxval_k_gpu > threshold
+        hits  = self.maxval_k_gpu[mask]
+        idx_f = self.maxidx_f_gpu[mask]
+        idx_t = self.maxidx_t_gpu[mask]
+
+        if len(hits) >= 1e9:
+            # Now we want to look for any hits that are spaced by < K
+            # (This is possible if hits are near edge of search space)
+            f_spacing = cp.diff(idx_f)
+            mask = f_spacing > min_spacing
+            mask = cp.concatenate((cp.asarray([True, ]), mask))
+            hits = hits[mask]
+            idx_f = idx_f[mask]
+            idx_t = idx_t[mask]
+
+        if return_space == 'cpu':
+            return cp.asnumpy(hits), cp.asnumpy(idx_f), cp.asnumpy(idx_t)
+        else:
+            return hits, idx_f, idx_t
+
+
     def __del__(self):
         """ Free memory when deleted 
         

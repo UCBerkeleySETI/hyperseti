@@ -47,7 +47,7 @@ def test_with_voyager():
     try:
         print("hyperseti find_et from file {} .....".format(voyager_h5))
         update_levels(logbook.WARNING, [])
-        time_logger.level = logbook.INFO
+        #time_logger.level = logbook.INFO
 
         config = {
             'preprocess': {

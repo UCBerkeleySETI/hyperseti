@@ -1,6 +1,13 @@
 import numpy as np
 import cupy as cp
 from hyperseti.kernels.peak_finder import PeakFinder
+from hyperseti.normalize import normalize
+from hyperseti.io import from_h5
+
+try:
+    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
+except:
+    from file_defs import synthetic_fil, test_fig_dir, voyager_h5
 
 def find_max_np(a, K):
     """ numpy-based kernel for testing """
@@ -95,5 +102,19 @@ def test_peak_kernel():
     assert np.allclose(maxidx_f_cpu, maxidx_f_gpu)
     assert np.allclose(maxidx_t_cpu, maxidx_t_gpu)
 
+    return  maxval_gpu, maxidx_f_gpu, maxidx_t_gpu 
+
+def test_hitsearch():
+    v = from_h5(voyager_h5)
+    vs = v.isel({'frequency': slice(0, 2**20)})
+    vs.data = cp.asarray(vs.data)
+    vs = normalize(vs, poly_fit=5)
+
+    pf = PeakFinder()
+    pf.init(N_chan=vs.frequency.n_step, N_time=vs.time.n_step, K=32)
+    mv, f_idx, t_idx = pf.hitsearch(vs.data, threshold=3, min_spacing=100)
+    print(mv, f_idx, t_idx)
+
 if __name__ == "__main__":
-    test_peak_kernel()
+     #test_peak_kernel()
+     test_hitsearch()
