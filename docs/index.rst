@@ -10,7 +10,12 @@ Welcome to hyperseti's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-
+   usage/quickstart
+   usage/config
+   usage/data_array
+   pipeline/preprocessing
+   pipeline/dedoppler
+   pipeline/hitsearch
 
 Indices and tables
 ==================
