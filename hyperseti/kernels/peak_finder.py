@@ -209,24 +209,42 @@ class PeakFinder(object):
         self.execute(d_gpu)
 
         mask  = self.maxval_k_gpu > threshold
-        hits  = self.maxval_k_gpu[mask]
-        idx_f = self.maxidx_f_gpu[mask]
-        idx_t = self.maxidx_t_gpu[mask]
+        hits  = cp.asnumpy(self.maxval_k_gpu[mask])
+        idx_f = cp.asnumpy(self.maxidx_f_gpu[mask])
+        idx_t = cp.asnumpy(self.maxidx_t_gpu[mask])
 
-        if len(hits) >= 1e9:
-            # Now we want to look for any hits that are spaced by < K
-            # (This is possible if hits are near edge of search space)
-            f_spacing = cp.diff(idx_f)
-            mask = f_spacing > min_spacing
-            mask = cp.concatenate((cp.asarray([True, ]), mask))
-            hits = hits[mask]
-            idx_f = idx_f[mask]
-            idx_t = idx_t[mask]
-
-        if return_space == 'cpu':
-            return cp.asnumpy(hits), cp.asnumpy(idx_f), cp.asnumpy(idx_t)
+        if len(hits) < 1:
+            return hits, idx_f, idx_t       # return empty lists
         else:
-            return hits, idx_f, idx_t
+            df = np.column_stack((np.arange(len(hits)), hits, idx_f, idx_t))
+
+            ## Sort into groups
+            groups = []
+            cur = df[0]
+            g = [cur, ]
+
+            for row in df[1:]:
+                if row[2] - cur[2] < min_spacing:
+                    g.append(row)
+                else:
+                    groups.append(g)
+                    g = [row, ]
+                cur = row
+            groups.append(g)
+
+            df = []
+            for g in groups:
+                if len(g) == 1:
+                    df.append(g[0])
+                else:
+                    mv, mi = g[0][1], 0
+                    for i, h in enumerate(g[1:]):
+                        if mv < h[1]:
+                            mv, mi = h[1], i + 1 
+                    df.append(g[mi])
+            df = np.array(df)        
+
+            return df[:, 1], df[:, 2].astype('int32'), df[:, 3].astype('int32')
 
 
     def __del__(self):
@@ -241,3 +259,7 @@ class PeakFinder(object):
         self.maxidx_f_gpu = None
         self.maxidx_t_gpu = None
         mempool.free_all_blocks()
+
+
+import numpy as np
+

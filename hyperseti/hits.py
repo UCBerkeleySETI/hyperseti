@@ -115,24 +115,26 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
     
     drift_trials = np.asarray(dedopp_array.drift_rate.data)
 
+    # TODO: Get this out of loop? 
+    # Set kernel size to be 2^(N-1)
+    K = 2**(int(np.log2(min_fdistance)))
+    pf = PeakFinder()
+    pf.init(N_chan=dedopp_array.shape[2], N_time=dedopp_array.shape[0], K=K)  
 
 
     t0 = time.time()
     dfs = []
     for beam_idx in range(dedopp_data.shape[1]):
 
-
-        # Initialize peak finder
-        # TODO: Get this out of loop? 
-        pf = PeakFinder()
-
-        # Set kernel size to be 2^(N-1)
-        K = 2**(int(np.log2(min_fdistance)))
-        pf.init(N_chan=dedopp_array.shape[2], N_time=dedopp_array.shape[0], K=K)  
-        intensity, fcoords, dcoords = pf.hitsearch(dedopp_data, beam_id=beam_idx, threshold=threshold, min_spacing=min_fdistance)
-
         ## TODO: Can we get rid of this copy?
-        #imgdata = cp.copy(cp.expand_dims(dedopp_data[:, beam_idx, :].squeeze(), 1))
+        if dedopp_data.shape[1] > 1:
+            imgdata = cp.copy(cp.expand_dims(dedopp_data[:, beam_idx, :].squeeze(), 1))
+        else:
+            imgdata = dedopp_data.squeeze()
+
+        # Run peak find
+        intensity, fcoords, dcoords = pf.hitsearch(dedopp_data, beam_id=beam_idx, threshold=threshold, min_spacing=min_fdistance)
+        #print(intensity, fcoords, dcoords)
         #intensity, fcoords, dcoords = find_peaks_argrelmax(imgdata, threshold=threshold, order=min_fdistance)
 
         t1 = time.time()
