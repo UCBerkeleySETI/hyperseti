@@ -1,7 +1,12 @@
 ## hyperseti
 
 <p align="right">
-[![Documentation Status](https://readthedocs.org/projects/hyperseti/badge/?version=latest)](https://hyperseti.readthedocs.io/en/latest/?badge=latest) [![codecov](https://codecov.io/gh/UCBerkeleySETI/hyperseti/branch/master/graph/badge.svg?token=YGW53OTFQA)](https://codecov.io/gh/UCBerkeleySETI/hyperseti)
+<a href="https://codecov.io/github/UCBerkeleySETI/hyperseti" > 
+ <img src="https://codecov.io/github/UCBerkeleySETI/hyperseti/branch/master/graph/badge.svg?token=YGW53OTFQA"/> 
+ </a>
+<a href='https://hyperseti.readthedocs.io/en/latest/?badge=latest'>
+    <img src='https://readthedocs.org/projects/hyperseti/badge/?version=latest' alt='Documentation Status' />
+</a>
 </p>
 
 A brute-force GPU dedoppler code and hit search package for technosignature searches.
