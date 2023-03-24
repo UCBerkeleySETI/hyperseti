@@ -29,7 +29,7 @@ def load_data(filename: str) -> DataArray:
             ds = from_fil(filename)
         else:
             raise RuntimeError("Only HDF5/filterbank files or DataArray/setigen.Frame objects are currently supported")
-    elif isinstance(stg.Frame, filename):
+    elif isinstance(filename, stg.Frame):
         ds = from_setigen(filename)
     else:
         raise RuntimeError("Only HDF5/filterbank files or DataArray/setigen.Frame objects are currently supported")
