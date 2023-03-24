@@ -21,10 +21,13 @@ def load_data(filename: str) -> DataArray:
     """
     if isinstance(filename, DataArray):
         ds = filename           # User has actually supplied a DataArray
-    elif h5py.is_hdf5(filename):
-        ds = from_h5(filename)
-    elif sigproc.is_filterbank(filename):
-        ds = from_fil(filename)
+    elif isinstance(filename, str):
+        if h5py.is_hdf5(filename):
+            ds = from_h5(filename)
+        elif sigproc.is_filterbank(filename):
+            ds = from_fil(filename)
+        else:
+            raise RuntimeError("Only HDF5/filterbank files or DataArray/setigen.Frame objects are currently supported")
     elif isinstance(stg.Frame, filename):
         ds = filename 
     else:
