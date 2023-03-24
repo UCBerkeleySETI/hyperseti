@@ -1,6 +1,7 @@
 import pylab as plt
 import cupy as cp
 import numpy as np
+import os
 
 from hyperseti.io import from_fil, from_h5
 from hyperseti.pipeline import logger
@@ -63,15 +64,21 @@ def test_pipeline():
     print(hits_et)
 
 def test_pipeline_to_db():
-    config['pipeline']['n_boxcar'] = 1
-    hits_et = find_et(voyager_h5, 
-                        config, 
-                        gulp_size=2**20,
-                        filename_out='test_voyager.hitdb'
-                        )
-    print(hits_et)   
+    try:
+        config['pipeline']['n_boxcar'] = 1
+        hits_et = find_et(voyager_h5, 
+                            config, 
+                            gulp_size=2**20,
+                            filename_out='test_voyager.hitdb'
+                            )
+        print(hits_et)   
+    finally:
+        fns = 'test_voyager.hitdb'
+        for fn in fns:
+            if os.path.exists(fn):
+                os.remove(fn)
 
 
 if __name__ == "__main__":
-    #test_pipeline()
+    test_pipeline()
     test_pipeline_to_db()

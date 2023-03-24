@@ -177,8 +177,11 @@ class PeakFinder(object):
         except AssertionError:
             raise RuntimeError("Array dimensions do not match those passed during init()")
         find_max_1D(d_gpu, self.maxval_gpu, self.maxidx_gpu)
+        cp.cuda.Device().synchronize()
         find_max_reduce(self.maxval_gpu, self.maxidx_gpu, self.maxval_k_gpu, 
                         self.maxidx_f_gpu, self.maxidx_t_gpu, self.K)
+        cp.cuda.Device().synchronize()
+
         return self.maxval_k_gpu, self.maxidx_f_gpu, self.maxidx_t_gpu
     
     def find_peaks(self, d_gpu: cp.ndarray, return_space: str='cpu'):
@@ -216,6 +219,10 @@ class PeakFinder(object):
         if len(hits) < 1:
             return hits, idx_f, idx_t       # return empty lists
         else:
+            # Final stage: we need to make sure only one maxima within
+            # The minimum spacing. We loop through and assign to groups
+            # Then find the maximum for each group.
+            # TODO: Speed up this code
             df = np.column_stack((np.arange(len(hits)), hits, idx_f, idx_t))
 
             ## Sort into groups
@@ -252,14 +259,11 @@ class PeakFinder(object):
         
         See https://docs.cupy.dev/en/stable/user_guide/memory.html
         """
-        mempool = cp.get_default_memory_pool()
-        self.maxval_gpu   = None
-        self.maxidx_gpu   = None
-        self.maxval_k_gpu = None
-        self.maxidx_f_gpu = None
-        self.maxidx_t_gpu = None
-        mempool.free_all_blocks()
-
-
-import numpy as np
-
+        #mempool = cp.get_default_memory_pool()
+        #self.maxval_gpu   = None
+        #self.maxidx_gpu   = None
+        #self.maxval_k_gpu = None
+        #self.maxidx_f_gpu = None
+        #self.maxidx_t_gpu = None
+        #mempool.free_all_blocks()
+        pass

@@ -99,7 +99,7 @@ def test_with_voyager():
 
     finally:
         for file_ext in ('.log', '.csv', '.yaml'):
-            cleanup=False
+            cleanup=True
             if cleanup:
                 if os.path.exists('test_voyager_hits' + file_ext):
                     os.remove('test_voyager_hits' + file_ext)

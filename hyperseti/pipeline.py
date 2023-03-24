@@ -219,11 +219,12 @@ class GulpPipeline(object):
            
             if n_blank > 1:
                 if n_hits_iter > n_hits_last_iter:
-                    logger.info(f"GulpPipeline.run: blanking hits, (iteration {blank_count + 1} / {n_blank})")
+                    #proglog.info(self.peaks)
+                    proglog.info(f"GulpPipeline.run: blanking hits, (iteration {blank_count + 1} / {n_blank})")
                     self.data_array = blank_hits(self.data_array, self.peaks)
                     n_hits_last_iter = n_hits_iter
                 else:
-                    logger.info(f"GulpPipeline.run: No new hits found, breaking! (iteration {blank_count + 1} / {n_blank})")
+                    proglog.info(f"GulpPipeline.run: No new hits found, breaking! (iteration {blank_count + 1} / {n_blank})")
                     break
 
         t1 = time.time()

@@ -204,12 +204,13 @@ def test_find_et():
             'apply_smearing_corr': False,
         },
         'hitsearch': {
-            'threshold': 15,
+            'threshold': 30,
             'min_fdistance': None
         },
         'pipeline': {
             'n_boxcar': 2,
-            'merge_boxcar_trials': True
+            'merge_boxcar_trials': True,
+            'n_blank': 2
         }
     }
 
@@ -226,17 +227,23 @@ def test_find_et():
 
 
 def test_find_et_cmd_tool():
-    from hyperseti.findET import cmd_tool
+    try:
+        from hyperseti.findET import cmd_tool
 
-    args = [voyager_h5, 
-            "-o", "hits.csv", 
-            "-c", voyager_yaml, 
-            ]
+        args = [voyager_h5, 
+                "-o", "hits.csv", 
+                "-c", voyager_yaml, 
+                ]
 
-    cmd_tool(args)
+        cmd_tool(args)
+    finally:
+        fns = 'hits.csv', 'hits.log'
+        for fn in fns:
+            if os.path.exists(fn):
+                os.remove(fn)
 
 if __name__ == "__main__":
-    #test_hitsearch()
-    #test_hitsearch_multi()
+    test_hitsearch()
+    test_hitsearch_multi()
     test_find_et()
     test_find_et_cmd_tool()
