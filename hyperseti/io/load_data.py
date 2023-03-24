@@ -21,7 +21,7 @@ def load_data(filename: str) -> DataArray:
     """
     if isinstance(filename, DataArray):
         ds = filename           # User has actually supplied a DataArray
-    if h5py.is_hdf5(filename):
+    elif h5py.is_hdf5(filename):
         ds = from_h5(filename)
     elif sigproc.is_filterbank(filename):
         ds = from_fil(filename)

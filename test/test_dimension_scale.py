@@ -1,6 +1,7 @@
 from hyperseti.dimension_scale import DimensionScale, TimeScale
 import numpy as np
 from astropy import units as u
+import pytest
 
 def test_dimension_scale():
     print("\n-------TESTING DimensionScale-------")
@@ -26,6 +27,7 @@ def test_dimension_scale():
     print(ds[10:20:2])
     print(np.asarray(ds[10:20:2]))
     print(ds_arr[5:9])
+    print(ds[6])
 
     # Check reverse indexing
     print(ds.index(1008))
@@ -98,15 +100,36 @@ def test_time_scale():
     print(ts.generate())
     print(ts[0:8:2])
     print(ts[0:8:2].generate())
+    print(ts[0])
     
     # Subtracting times will give a DimensionScale
     # Although this isn't something that makes much sense to do in reality
     ts1 = TimeScale('time', tstart, tsamp, 16, time_format='mjd', time_delta_format='sec')
     ts2 = TimeScale('time', tstart + 1, tsamp, 16, time_format='mjd', time_delta_format='sec')
     print(ts2 - ts1)
+
+def test_raises():
+    print("\n-------TESTING Error Raising-------")
+    ds = DimensionScale('frequency', 1000, 0.1, n_step=100, units='MHz')
+    ts = TimeScale('time', 60000, 1.0, 16, time_format='mjd', time_delta_format='sec')
+
+    with pytest.raises(IndexError):
+        ds[100000]
+        ts[100000]
     
+    with pytest.raises(TypeError): 
+        # TypeError: no implementation found for 'numpy.mean' on types that
+        # implement __array_function__: [<class 'hyperseti.dimension_scale.DimensionScale'>]
+        np.mean(ds)
+    
+    with pytest.raises(ValueError):
+        ds.index(-1)
+        ds.index(np.arange(-1, 1, 0.1))
+        ds.index(1001, -9)
+  
 
 if __name__ == "__main__":
     test_dimension_scale()
     test_time_scale()
     test_scalar_add()
+    test_raises()

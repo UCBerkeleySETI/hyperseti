@@ -76,6 +76,10 @@ def test_dedoppler():
         darray = from_fil(synthetic_fil)
         darray.data = cp.asarray(darray.data[:])
 
+        # test kernels
+        for kernel in ('dedoppler', 'kurtosis', 'ddsk'):
+            dedoppler(darray, boxcar_size=1, max_dd=1.0, plan='optimal', kernel=kernel)
+
         dedopp_array = dedoppler(darray, boxcar_size=1, max_dd=1.0, plan='optimal')
 
         dedopp, metadata = split_metadata(dedopp_array)

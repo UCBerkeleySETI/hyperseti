@@ -1,4 +1,4 @@
-from hyperseti.io import from_setigen
+from hyperseti.io import from_setigen, load_data
 import setigen as stg
 from astropy import units as u
 
@@ -31,6 +31,14 @@ def test_setigen():
                             stg.constant_bp_profile(level=1))
 
     d = from_setigen(frame)
+
+    load_data(frame)
+
+def test_load_data():
+    with pytest.raises(RuntimeError):
+        a = np.array([1,2,3])
+        load_data(a)
     
 if __name__ == "__main__":
     test_setigen()
+    test_load_data()

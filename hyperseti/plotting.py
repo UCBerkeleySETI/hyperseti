@@ -94,6 +94,6 @@ def overlay_hits(hits, xaxis='channel', yaxis='driftrate', marker='x', c='red'):
     if yaxis == 'driftrate':
         y = hits['drift_rate']
     elif yaxis == 'driftidx':
-        y = hits['drift_idx']
+        y = hits['driftrate_idx']
     
     plt.scatter(x=x, y=y, marker=marker, c=c)
