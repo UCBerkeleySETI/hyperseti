@@ -104,9 +104,21 @@ def test_time_scale():
     ts1 = TimeScale('time', tstart, tsamp, 16, time_format='mjd', time_delta_format='sec')
     ts2 = TimeScale('time', tstart + 1, tsamp, 16, time_format='mjd', time_delta_format='sec')
     print(ts2 - ts1)
+
+def test_index():
+    # Test index() method works with quantities
+    ds1 = DimensionScale('frequency', 1000, 0.1, n_step=100, units='MHz')
+    q = 1001 * u.MHz
+     
+    print(ds1.index(q))
+    q = np.array([1000, 1001, 1002.11]) * 1e6 * u.Hz
+    print(ds1.index(q))
+    assert np.allclose(ds1.index(q), [0, 10, 21])
     
+
 
 if __name__ == "__main__":
     test_dimension_scale()
     test_time_scale()
     test_scalar_add()
+    test_index()

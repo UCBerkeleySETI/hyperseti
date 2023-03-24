@@ -61,12 +61,16 @@ def blank_hit(data_array: DataArray, f0: u.Quantity, drate: u.Quantity, padding:
     TODO: Add check if drate * time_step > padding
     """
     n_time, n_pol, n_chans = data_array.data.shape
-    f_start = data_array.frequency.start.to('Hz').value
+
+    if isinstance(drate, u.Quantity):
+        drate = drate.to('Hz/s').value
+ 
     f_step  = data_array.frequency.step.to('Hz').value
     t_step  = data_array.time.step.to('s').value
 
-    i0     = int((f0 - f_start) / f_step)
-    i_step =  t_step * drate / f_step
+    i0 = data_array.frequency.index(f0)
+    i_step = t_step * drate / f_step
+
     i_off  = (i_step * cp.arange(n_time) + i0).astype('int64')
     
     min_padding = int(abs(i_step) + 1)  # i_step == frequency smearing
