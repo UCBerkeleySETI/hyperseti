@@ -2,6 +2,7 @@ from .hdf5 import from_h5
 from .filterbank import from_fil
 from .setigen import from_setigen
 from ..data_array import from_metadata, DataArray
+import setigen as stg
 
 import h5py
 
@@ -29,7 +30,7 @@ def load_data(filename: str) -> DataArray:
         else:
             raise RuntimeError("Only HDF5/filterbank files or DataArray/setigen.Frame objects are currently supported")
     elif isinstance(stg.Frame, filename):
-        ds = filename 
+        ds = from_setigen(filename)
     else:
         raise RuntimeError("Only HDF5/filterbank files or DataArray/setigen.Frame objects are currently supported")
     return ds

@@ -2,6 +2,7 @@ from hyperseti.io import from_setigen, load_data
 import setigen as stg
 from astropy import units as u
 import pytest
+import numpy as np
 
 def test_setigen():
     """ Generate a setigen frame and convert it into a DataArray"""
