@@ -1,5 +1,22 @@
 ## Preprocessing
 
+Preprocessing prepares the data for dedoppler searching.
+
+### Normalization
+
+Normalizing the data refers to converting it into units of signal-to-noise, by applying
+
+```
+data =  (data - mean(data)) / stdev(data)
+```
+
+When applying normalization, it is important to first flag outlier data points (i.e. radio interference)
+which would bias the calculation. A frequency-dependent bandpass correction can also be applied. 
+
+Hyperseti uses spectral kurtosis flagging to find any points which are not noise-like and flag them. 
+Note that hyperseti does *not* remove these signals from the data when searching for hits, we just make sure
+they are not used when calculating S/N.
+
 ### Spectral Kurtosis flagging
 
 [Kurtosis](https://en.wikipedia.org/wiki/Kurtosis) is essentially a statistical measure of how un-noiselike data is.
@@ -40,3 +57,14 @@ estimate of the true noise.
 ```
 
 Where `N_acc` is the number of accumulations per time bin, and `n` is the length of the x array.
+
+### Blanking
+
+While the SK flagging does not blank data (i.e. set it to zero), there are two methods that do blank data:
+
+1) `config['preprocessing']['blank_extrema'] = MAX_SNR`: This will blank any stupidly bright signals with a S/N greater than user-supplied `float=MAX_SNR`.
+2) `config['preprocessing']['blank_edges'] = N_CHAN`: This blanks the edges of the gulp. Can be useful if the bandpass falls off steeply at the edges. Polynomial fits are also generally rubbish at the band edges which can cause issues if the edges are not flagged.
+
+### Bandpass removal
+
+Hyperseti currently has one method for bandpass removal: polynomial subtraction. Use the `config['preprocessing']['poly_fit'] = N` parameter to apply. 
