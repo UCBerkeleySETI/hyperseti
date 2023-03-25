@@ -6,6 +6,11 @@
 Hyperseti: a narrowband radio technosignature search code
 =========================================================
 
+.. image:: figs/hyperseti-robot-web.jpg
+   :width: 75 %
+   :alt: hyperseti robot searching for signals
+   :align: center
+
 `Hyperseti` is a GPU-accelerated code for searching radio astronomy spectral datasets for 
 narrowband technosignatures that indicate the presence of intelligent (i.e. technologically capable)
 life beyond Earth. It was developed as part of the Breakthrough Listen initiative, which seeks to 
