@@ -97,7 +97,7 @@ The stepped plan is motivated primarily to reduce memory usage. In the stepped p
  
 The stepped plan is kinda similar to searching your data up to `T` drift trials, then iterative decimating the input data by a factor of 2 (aka 'frequency scrunching') and running the search again at higher drift rates. The number of trials needed is decreased by `O(log2(T))`.
 
-[!optimal-vs-stepped](https://user-images.githubusercontent.com/713251/227719265-2553f687-aebc-4c83-a923-5e304fec601b.png)
+![optimal-vs-stepped](https://user-images.githubusercontent.com/713251/227719265-2553f687-aebc-4c83-a923-5e304fec601b.png)
 
 ### Comparison to turboSETI
 
