@@ -9,10 +9,21 @@
 </a>
 </p>
 
-A brute-force GPU dedoppler code and hit search package for technosignature searches.
+`Hyperseti` is a GPU-accelerated code for searching radio astronomy spectral datasets for 
+narrowband technosignatures that indicate the presence of intelligent (i.e. technologically capable)
+life beyond Earth. It was developed as part of the Breakthrough Listen initiative, which seeks to 
+quantify the prevalence of intelligent life within the Universe.
+
+Hyperseti is centered around a brute-force dedoppler CUDA code, and has a Python-based frontend.
+Hyperseti is intended as the spiritual successor to the [turboSETI](https://github.com/UCBerkeleySETI/turbo_seti/)
+package. 
 
 
-#### Example 1: running the search pipeline on voyager data
+#### Example Usage
+
+The following code searches a filterbank file which contains telemetry data from the Voyager space mission 
+([data available here](http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.h5)).
+
 
 ```python
 from hyperseti.pipeline import find_et
@@ -47,7 +58,7 @@ hit_browser.view_hit(0, padding=128, plot='dual')
 
 ```
 
-#### Example 2: Inspecting a setigen Frame
+Hyperseti can natively load data generated with [setigen](https://github.com/bbrzycki/setigen):
 
 ```python
 import numpy as np
@@ -81,27 +92,9 @@ plt.tight_layout()
 
 ![image](https://user-images.githubusercontent.com/713251/164058073-88ccf3b1-b4a1-4160-b650-fca37770f96d.png)
 
-Can also search for hits in the dedoppler spectra:
-
-```python
-# ... run code from above ...  
-
-from hyperseti import  hitsearch
-hits = hitsearch(dedopp, threshold=100, min_fdistance=10)
-
-from hyperseti.plotting import overlay_hits
-imshow_dedopp(dedopp)
-overlay_hits(hits)
-```
-
-![image](https://user-images.githubusercontent.com/713251/164058025-ab8a3d7a-ffa5-4437-b01b-6c8d6a29cd7c.png)
-
-![image](https://user-images.githubusercontent.com/713251/164058051-9b511f50-d0d0-4058-b512-c062cc7d7964.png)
-
-
 ### Installation
 
-Theoretically, just type:
+Hyperseti requires a CUDA-capable GPU. To install, you should theoretically just need to type:
 
 ```
 pip install git+https://github.com/ucberkeleyseti/hyperseti
@@ -109,6 +102,7 @@ pip install git+https://github.com/ucberkeleyseti/hyperseti
 
 hyperseti uses the GPU heavily, so a working CUDA environment is needed, and
 requires Python 3.7 or above.
+
 hyperseti relies upon `cupy`, and currently uses a single function, 
 `argrelmax` from `cusignal`. These are part of [rapids](https://rapids.ai/start.html)
 and are easiest to install using `conda`. If starting from scratch, this should get you most of

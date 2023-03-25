@@ -3,8 +3,13 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to hyperseti's documentation!
-=====================================
+Hyperseti: a narrowband radio technosignature search code
+=========================================================
+
+`Hyperseti` is a GPU-accelerated code for searching radio astronomy spectral datasets for 
+narrowband technosignatures that indicate the presence of intelligent (i.e. technologically capable)
+life beyond Earth. It was developed as part of the Breakthrough Listen initiative, which seeks to 
+quantify the prevalence of intelligent life within the Universe.
 
 .. toctree::
    :maxdepth: 2
