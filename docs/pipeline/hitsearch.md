@@ -44,7 +44,7 @@ Our local maxima approach to finding hits requires setting a minimum distance wi
 
 An example of iterative blanking is show below; in the example, the highest S/N hit is blanked, then the data are searched again. As can be seen, hits hiding below the bright S/N hits become apparent.
 
-[!Iterative-blanking](https://user-images.githubusercontent.com/713251/227689177-42e81c48-53cc-4eb9-a8f9-4cea8ce37f2e.png)
+![Iterative-blanking](https://user-images.githubusercontent.com/713251/227689177-42e81c48-53cc-4eb9-a8f9-4cea8ce37f2e.png)
 
 Iterative blanking can be enabled by setting `config['pipeline']['n_blank']` to 1 or greater, where `n_blank` is the 
 number of iterations to apply. Note that if no new hits are found after blanking, the process will stop. 
