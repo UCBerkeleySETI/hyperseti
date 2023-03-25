@@ -49,3 +49,56 @@ An example of iterative blanking is show below; in the example, the highest S/N 
 Iterative blanking can be enabled by setting `config['pipeline']['n_blank']` to 1 or greater, where `n_blank` is the 
 number of iterations to apply. Note that if no new hits are found after blanking, the process will stop. 
 
+### Browsing hits
+
+Results from `find_et` are returned as a `HitBrowser`, which has a `view_hits()` method for viewing this, and an `extract_hits()` method for extracting hits. 
+
+A Pandas DataFrame of all hits found is attached as `hit_brower.hit_table`, and the data are accessible via `hit_browser.data_array`. 
+
+```python
+hit_browser = find_et(voyager_h5, config, gulp_size=2**20)
+display(hit_browser.hit_table)
+
+hit_browser.view_hit(0, padding=128, plot='dual')
+```
+
+![image](https://user-images.githubusercontent.com/713251/227728999-1bec6e2f-bfca-4ab7-ae59-d08010ad8a8d.png)
+
+
+### Storing hits in a `HitDatabase`
+
+Hyperseti implements a simple HDF5-backed database for storing hits from multiple observations. These files can be accessed via the `hyperseti.io.hit_db.HitDatabase` class. 
+
+The `HitDatabase` class provides:
+
+* `hit_db.list_obs()` - List all observations within the database file.
+* `hit_db.add_obs()`  - Add a new observation to database.
+* `hit_db.get_obs()`  - Retrieve hit data table from the database.
+* `get_obs_metadata()` - Retrieve metadata about an observation.
+* `hit_db.browse_obs()` - Return a `HitBrowser` object for given obs_id.
+
+#### Data model notes:
+
+Within the HDF5 file, a new group is created in the root for each observation.
+Table data are a column store, one dataset per column, i.e.:
+
+```
+GROUP "/" {
+    GROUP "proxima_cen" {
+        DATASET "beam_idx"
+        DATASET "boxcar_size"
+        DATASET "snr"
+        DATASET ...}
+    GROUP "alpha_cen" {
+        DATASET "beam_idx"
+        DATASET "boxcar_size"
+        DATASET "snr"
+        DATASET ...}
+    GROUP ... {
+        DATASET ...
+    }  
+}
+```
+
+The database may optionally provide paths to data files for each observation. Metadata are stored
+as attributes. 
