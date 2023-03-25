@@ -45,10 +45,22 @@ TLDR: Any frequency bins including constant tones (that don't drift) will have a
 Bins that are crossed by drifting tones will have high SK values. Bins with only noise will have
 SK values close to 1.
 
+#### Setting sigma
+
+Hyperseti does flagging on the log of SK values, using the following:
+
+```
+    std_log  = 2 / sqrt(N_acc)         # Based on setigen
+    mean_log = -1.25 / N_acc           # Based on setigen  
+    mask  = np.abs(log_sk) > abs(mean_log) + (std_log * n_sigma)
+```
+
+Where `N_acc` is the number of timesteps in the dynamic spectrum, and `n_sigma` number of stdev above which to flag,
+and (set by the user). Note the mean_log value is not canonical: it was arrived at by a fit to `setigen` noise data. 
+
 #### Why are we using SK flagging?
 
-We are using SK flagging when normalizing data. To normalize data, we want to compute the signal-to-noise ratio. By flagging anything with spurious SK values, we can get a good 
-estimate of the true noise.
+We are using SK flagging when normalizing data. To normalize data, we want to compute the signal-to-noise ratio. By flagging anything with spurious SK values, we can get a good estimate of the true noise.
 
 #### SK definition
 
