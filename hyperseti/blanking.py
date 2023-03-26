@@ -13,7 +13,6 @@ logger = get_logger('hyperseti.blanking')
 
 def blank_edges(data_array: DataArray, n_chan: int) -> DataArray:
     """ Blank n_chan at edge of data array 
-
     Args:
         data_array (DataArray): Data array to blank extrema in 
         n_chan (int): Number of channels to blank on left and right side
@@ -33,7 +32,6 @@ def blank_extrema(data_array: DataArray, threshold: float, do_neg: bool=False) -
         data_array (DataArray): Data array to blank extrema in 
         threshold (float): Values above which to blank as 'extrema'
         do_neg (bool): Blank less than negative threshold
-
     Returns:
         data (DataArray): blanked data array
     """
@@ -61,12 +59,16 @@ def blank_hit(data_array: DataArray, f0: u.Quantity, drate: u.Quantity, padding:
     TODO: Add check if drate * time_step > padding
     """
     n_time, n_pol, n_chans = data_array.data.shape
-    f_start = data_array.frequency.start.to('Hz').value
+
+    if isinstance(drate, u.Quantity):
+        drate = drate.to('Hz/s').value
+ 
     f_step  = data_array.frequency.step.to('Hz').value
     t_step  = data_array.time.step.to('s').value
 
-    i0     = int((f0 - f_start) / f_step)
-    i_step =  t_step * drate / f_step
+    i0 = data_array.frequency.index(f0)
+    i_step = t_step * drate / f_step
+
     i_off  = (i_step * cp.arange(n_time) + i0).astype('int64')
     
     min_padding = int(abs(i_step) + 1)  # i_step == frequency smearing
@@ -81,9 +83,7 @@ def blank_hit(data_array: DataArray, f0: u.Quantity, drate: u.Quantity, padding:
 
 def blank_hits(data_array: DataArray, df_hits: pd.DataFrame, padding: int=4) -> DataArray:
     """ Blank all hits in a data_array 
-
     Calls blank_hit() iteratively
-
     Args:
         data_array (DataArray): data array to apply blanking to
         df_hits (pd.DataFrame): pandas dataframe of hits to blank

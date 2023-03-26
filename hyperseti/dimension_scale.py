@@ -270,6 +270,8 @@ class DimensionScale(object):
         """ Lookup the closest index where DimensionScale equals value """
         #x = x0 + i * dx
         # i = (x - x0) / dx
+        if isinstance(val, Quantity):
+            val = val.to(self.units)
         if isinstance(val, np.ndarray):
             i = ( (val - self.val_start) / self.val_step).astype('int32')
             if np.min(i) < 0:

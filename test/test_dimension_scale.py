@@ -127,9 +127,19 @@ def test_raises():
         ds.index(np.arange(-1, 1, 0.1))
         ds.index(1001, -9)
   
+  def test_index():
+    # Test index() method works with quantities
+    ds1 = DimensionScale('frequency', 1000, 0.1, n_step=100, units='MHz')
+    q = 1001 * u.MHz
+
+    print(ds1.index(q))
+    q = np.array([1000, 1001, 1002.11]) * 1e6 * u.Hz
+    print(ds1.index(q))
+    assert np.allclose(ds1.index(q), [0, 10, 21])
 
 if __name__ == "__main__":
     test_dimension_scale()
     test_time_scale()
     test_scalar_add()
     test_raises()
+    test_index()
