@@ -130,7 +130,7 @@ class GulpPipeline(object):
             pp_dict = self.data_array.attrs['preprocess']    # This is added by normalize()
             proglog.info(f"\tPreprocess mean:       {pp_dict['mean']}")
             proglog.info(f"\tPreprocess STD:        {pp_dict['std']}")
-            proglog.info(f"\tPreprocess flagged:    {pp_dict.get('flagged_fraction', 0):.2f}%")
+            proglog.info(f"\tPreprocess flagged:    {pp_dict.get('flagged_fraction', 0) * 100:.2f}%")
 
         # Blank edges 
         if self.config['preprocess'].get('blank_edges', 0):
