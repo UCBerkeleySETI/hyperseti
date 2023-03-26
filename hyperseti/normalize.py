@@ -27,7 +27,7 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
     t0 = time.time()
     
     # Get rid of NaNs - TODO: figure out why there are NaNs ...
-    data_array.data = cp.nan_to_num(data_array.data, 0)
+    data_array.data = cp.nan_to_num(data_array.data)
     
     d_flag = cp.copy(data_array.data)
 
