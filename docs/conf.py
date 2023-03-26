@@ -14,6 +14,7 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
+from hyperseti import __version__
 
 # -- Project information -----------------------------------------------------
 
@@ -22,7 +23,7 @@ copyright = '2023, Danny C. Price'
 author = 'Danny C. Price'
 
 # The full version, including alpha/beta/rc tags
-release = '0.5.0'
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 
