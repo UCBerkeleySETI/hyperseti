@@ -77,7 +77,7 @@ class HitBrowser(object):
         else:
             chanX += abs(n_chan_drift) 
 
-        data_sel = self.data_array.isel(
+        data_sel = self.data_array.sel(
             {'frequency': slice(chan0, chanX)}
             )
         if space == 'cpu':

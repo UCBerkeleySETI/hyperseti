@@ -68,7 +68,7 @@ These will populate if you call the `isel()` method:
 
 ```python
 darr = from_h5('voyager_data.h5')
-dsel = darr.isel({'frequency': slice(0, 4096, 2), 'time': slice(1, 7)})
+dsel = darr.sel({'frequency': slice(0, 4096, 2), 'time': slice(1, 7)})
 ```
 
 Which returns a new DataArray:

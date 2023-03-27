@@ -199,9 +199,9 @@ class DataArray(object):
         
         Example usage:
             # Select every second sample along freq axis, from 0-1000
-            ds.isel({'frequency': slice(0, 1000, 2)})   
+            ds.sel({'frequency': slice(0, 1000, 2)})   
             # select first 4096 freq channels for first 10 timesteps
-            d_h5.isel({'frequency': slice(0, 4096), 'time': slice(0, 10)})
+            d_h5.sel({'frequency': slice(0, 4096), 'time': slice(0, 10)})
             
         """
         slices = []
@@ -263,7 +263,7 @@ class DataArray(object):
         
         for slices in itertools.product(*dim_slices):
             selector = {key: slice for key, slice in zip(dims, slices)}
-            yield self.isel(selector, space=space)
+            yield self.sel(selector, space=space)
 
     def apply_transform(self, transform, *args, **kwargs):
         """ Apply a tranformation function (e.g. np.log) to the data 
