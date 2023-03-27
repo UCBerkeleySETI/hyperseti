@@ -33,7 +33,7 @@ def test_data_array_basic():
     d = from_h5(voyager_h5)
     
     # Test slice data
-    sel = d.isel({'frequency': slice(8192, 8192+4096)})
+    sel = d.sel({'frequency': slice(8192, 8192+4096)})
     assert sel.shape == (16, 1, 4096)
     
     # Test iterate through chunks

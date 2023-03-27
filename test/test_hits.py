@@ -51,7 +51,7 @@ def test_blank_hits():
                             stg.constant_bp_profile(level=1))
 
     d = from_setigen(frame)
-    d = d.isel({'frequency': slice(0, 2**12)}, space='gpu')
+    d = d.sel({'frequency': slice(0, 2**12)}, space='gpu')
 
     config = {
         'preprocess': {
