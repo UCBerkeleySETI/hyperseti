@@ -1,0 +1,61 @@
+:root {
+/* CSS HEX */
+--seal-brown: #491f0cff;
+--hunyadi-yellow: #eeb95aff;
+--licorice: #1f1516ff;
+--russet: #834b26ff;
+--jet: #332e31ff;
+--brown: #a55a27ff;
+--seal-brown-2: #5f3017ff;
+--bistre: #381f18ff;
+--wenge: #675753ff;
+--wengelite: #70605C;
+--taupe: #4F4440;
+--cinereous: #87736E;
+--cinereouslite: #A3948F;
+--sienna: #DE7342;
+}
+
+h1 h2 h3 h4 h5 h6 {
+    color: var(--jet);
+}
+
+.pre {
+    color: var(--sienna);
+}
+
+.wy-side-nav-search, .wy-nav-top {
+     background: var(--licorice);
+}
+
+.wy-nav-side {
+    background: var(--jet);
+}
+
+.wy-menu-vertical p.caption {
+    color: var(--hunyadi-yellow);
+}
+
+.wy-breadcrumbs a {
+    color: var(--wengelite);
+}
+
+.wy-breadcrumbs a:visited {
+    color: var(--taupe);
+}
+
+.wy-breadcrumbs a:hover {
+    color: var(--cinerous);
+}
+
+.document a {
+    color: var(--cinereous);
+}
+
+.document a:visited {
+    color: var(--wengelite);
+}
+
+.document a:hover {
+    color: var(--cinereouslite);
+}
