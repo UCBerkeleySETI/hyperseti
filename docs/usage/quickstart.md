@@ -74,8 +74,30 @@ hit_browser.view_hit(0, padding=128, plot='dual')
 
 ### Loading files
 
+Hyperseti loads filterbank files in HDF5 and sigproc format, and can also generate a `DataArray` from a [setigen](https://github.com/bbrzycki/setigen) `Frame`. 
+
 ```python
-from hyperseti.io import from_h5
+from hypersetio.io import load_data         # Loads HDF5/Filterbank/setigen
+from hyperseti.io import from_h5            # Loads .h5 HDF5 files
+from hyperseti.io import from_fil           # Loads .fil files
+from hyperseti.io import from_setigen       # Converts setigen Frame into DataArray
 
 d = from_h5('path/to/data.h5')
+```
+
+### Loading 'duck' arrays
+
+A hyperseti `DataArray` can also be created from any array that acts like a Numpy array (i.e. using 'duck typing'), along with a metadata dictionary that defines its axes using `from_metadata()`. Similarly, once you have a `DataArray` you can split out its metadata using
+`data_array.split_metadata()`:
+
+```python
+metadata_in = {'frequency_start': 1000*u.MHz,
+               'time_start': Time(datetime.now()),
+               'time_step': 1.0*u.s, 
+               'frequency_step': 1.0*u.Hz,
+               'dims': ('time', 'beam_id', 'frequency')}
+
+test_data = np.zeros(shape=(16, 1, 2**20), dtype='float32')
+
+d_array = from_metadata(test_data, metadata_in)
 ```
