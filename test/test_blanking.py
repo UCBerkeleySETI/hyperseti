@@ -66,11 +66,12 @@ def test_blank_extrema():
 
 def test_blank_hits():
     d = generate_data_array_multihits()
+    start_idxs = 500, 700, 2048, 3000
     d = d.sel({'frequency': slice(0, 2**12)}, space='gpu')
 
     config = {
         'preprocess': {
-            'sk_flag': True,
+            'sk_flag': False,
             'normalize': True,
         },
         'sk_flag': {
@@ -82,9 +83,10 @@ def test_blank_hits():
             'min_dd': None,
             'apply_smearing_corr': False
         },
+
         'hitsearch': {
-            'threshold': 3,
-            'min_fdistance': 100
+            'threshold': 25,
+            'min_fdistance': None
         },
         'pipeline': {
             'n_boxcar': 4,
@@ -111,7 +113,6 @@ def test_blank_hits():
     for idx in start_idxs:
         assert db.data[0,0, idx] == 0
     print("Hits blanked!")
-
 
 
 if __name__ == "__main__":
