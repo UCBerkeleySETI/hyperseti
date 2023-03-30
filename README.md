@@ -1,10 +1,29 @@
-### hyperseti
+## hyperseti
 
-A brute-force GPU dedoppler code and hit search package for technosignature searches.
+<p align="right">
+<a href="https://codecov.io/github/UCBerkeleySETI/hyperseti" > 
+ <img src="https://codecov.io/github/UCBerkeleySETI/hyperseti/branch/master/graph/badge.svg?token=YGW53OTFQA"/> 
+ </a>
+<a href='https://hyperseti.readthedocs.io/en/latest/?badge=latest'>
+    <img src='https://readthedocs.org/projects/hyperseti/badge/?version=latest' alt='Documentation Status' />
+</a>
+</p>
 
-_In beta_
+`Hyperseti` is a GPU-accelerated code for searching radio astronomy spectral datasets for 
+narrowband technosignatures that indicate the presence of intelligent (i.e. technologically capable)
+life beyond Earth. It was developed as part of the Breakthrough Listen initiative, which seeks to 
+quantify the prevalence of intelligent life within the Universe.
 
-#### Example 1: running the search pipeline on voyager data
+Hyperseti is centered around a brute-force dedoppler CUDA code, and has a Python-based frontend.
+Hyperseti is intended as the spiritual successor to the [turboSETI](https://github.com/UCBerkeleySETI/turbo_seti/)
+package. 
+
+
+#### Example Usage
+
+The following code searches a filterbank file which contains telemetry data from the Voyager space mission 
+([data available here](http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.h5)).
+
 
 ```python
 from hyperseti.pipeline import find_et
@@ -16,42 +35,30 @@ config = {
         'sk_flag': True,                        # Apply spectral kurtosis flagging
         'normalize': True,                      # Normalize data
         'blank_edges': {'n_chan': 32},          # Blank edges channels
-        'blank_extrema': {'threshold': 100000}  # Blank ridiculously bright signals before search
+        'blank_extrema': {'threshold': 10000}   # Blank ridiculously bright signals before search
     },
     'dedoppler': {
         'kernel': 'ddsk',                       # Doppler + kurtosis doppler (ddsk)
-        'max_dd': 5.0,                          # Maximum dedoppler delay, 5 Hz/s
-        'min_dd': None,                         # 
-        'apply_smearing_corr': False,           # Correct  for smearing within dedoppler kernel 
-                                                # Note: set to False if using multiple boxcars 
+        'max_dd': 10.0,                         # Maximum dedoppler delay, 10 Hz/s
+        'apply_smearing_corr': True,            # Correct  for smearing within dedoppler kernel 
         'plan': 'stepped'                       # Dedoppler trial spacing plan (stepped = less memory)
     },
     'hitsearch': {
         'threshold': 20,                        # SNR threshold above which to consider a hit
-        'min_fdistance': None                   # Automatic calculation of min. channel spacing between hits
     },
     'pipeline': {
-        'n_boxcar': 10,                         # Number of boxcar trials to apply (10 stages, 2^10 channels)
-                                                # Boxcar is a moving average to compensate for smearing / broadband
         'merge_boxcar_trials': True             # Merge hits at same frequency that are found in multiple boxcars
     }
 }
 
-hit_browser = find_et(voyager_h5, config, 
-                gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
-                filename_out='./test_voyager_hits.csv',
-                log_output=True,
-                log_config=True
-                )
-
-# find_et returns a hit browser object that makes it easy to plot hits 
-print(hit_browser.hit_table)
+hit_browser = find_et(voyager_h5, config, gulp_size=2**20)
+display(hit_browser.hit_table)
 
 hit_browser.view_hit(0, padding=128, plot='dual')
 
 ```
 
-#### Example 2: Inspecting a setigen Frame
+Hyperseti can natively load data generated with [setigen](https://github.com/bbrzycki/setigen):
 
 ```python
 import numpy as np
@@ -65,17 +72,7 @@ from hyperseti.dedoppler import dedoppler
 from hyperseti.plotting import imshow_waterfall, imshow_dedopp
 
 # Create data using setigen
-frame = stg.Frame(fchans=8192*u.pixel,
-                  tchans=32*u.pixel,
-                  df=2*u.Hz,
-                  dt=10*u.s,
-                  fch1=1420*u.MHz)
-noise = frame.add_noise(x_mean=10, noise_type='chi2')
-signal = frame.add_signal(stg.constant_path(f_start=frame.get_frequency(index=2000),
-                                            drift_rate=2*u.Hz/u.s),
-                          stg.constant_t_profile(level=frame.get_intensity(snr=50)),
-                          stg.gaussian_f_profile(width=100*u.Hz),
-                          stg.constant_bp_profile(level=1))
+frame = stg.Frame(...)
 
 # Convert data into hyperseti DataArray
 d = from_setigen(frame)
@@ -95,27 +92,9 @@ plt.tight_layout()
 
 ![image](https://user-images.githubusercontent.com/713251/164058073-88ccf3b1-b4a1-4160-b650-fca37770f96d.png)
 
-Can also search for hits in the dedoppler spectra:
-
-```python
-# ... run code from above ...  
-
-from hyperseti import  hitsearch
-hits = hitsearch(dedopp, threshold=100, min_fdistance=10)
-
-from hyperseti.plotting import overlay_hits
-imshow_dedopp(dedopp)
-overlay_hits(hits)
-```
-
-![image](https://user-images.githubusercontent.com/713251/164058025-ab8a3d7a-ffa5-4437-b01b-6c8d6a29cd7c.png)
-
-![image](https://user-images.githubusercontent.com/713251/164058051-9b511f50-d0d0-4058-b512-c062cc7d7964.png)
-
-
 ### Installation
 
-Theoretically, just type:
+Hyperseti requires a CUDA-capable GPU. To install, you should theoretically just need to type:
 
 ```
 pip install git+https://github.com/ucberkeleyseti/hyperseti
@@ -123,6 +102,7 @@ pip install git+https://github.com/ucberkeleyseti/hyperseti
 
 hyperseti uses the GPU heavily, so a working CUDA environment is needed, and
 requires Python 3.7 or above.
+
 hyperseti relies upon `cupy`, and currently uses a single function, 
 `argrelmax` from `cusignal`. These are part of [rapids](https://rapids.ai/start.html)
 and are easiest to install using `conda`. If starting from scratch, this should get you most of

@@ -34,7 +34,7 @@ def set_log_level(level, debug=[]):
     """
     update_levels(level, debug)
 
-def update_levels(arg_group_level, arg_debug_name_list):
+def update_levels(arg_group_level, arg_debug_name_list=[]):
     """ Update logging levels 
     
     Args:

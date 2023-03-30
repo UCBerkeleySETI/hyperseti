@@ -1,4 +1,8 @@
-## API approach
+## API approach - DEPRECATED
+
+```
+DCP 2023/03/25: This approach had flaws, and we now use `DataArray` objects.
+```
 
 Key functions are written with the first two arguments:
   ```python

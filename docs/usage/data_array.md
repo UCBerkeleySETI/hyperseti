@@ -1,4 +1,4 @@
-## Getting to know `DataArray`
+## Working with DataArrays
 
 The central data structure used in hyperseti is the `DataArray`. It is returned when loading data (fil or h5), and internally. For example:
 
@@ -64,7 +64,7 @@ These correspond to
 * `attrs` - A dictionary of any other metadata you'd like to attach.
 
 The `slice_info` and `parent_shape` are to do with if you have selected a subsection of data from a larger array, so you can keep track. 
-These will populate if you call the `isel()` method:
+These will populate if you call the `sel()` method:
 
 ```python
 darr = from_h5('voyager_data.h5')
@@ -74,7 +74,3 @@ dsel = darr.sel({'frequency': slice(0, 4096, 2), 'time': slice(1, 7)})
 Which returns a new DataArray:
 
 <img width="650" alt="image" src="https://user-images.githubusercontent.com/713251/126745394-373cf705-ae94-48ca-ae6e-ab17d7d97075.png">
-
-
-
-

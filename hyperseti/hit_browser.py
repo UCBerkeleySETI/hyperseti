@@ -18,6 +18,7 @@ class HitBrowser(object):
         browser = HitBrowser(data_array, hit_table)
         browser.extract_hit() - extract a hit from the data_array and return data
         browser.view_hit() - plot a hit from the hit table
+        browser.to_db() - write to database
 
     """
     def __init__(self, data_array: DataArray, hit_table: pd.DataFrame):
@@ -76,7 +77,7 @@ class HitBrowser(object):
         else:
             chanX += abs(n_chan_drift) 
 
-        data_sel = self.data_array.isel(
+        data_sel = self.data_array.sel(
             {'frequency': slice(chan0, chanX)}
             )
         if space == 'cpu':

@@ -2,9 +2,10 @@ from .hdf5 import from_h5
 from .filterbank import from_fil
 from .setigen import from_setigen
 from ..data_array import from_metadata, DataArray
+from blimpy.io import sigproc
+import setigen as stg
 
 import h5py
-
 
 def load_data(filename: str) -> DataArray:
     """ Load file and return data array
@@ -21,12 +22,15 @@ def load_data(filename: str) -> DataArray:
     """
     if isinstance(filename, DataArray):
         ds = filename           # User has actually supplied a DataArray
-    if h5py.is_hdf5(filename):
-        ds = from_h5(filename)
-    elif sigproc.is_filterbank(filename):
-        ds = from_fil(filename)
-    elif isinstance(stg.Frame, filename):
-        ds = filename 
+    elif isinstance(filename, str):
+        if h5py.is_hdf5(filename):
+            ds = from_h5(filename)
+        elif sigproc.is_filterbank(filename):
+            ds = from_fil(filename)
+        else:
+            raise RuntimeError("Only HDF5/filterbank files or DataArray/setigen.Frame objects are currently supported")
+    elif isinstance(filename, stg.Frame):
+        ds = from_setigen(filename)
     else:
         raise RuntimeError("Only HDF5/filterbank files or DataArray/setigen.Frame objects are currently supported")
     return ds

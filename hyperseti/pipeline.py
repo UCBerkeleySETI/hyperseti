@@ -12,12 +12,12 @@ from copy import deepcopy
 
 from .dedoppler import dedoppler, calc_ndrift
 from .normalize import normalize
-from .hits import hitsearch, merge_hits, create_empty_hits_table, blank_hits
+from .hits import hitsearch, merge_hits, create_empty_hits_table
 from .io import load_data
 from .io.hit_db import HitDatabase
 from .kurtosis import sk_flag
 from .utils import attach_gpu_device, timeme
-from .blanking import blank_edges, blank_extrema
+from .blanking import blank_edges, blank_extrema, blank_hits_gpu
 from .hit_browser import HitBrowser
 from .version import HYPERSETI_VERSION
 from .data_array import DataArray
@@ -130,7 +130,7 @@ class GulpPipeline(object):
             pp_dict = self.data_array.attrs['preprocess']    # This is added by normalize()
             proglog.info(f"\tPreprocess mean:       {pp_dict['mean']}")
             proglog.info(f"\tPreprocess STD:        {pp_dict['std']}")
-            proglog.info(f"\tPreprocess flagged:    {pp_dict.get('flagged_fraction', 0):.2f}%")
+            proglog.info(f"\tPreprocess flagged:    {pp_dict.get('flagged_fraction', 0) * 100:.2f}%")
 
         # Blank edges 
         if self.config['preprocess'].get('blank_edges', 0):
@@ -219,9 +219,8 @@ class GulpPipeline(object):
            
             if n_blank > 1:
                 if n_hits_iter > n_hits_last_iter:
-                    #proglog.info(self.peaks)
-                    proglog.info(f"GulpPipeline.run: blanking hits, (iteration {blank_count + 1} / {n_blank})")
-                    self.data_array = blank_hits(self.data_array, self.peaks)
+                    logger.info(f"GulpPipeline.run: blanking hits, (iteration {blank_count + 1} / {n_blank})")
+                    self.data_array = blank_hits_gpu(self.data_array, self.peaks)
                     n_hits_last_iter = n_hits_iter
                 else:
                     proglog.info(f"GulpPipeline.run: No new hits found, breaking! (iteration {blank_count + 1} / {n_blank})")

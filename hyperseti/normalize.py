@@ -25,7 +25,10 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
     # Normalise
     logger.debug(f"Poly fit = {poly_fit}")
     t0 = time.time()
-
+    
+    # Get rid of NaNs - TODO: figure out why there are NaNs ...
+    data_array.data = cp.nan_to_num(data_array.data)
+    
     d_flag = cp.copy(data_array.data)
 
     n_int, n_ifs, n_chan = data_array.data.shape
@@ -57,9 +60,9 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
             data_array.data[:, ii] = data_array.data[:, ii] - fit
 
         # compute mean and stdev
-        dmean = dfit.mean()
-        dvar  = ((data_array.data[:, ii] - dmean)**2).mean(axis=0)
-        dvar  = cp.compress(~mask, dvar).mean()
+        dmean = cp.nanmean(dfit)
+        dvar  = cp.nanmean((data_array.data[:, ii] - dmean)**2, axis=0)
+        dvar  = cp.nanmean(cp.compress(~mask, dvar))
         dstd  = cp.sqrt(dvar)
         d_mean_ifs[ii] = dmean
         d_std_ifs[ii]  = dstd
