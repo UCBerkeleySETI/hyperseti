@@ -64,7 +64,7 @@ These correspond to
 * `attrs` - A dictionary of any other metadata you'd like to attach.
 
 The `slice_info` and `parent_shape` are to do with if you have selected a subsection of data from a larger array, so you can keep track. 
-These will populate if you call the `isel()` method:
+These will populate if you call the `sel()` method:
 
 ```python
 darr = from_h5('voyager_data.h5')

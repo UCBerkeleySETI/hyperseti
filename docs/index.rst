@@ -19,7 +19,7 @@ quantify the prevalence of intelligent life within the Universe.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Hyperseti usage:
+   :caption: Hyperseti usage
 
    usage/quickstart
    usage/config
@@ -27,7 +27,7 @@ quantify the prevalence of intelligent life within the Universe.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Theory of operation:
+   :caption: Theory of operation
 
    pipeline/preprocessing
    pipeline/dedoppler

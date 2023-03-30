@@ -21,10 +21,10 @@ class DataArray(object):
     """ An N-dimensional array with dimension scales and metadata
 
     Designed for large out-of-memory data to read via iterative chunks.
-    Provides an isel() 
+    Provides an sel() 
     
     Provides two main methods:
-       * isel() - method to read slices into memory, and compute
+       * sel() - method to read slices into memory, and compute
          corresponding dimension scale values. Returns a new DataArray
        * iterate_through_data() - method to easily iterate through chunks
          of data. This is a generator which yields DataArrays
@@ -191,7 +191,7 @@ class DataArray(object):
         """
         return self.data    
     
-    def isel(self, sel, space=None):
+    def sel(self, sel, space=None):
         """ Select subset of data using slices along specified dimension.
         
         Args:
@@ -212,7 +212,7 @@ class DataArray(object):
             new_scales[dim_id] = self.scales[dim_id][sl]
         slices = tuple(slices)
         data = self.data[slices]
-        logger.debug(f"isel data shape: {data.shape}")
+        logger.debug(f"sel data shape: {data.shape}")
         if space == 'cpu':
             data = cp.asnumpy(data)
         elif space == 'gpu':

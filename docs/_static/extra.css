@@ -59,3 +59,11 @@ h1 h2 h3 h4 h5 h6 {
 .document a:hover {
     color: var(--cinereouslite);
 }
+
+footer a { color: var(--cinereous);}
+
+footer a:visited {color: var(--wengelite);}
+
+footer a:hover { color: var(--cinereouslite);}
+
+footer p { color: var(--jet);}
