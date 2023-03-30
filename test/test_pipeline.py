@@ -73,7 +73,7 @@ def test_pipeline_to_db():
                             )
         print(hits_et)   
     finally:
-        fns = 'test_voyager.hitdb'
+        fns = ('test_voyager.hitdb', )
         for fn in fns:
             if os.path.exists(fn):
                 os.remove(fn)

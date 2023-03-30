@@ -8,7 +8,7 @@ import os
 from astropy import units as u
 
 from .peak import find_peaks_argrelmax
-from .kernels.peak_finder import PeakFinder
+from .kernels.peak_finder import peak_find
 
 from .data_array import DataArray
 from .blanking import blank_hit, blank_hits
@@ -117,9 +117,9 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
 
     # TODO: Get this out of loop? 
     # Set kernel size to be 2^(N-1)
-    K = 2**(int(np.log2(min_fdistance)))
-    pf = PeakFinder()
-    pf.init(N_chan=dedopp_array.shape[2], N_time=dedopp_array.shape[0], K=K)  
+    #K = 2**(int(np.log2(min_fdistance)))
+    #pf = PeakFinder()
+    #pf.init(N_chan=dedopp_array.shape[2], N_time=dedopp_array.shape[0], K=K)  
 
 
     t0 = time.time()
@@ -133,7 +133,8 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
             imgdata = dedopp_data.squeeze()
 
         # Run peak find
-        intensity, fcoords, dcoords = pf.hitsearch(dedopp_data, beam_id=beam_idx, threshold=threshold, min_spacing=min_fdistance)
+        ##intensity, fcoords, dcoords = pf.hitsearch(dedopp_data, beam_id=beam_idx, threshold=threshold, min_spacing=min_fdistance)
+        intensity, fcoords, dcoords = peak_find(imgdata, threshold=threshold, min_spacing=min_fdistance)
         #print(intensity, fcoords, dcoords)
         #intensity, fcoords, dcoords = find_peaks_argrelmax(imgdata, threshold=threshold, order=min_fdistance)
 

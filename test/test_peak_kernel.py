@@ -106,7 +106,7 @@ def test_peak_kernel():
 
 def test_hitsearch():
     v = from_h5(voyager_h5)
-    vs = v.isel({'frequency': slice(0, 2**20)})
+    vs = v.sel({'frequency': slice(0, 2**20)})
     vs.data = cp.asarray(vs.data)
     vs = normalize(vs, poly_fit=5)
 

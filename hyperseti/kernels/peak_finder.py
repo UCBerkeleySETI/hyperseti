@@ -267,3 +267,69 @@ class PeakFinder(object):
         #self.maxidx_t_gpu = None
         #mempool.free_all_blocks()
         pass
+
+def peak_find(dedopp_data: cp.ndarray, threshold: float, min_spacing: float, beam_id: int=0):
+        K = 2**(int(np.log2(min_spacing)))
+        N_chan=dedopp_data.shape[1]
+        N_time=dedopp_data.shape[0]
+
+        # Initialize empty arrays
+        maxval = np.zeros(N_chan, dtype='float32')
+        maxidx = np.zeros(N_chan, dtype='int32')
+        maxval_k = np.zeros(N_chan // K, dtype='float32')
+        maxidx_f = np.zeros(N_chan // K, dtype='int32')
+        maxidx_t = np.zeros(N_chan // K, dtype='int32')
+
+        # Allocate on GPU
+        maxval_gpu = cp.asarray(maxval)
+        maxidx_gpu = cp.asarray(maxidx)
+        maxval_k_gpu = cp.asarray(maxval_k)
+        maxidx_f_gpu = cp.asarray(maxidx_f)
+        maxidx_t_gpu = cp.asarray(maxidx_t)
+
+        # Execute 
+        find_max_1D(dedopp_data, maxval_gpu, maxidx_gpu)
+        find_max_reduce(maxval_gpu, maxidx_gpu, maxval_k_gpu, maxidx_f_gpu, maxidx_t_gpu, K)
+
+        # Find hits above threshold
+        mask  = maxval_k_gpu > threshold
+        hits  = cp.asnumpy(maxval_k_gpu[mask])
+        idx_f = cp.asnumpy(maxidx_f_gpu[mask])
+        idx_t = cp.asnumpy(maxidx_t_gpu[mask])
+
+        if len(hits) < 1:
+            return hits, idx_f, idx_t       # return empty lists
+        else:
+            # Final stage: we need to make sure only one maxima within
+            # The minimum spacing. We loop through and assign to groups
+            # Then find the maximum for each group.
+            # TODO: Speed up this code
+            df = np.column_stack((np.arange(len(hits)), hits, idx_f, idx_t))
+
+            ## Sort into groups
+            groups = []
+            cur = df[0]
+            g = [cur, ]
+
+            for row in df[1:]:
+                if row[2] - cur[2] < min_spacing:
+                    g.append(row)
+                else:
+                    groups.append(g)
+                    g = [row, ]
+                cur = row
+            groups.append(g)
+
+            df = []
+            for g in groups:
+                if len(g) == 1:
+                    df.append(g[0])
+                else:
+                    mv, mi = g[0][1], 0
+                    for i, h in enumerate(g[1:]):
+                        if mv < h[1]:
+                            mv, mi = h[1], i + 1 
+                    df.append(g[mi])
+            df = np.array(df)        
+
+            return df[:, 1], df[:, 2].astype('int32'), df[:, 3].astype('int32')
