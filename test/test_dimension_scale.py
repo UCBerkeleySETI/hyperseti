@@ -127,7 +127,7 @@ def test_raises():
         ds.index(np.arange(-1, 1, 0.1))
         ds.index(1001, -9)
   
-  def test_index():
+def test_index():
     # Test index() method works with quantities
     ds1 = DimensionScale('frequency', 1000, 0.1, n_step=100, units='MHz')
     q = 1001 * u.MHz

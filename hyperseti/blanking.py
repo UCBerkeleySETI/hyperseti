@@ -6,6 +6,7 @@ import pandas as pd
 from astropy import units as u
 
 from .data_array import DataArray
+from .kernels.blank_hits import blank_hits_kernel
 
 #logging
 from .log import get_logger
@@ -95,4 +96,41 @@ def blank_hits(data_array: DataArray, df_hits: pd.DataFrame, padding: int=4) -> 
         f0, drate = float(row['f_start']), float(row['drift_rate'])
         box_width = int(row['boxcar_size'])
         data_array = blank_hit(data_array, f0, drate, padding=padding+box_width)
+    return data_array
+
+def blank_hits_gpu(data_array: DataArray, df_hits: pd.DataFrame, padding: int=4) -> DataArray:
+    """ Blank all hits in a data_array 
+    Calls blank_hit() iteratively
+    Args:
+        data_array (DataArray): data array to apply blanking to
+        df_hits (pd.DataFrame): pandas dataframe of hits to blank
+    
+    Returns:
+        data_array (DataArray): Blanked data array
+    
+    TODO: Get this to work with mutiple polarizations.
+    """
+    
+    # Setup grid and block dimensions
+    N_blank   = len(df_hits)
+    N_threads = np.min((N_blank, 1024))
+    N_grid    = N_blank // N_threads
+    if N_blank % N_threads != 0:
+        N_grid += 1
+    logger.debug(f"blank_hits: Kernel shape (grid, block) {(N_grid, ), (N_threads,)}")
+
+    d_gpu = data_array.data
+    N_chan, N_pol, N_time = d_gpu.shape
+    cidxs_gpu = cp.asarray(df_hits['channel_idx'], dtype='int32')
+
+    boxcar_size_gpu = cp.asarray(df_hits['boxcar_size'], dtype='int32')
+
+    # Convert dedoppler Hz/s into channels/timestep (can't use driftrate_idx in case they used 'stepped')
+    df, dt = data_array.frequency.step.to('Hz').value, data_array.time.step.to('s').value
+    dd_shift_gpu = cp.asarray(np.round(df_hits['drift_rate'] / (df / dt)), dtype='int32')
+
+    blank_hits_kernel((N_grid, 1, 1), (N_threads, 1, 1), 
+                      (d_gpu, cidxs_gpu, dd_shift_gpu, boxcar_size_gpu, padding, N_chan, N_pol, N_time, N_blank)) 
+
+    data_array.data = d_gpu
     return data_array
