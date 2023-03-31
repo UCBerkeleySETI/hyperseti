@@ -53,11 +53,16 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
         dfit = cp.compress(~mask, data_array.data[:, ii].mean(axis=0))
 
         if poly_fit > 0:
-            # WAR: int64 dtype causes issues in cupy 10 (19.04.2022)
-            p    = cp.poly1d(cp.polyfit(xc, dfit, poly_fit))
-            fit   = p(x)
-            dfit  -=  p(xc)
-            data_array.data[:, ii] = data_array.data[:, ii] - fit
+            try:
+                # WAR: int64 dtype causes issues in cupy 10 (19.04.2022)
+                p    = cp.poly1d(cp.polyfit(xc, dfit, poly_fit))
+                fit   = p(x)
+                dfit  -=  p(xc)
+                data_array.data[:, ii] = data_array.data[:, ii] - fit
+            except TypeError:
+                # WAR for TypeError: expected non-empty vector for x 
+                logger.critical(f"Error encountered in poly fitting!")
+                pass
 
         # compute mean and stdev
         dmean = cp.nanmean(dfit)

@@ -120,7 +120,7 @@ def blank_hits_gpu(data_array: DataArray, df_hits: pd.DataFrame, padding: int=4)
     logger.debug(f"blank_hits: Kernel shape (grid, block) {(N_grid, ), (N_threads,)}")
 
     d_gpu = data_array.data
-    N_chan, N_pol, N_time = d_gpu.shape
+    N_time, N_pol, N_chan = d_gpu.shape
     cidxs_gpu = cp.asarray(df_hits['channel_idx'], dtype='int32')
 
     boxcar_size_gpu = cp.asarray(df_hits['boxcar_size'], dtype='int32')

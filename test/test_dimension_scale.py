@@ -108,6 +108,7 @@ def test_time_scale():
     ts2 = TimeScale('time', tstart + 1, tsamp, 16, time_format='mjd', time_delta_format='sec')
     print(ts2 - ts1)
 
+
 def test_raises():
     print("\n-------TESTING Error Raising-------")
     ds = DimensionScale('frequency', 1000, 0.1, n_step=100, units='MHz')
@@ -136,6 +137,7 @@ def test_index():
     q = np.array([1000, 1001, 1002.11]) * 1e6 * u.Hz
     print(ds1.index(q))
     assert np.allclose(ds1.index(q), [0, 10, 21])
+
 
 if __name__ == "__main__":
     test_dimension_scale()

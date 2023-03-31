@@ -8,6 +8,8 @@ import os
 from astropy import units as u
 
 from .peak import find_peaks_argrelmax
+from .kernels.peak_finder import peak_find
+
 from .data_array import DataArray
 from .blanking import blank_hit, blank_hits
 
@@ -61,6 +63,7 @@ def merge_hits(hitlist):
     """
     t0 = time.time()
     p = hitlist.sort_values('snr', ascending=False)
+
     logger.debug(f"merge_hits: sorted hitlist: {p}")
     hits = []
     if len(p) > 1:
@@ -76,12 +79,15 @@ def merge_hits(hitlist):
                     abs(channel_idx - {p0['channel_idx']}) <= boxcar_size + 1)"""
             q = q.replace('\n', '') # Query must be one line
             pq = p.query(q)
-            tophit = pq.sort_values("snr", ascending=False).iloc[0]
-
+            
+            # WAR: If we get tophit with .iloc, it destroys column dtypes as pd.Series does not support mixed dtypes
+            # So, here we use a weird indexing that returns a DataFrame of len(1), not a Series
+            tophit = pq.sort_values("snr", ascending=False)[0:0+1] 
             # Drop all matched rows
             p = p.drop(pq.index)
             hits.append(tophit)
-        hits = pd.DataFrame(hits)
+
+        hits = pd.concat(hits)
     else:
         hits = p
     t1 = time.time()
@@ -112,13 +118,29 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
     dedopp_data = dedopp_array.data
     
     drift_trials = np.asarray(dedopp_array.drift_rate.data)
-    
+
+    # TODO: Get this out of loop? 
+    # Set kernel size to be 2^(N-1)
+    #K = 2**(int(np.log2(min_fdistance)))
+    #pf = PeakFinder()
+    #pf.init(N_chan=dedopp_array.shape[2], N_time=dedopp_array.shape[0], K=K)  
+
+
     t0 = time.time()
     dfs = []
     for beam_idx in range(dedopp_data.shape[1]):
-        # TODO: Can we get rid of this copy?
-        imgdata = cp.copy(cp.expand_dims(dedopp_data[:, beam_idx, :].squeeze(), 1))
-        intensity, fcoords, dcoords = find_peaks_argrelmax(imgdata, threshold=threshold, order=min_fdistance)
+
+        ## TODO: Can we get rid of this copy?
+        if dedopp_data.shape[1] > 1:
+            imgdata = cp.copy(cp.expand_dims(dedopp_data[:, beam_idx, :].squeeze(), 1))
+        else:
+            imgdata = dedopp_data.squeeze()
+
+        # Run peak find
+        ##intensity, fcoords, dcoords = pf.hitsearch(dedopp_data, beam_id=beam_idx, threshold=threshold, min_spacing=min_fdistance)
+        intensity, fcoords, dcoords = peak_find(imgdata, threshold=threshold, min_spacing=min_fdistance)
+        #print(intensity, fcoords, dcoords)
+        #intensity, fcoords, dcoords = find_peaks_argrelmax(imgdata, threshold=threshold, order=min_fdistance)
 
         t1 = time.time()
         logger.debug(f"hitsearch: Peak find time: {(t1-t0)*1e3:2.2f}ms")

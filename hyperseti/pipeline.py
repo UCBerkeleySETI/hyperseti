@@ -178,10 +178,15 @@ class GulpPipeline(object):
         _peaks = hitsearch(self.dedopp, **conf['hitsearch'])
         
         if _peaks is not None:
+
             #_peaks['snr'] /= np.sqrt(boxcar_size)
             proglog.info(f"\t Hits in gulp: {len(_peaks)}")
-            self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
-
+            
+            # Concatenating an empty table can cause loss of dtypes
+            if len(self.peaks) == 0:
+                self.peaks = _peaks
+            else:
+                self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
     @timeme   
     def run(self) -> pd.DataFrame:
         """ Main pipeline runner 
@@ -216,14 +221,13 @@ class GulpPipeline(object):
                 logger.info(f"GulpPipeline.run: merging hits")
                 self.peaks = merge_hits(self.peaks)
 
-           
             if n_blank > 1:
                 if n_hits_iter > n_hits_last_iter:
                     logger.info(f"GulpPipeline.run: blanking hits, (iteration {blank_count + 1} / {n_blank})")
                     self.data_array = blank_hits_gpu(self.data_array, self.peaks)
                     n_hits_last_iter = n_hits_iter
                 else:
-                    logger.info(f"GulpPipeline.run: No new hits found, breaking! (iteration {blank_count + 1} / {n_blank})")
+                    proglog.info(f"GulpPipeline.run: No new hits found, breaking! (iteration {blank_count + 1} / {n_blank})")
                     break
 
         t1 = time.time()
@@ -282,7 +286,6 @@ def find_et(filename: str,
 
     msg = f"find_et: hyperseti version {HYPERSETI_VERSION}"
     proglog.info(msg)
-    #print(msg)
     logger.info(pipeline_config)
 
     ds = load_data(filename)
@@ -290,6 +293,7 @@ def find_et(filename: str,
     if gulp_size > ds.data.shape[2]:
         logger.warning(f'find_et: gulp_size ({gulp_size}) > Num fine frequency channels ({ds.data.shape[2]}).  Setting gulp_size = {ds.data.shape[2]}')
         gulp_size = ds.data.shape[2]
+
     out = []
 
     attach_gpu_device(gpu_id)
@@ -312,9 +316,11 @@ def find_et(filename: str,
                     hits[f'b{beam_idx}_gulp_mean'] = cp.asnumpy(d_arr.attrs['preprocess']['mean'][beam_idx])
                     hits[f'b{beam_idx}_gulp_std']  = cp.asnumpy(d_arr.attrs['preprocess']['std'][beam_idx])
                     hits[f'b{beam_idx}_gulp_flag_frac'] = cp.asnumpy(d_arr.attrs['preprocess'].get('flagged_fraction', 0))
-
-        out.append(hits)
-    dframe = pd.concat(out)
+            out.append(hits)
+    if len(out) == 0:
+        dframe = create_empty_hits_table()
+    else:
+        dframe = pd.concat(out)
 
     if sort_hits:
         dframe = dframe.sort_values('snr', ascending=False).reset_index(drop=True)
@@ -326,7 +332,7 @@ def find_et(filename: str,
             dframe.to_csv(filename_out, index=False)
         elif filetype_out.lower() in ('h5', 'db', 'hitdb', 'hdf5'):
             db = HitDatabase(filename_out, mode='w')
-            db.add_obs(os.path.basename(filename), dframe, input_filename=filename)
+            db.add_obs(os.path.basename(filename), dframe, input_filename=filename, config=pipeline_config)
 
     if log_config:
         print(f"find_et: Pipeline runtime config logged to {config_out}")

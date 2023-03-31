@@ -47,7 +47,7 @@ def test_with_voyager():
     try:
         print("hyperseti find_et from file {} .....".format(voyager_h5))
         update_levels(logbook.WARNING, [])
-        time_logger.level = logbook.INFO
+        #time_logger.level = logbook.INFO
 
         config = {
             'preprocess': {
@@ -83,6 +83,8 @@ def test_with_voyager():
     
         # dframe column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
         print("Returned dataframe:\n", dframe)
+        print(dframe[['channel_idx', 'driftrate_idx']])
+        print(dframe.dtypes)
         list_drate = dframe["drift_rate"].tolist()
 
         assert os.path.exists('test_voyager_hits.csv')
@@ -99,7 +101,7 @@ def test_with_voyager():
 
     finally:
         for file_ext in ('.log', '.csv', '.yaml'):
-            cleanup=False
+            cleanup=True
             if cleanup:
                 if os.path.exists('test_voyager_hits' + file_ext):
                     os.remove('test_voyager_hits' + file_ext)

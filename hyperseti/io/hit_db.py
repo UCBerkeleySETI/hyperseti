@@ -1,6 +1,7 @@
 import h5py
 import hdf5plugin
 import pandas as pd
+import yaml
 
 # Imports for metadata creation
 import socket
@@ -100,13 +101,14 @@ class HitDatabase(object):
         """
         return list(self.h5.keys())
     
-    def add_obs(self, obs_id: str, hit_table: pd.DataFrame, input_filename: str=None):
+    def add_obs(self, obs_id: str, hit_table: pd.DataFrame, input_filename: str=None, config: dict=None):
         """ Add a new observation hit table to the database 
         
         Args:
             obs_id (str): Unique name for observation (e.g. input filterbank filename)
             hit_table (pd.DataFrame): DataFrame to store
             input_filename (str): Filename of input
+            config (dict): Pipeline config to add (Adds obs_group.attrs['pipeline_config'] as YAML dump)
 
         Notes:
             Need to open file with mode='w'
@@ -118,6 +120,9 @@ class HitDatabase(object):
         # Generate metadata
         for key, val in generate_metadata().items():
             obs_group.attrs[key] = val
+        
+        if config is not None:
+            obs_group.attrs['pipeline_config'] = yaml.dump(config)
         
         if input_filename is not None:
             obs_group.attrs['input_filepath'] = os.path.dirname(input_filename)
@@ -151,7 +156,18 @@ class HitDatabase(object):
         for key, val in self.h5[obs_id].attrs.items():
             d[key] = val
         return d
-    
+
+    def get_obs_config(self,  obs_id: str) -> dict:
+        """ Retrieve pipeline config information from the HDF5 database 
+
+        Args:
+            obs_id (str): Name of observation metadata to retrieve
+        
+        Returns:
+            md (dict): Metadata dictionary (generated from stored YAML, if present)
+        """
+        return yaml.load(self.h5[obs_id].attrs['pipeline_config'], yaml.Loader)  
+
     def browse_obs(self, obs_id: str, data_array: DataArray=None) -> HitBrowser:
         """ Return a HitBrowser object for given obs_id
 

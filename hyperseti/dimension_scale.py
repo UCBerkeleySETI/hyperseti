@@ -271,7 +271,7 @@ class DimensionScale(object):
         #x = x0 + i * dx
         # i = (x - x0) / dx
         if isinstance(val, Quantity):
-            val = val.to(self.units)
+            val = val.to(self.units).value
         if isinstance(val, np.ndarray):
             i = ( (val - self.val_start) / self.val_step).astype('int32')
             if np.min(i) < 0:

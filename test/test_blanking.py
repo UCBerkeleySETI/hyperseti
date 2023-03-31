@@ -2,10 +2,20 @@ from hyperseti.blanking import blank_edges, blank_extrema, blank_hits, blank_hit
 from hyperseti.io import from_setigen
 from hyperseti.pipeline import GulpPipeline
 
+from hyperseti.normalize import normalize
+from hyperseti.kurtosis import sk_flag
+from hyperseti.hits import hitsearch
+from hyperseti.dedoppler import dedoppler
+
 import setigen as stg
 from astropy import units as u
 import cupy as cp
 import numpy as np
+
+try:
+    from .file_defs import voyager_fil, voyager_h5
+except:
+    from file_defs import voyager_fil, voyager_h5
 
 def generate_data_array_multihits():
     metadata = {'fch1': 6095.214842353016*u.MHz, 
@@ -113,6 +123,25 @@ def test_blank_hits():
     for idx in start_idxs:
         assert db.data[0,0, idx] == 0
     print("Hits blanked!")
+
+def test_voyager_blanking():
+    """ Test blanking on main DC spike """
+    obs_id = obs_list[0]
+    darr = from_h5(os.path.join(FILTERBANK_DATA_PATH, obs_id))
+    darr = darr.sel({'frequency': slice(0, 2**20)})
+    darr.data = cp.asarray(darr.data)
+
+    flags = sk_flag(darr)
+    darr = normalize(darr, flags)
+    dd = dedoppler(darr, max_dd=1)
+    hits = hitsearch(dd, threshold=100)
+    darr = blank_hits_gpu(darr, hits)
+
+    hit_browser = HitBrowser(darr, hits)
+    hx = hit_browser.extract_hit(0, padding=100)
+
+    assert cp.asnumpy(hx.data[..., 100]).sum() == 0
+    assert cp.asnumpy(hx.data[..., 50]).sum() > 0
 
 
 if __name__ == "__main__":

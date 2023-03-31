@@ -31,3 +31,4 @@ coverage.xml
 test/*.csv
 test/*.log
 test/test_figs
+hyperseti/version.py

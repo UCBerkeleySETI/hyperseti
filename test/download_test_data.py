@@ -12,10 +12,6 @@ FIGDIR = './test_figs/'
 
 def download_test_data():
     """ Download Voyager test data """
-    try:
-        os.system('rm *.h5 *.fil *.dat *.log *.png *.csv 2> /dev/null')
-    except:
-        pass
     os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.h5"  -o ' + DATADIR + 'Voyager1.single_coarse.fine_res.h5')
     os.system('curl --url "http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.fil"  -o ' + DATADIR + 'Voyager1.single_coarse.fine_res.fil')
 
@@ -43,9 +39,8 @@ def flip_data():
 
 
 if __name__ == "__main__":
-    rmtree(DATADIR, ignore_errors=True)
-    os.mkdir(DATADIR)
-    rmtree(FIGDIR, ignore_errors=True)
-    os.mkdir(FIGDIR)
+    if not os.path.exists(DATADIR):
+        print(f"Creating directory {DATADIR}")
+        os.mkdir(DATADIR)
     download_test_data()
     flip_data()
