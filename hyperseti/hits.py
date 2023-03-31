@@ -63,6 +63,7 @@ def merge_hits(hitlist):
     """
     t0 = time.time()
     p = hitlist.sort_values('snr', ascending=False)
+
     logger.debug(f"merge_hits: sorted hitlist: {p}")
     hits = []
     if len(p) > 1:
@@ -78,12 +79,15 @@ def merge_hits(hitlist):
                     abs(channel_idx - {p0['channel_idx']}) <= boxcar_size + 1)"""
             q = q.replace('\n', '') # Query must be one line
             pq = p.query(q)
-            tophit = pq.sort_values("snr", ascending=False).iloc[0]
-
+            
+            # WAR: If we get tophit with .iloc, it destroys column dtypes as pd.Series does not support mixed dtypes
+            # So, here we use a weird indexing that returns a DataFrame of len(1), not a Series
+            tophit = pq.sort_values("snr", ascending=False)[0:0+1] 
             # Drop all matched rows
             p = p.drop(pq.index)
             hits.append(tophit)
-        hits = pd.DataFrame(hits)
+
+        hits = pd.concat(hits)
     else:
         hits = p
     t1 = time.time()
