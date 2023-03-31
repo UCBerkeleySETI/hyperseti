@@ -104,6 +104,32 @@ def test_peak_kernel():
 
     return  maxval_gpu, maxidx_f_gpu, maxidx_t_gpu 
 
+def test_resize():
+    
+    N_timesteps = (2, 16, 32, 59, 4, 32, 128, 61, 4, 2, 32)
+    N_channels  = (2**18, 2**19, 2**20, 2**19, 2**18)
+    N_iter      = 10  
+    N_pol       = 1
+    threshold   = 10
+
+    for ii in range(N_iter):
+        for N_time in N_timesteps:
+            for N_chan in N_channels:
+                print(f"({ii+1}/{N_iter}) Data shape: ({N_time}, {N_pol}, {N_chan})")
+
+                b = np.zeros(N_time *  N_chan, dtype='float32').reshape((N_time, N_pol, N_chan))
+
+                b[N_time - 1, 0, N_chan // 2 + 1] = 100
+                b[N_time - 1, 0, N_chan // 2 - 1000] = 50
+                #print(b.shape)
+                b_gpu = cp.asarray(b)
+                K = 64
+                pf = PeakFinder()
+                pf.init(N_chan=b_gpu.shape[2], N_time=b_gpu.shape[0], K=K)
+                maxval_gpu, maxidx_f_gpu, maxidx_t_gpu = pf.hitsearch(b_gpu, threshold=10, min_spacing=100, return_space='cpu')
+                maxval_cpu, maxidx_f_cpu, maxidx_t_cpu = cp.asnumpy(maxval_gpu),  cp.asnumpy(maxidx_f_gpu), cp.asnumpy(maxidx_t_gpu)
+
+
 def test_hitsearch():
     v = from_h5(voyager_h5)
     vs = v.sel({'frequency': slice(0, 2**20)})
@@ -117,4 +143,5 @@ def test_hitsearch():
 
 if __name__ == "__main__":
      #test_peak_kernel()
-     test_hitsearch()
+     #test_hitsearch()
+     test_resize()

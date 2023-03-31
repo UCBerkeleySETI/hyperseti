@@ -36,6 +36,7 @@ extern "C" __global__
                 }
             }
         }
+    __syncthreads();
     }
 ''', 'maxKernel')
 
@@ -59,10 +60,12 @@ extern "C" __global__
         const int tid = blockIdx.x * blockDim.x + threadIdx.x;
         
         int idx = 0;
-        maxval_k[tid] = maxval_in[K * tid];  // Set max to 0th entry within search box
-        maxidx_f[tid] = K * tid;             // Assume 0th entry within search box is max
-        maxidx_t[tid] = maxidx_in[K * tid];  // Grab the corresponding time index                   
-
+        if (K * tid < F) {
+            maxval_k[tid] = maxval_in[K * tid];  // Set max to 0th entry within search box
+            maxidx_f[tid] = K * tid;             // Assume 0th entry within search box is max
+            maxidx_t[tid] = maxidx_in[K * tid];  // Grab the corresponding time index    
+        }
+               
         for (int k = 0; k < K; k++) {
             idx = K * tid + k;
 
@@ -76,6 +79,7 @@ extern "C" __global__
             }           
 
         }
+    __syncthreads();
     }
 ''', 'maxReduceKernel')
 
@@ -175,12 +179,10 @@ class PeakFinder(object):
         try:
             assert d_gpu.shape == (self.N_time, self.N_chan)
         except AssertionError:
-            raise RuntimeError("Array dimensions do not match those passed during init()")
+            raise RuntimeError(f"Array dimensions {d_gpu.shape} do not match those passed during init() ({self.N_time}, {self.N_chan})")
         find_max_1D(d_gpu, self.maxval_gpu, self.maxidx_gpu)
-        cp.cuda.Device().synchronize()
         find_max_reduce(self.maxval_gpu, self.maxidx_gpu, self.maxval_k_gpu, 
                         self.maxidx_f_gpu, self.maxidx_t_gpu, self.K)
-        cp.cuda.Device().synchronize()
 
         return self.maxval_k_gpu, self.maxidx_f_gpu, self.maxidx_t_gpu
     
@@ -202,7 +204,7 @@ class PeakFinder(object):
         Also applies a third-stage filter to ensure hits have a minimum spacing
         
         Args:
-            d_gpu (cp.ndarray): 2D data array to search
+            d_gpu (cp.ndarray): (time, beam, freq) data array to search
         """
         if d_arr.shape[1] > 1:
             d_gpu = cp.copy(d_arr[:, beam_id])
@@ -289,7 +291,18 @@ def peak_find(dedopp_data: cp.ndarray, threshold: float, min_spacing: float, bea
 
         # Execute 
         find_max_1D(dedopp_data, maxval_gpu, maxidx_gpu)
+        #maxval_gpu = cp.max(dedopp_data, axis=0)
+        #maxidx_gpu = cp.argmax(dedopp_data, axis=0)
+        
         find_max_reduce(maxval_gpu, maxidx_gpu, maxval_k_gpu, maxidx_f_gpu, maxidx_t_gpu, K)
+        #M         = cp.max(maxval_gpu.reshape((-1, K)), axis=1)
+        #M_offset  = K * cp.arange(maxval_gpu.shape[0] // K)
+        #M_k_idx   = cp.argmax(maxval_gpu.reshape((-1, K)), axis=1)
+        #M_f_idx   = M_k_idx + M_offset
+        #M_t_idx   = maxidx_gpu[M_k_idx + M_offset] 
+        #maxval_k_gpu = M 
+        #maxidx_f_gpu = M_f_idx
+        #maxidx_t_gpu = M_t_idx
 
         # Find hits above threshold
         mask  = maxval_k_gpu > threshold
