@@ -1,17 +1,18 @@
 from hyperseti.io.hit_db import HitDatabase, generate_metadata
-from hyperseti.io import from_h5
+from hyperseti.io import from_h5, load_config
 from hyperseti.hit_browser import HitBrowser
 
 import pandas as pd
 from pprint import pprint
 import os
 
+
 import pytest
 
 try:
-    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_csv
+    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_csv, voyager_yaml
 except:
-    from file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_csv
+    from file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_csv, voyager_yaml
 
 def test_hit_db():
     try:
@@ -22,6 +23,7 @@ def test_hit_db():
 
         db.add_obs('voyager', df)
         db.add_obs('voyager_dupe', df)
+        db.add_obs('voyager_with_yaml', df, config=load_config(voyager_yaml))
 
         print(db.list_obs())
 
@@ -36,6 +38,12 @@ def test_hit_db():
         print(df_in_db)
         
         pprint(db.get_obs_metadata('voyager'))
+
+        df_in_db2 = db.get_obs('voyager_with_yaml')
+        config_roundtrip = db.get_obs_config('voyager_with_yaml')
+
+        pprint(config_roundtrip)
+
     finally:
         if os.path.exists('test_db.h5'):
             os.remove('test_db.h5')
