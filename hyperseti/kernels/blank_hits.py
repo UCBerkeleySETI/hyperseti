@@ -31,8 +31,8 @@ extern "C" __global__
           for (int t = 0; t < T; t++) {
             
             //     start_channel   +  timestep    + dedoppler offset
-            idx  = cidx[tid]       + (F * t)      + (shift[tid] * t / T);
-            //printf("TID %d IDX %d", tid, idx);
+            idx  = cidx[tid]       + (F * t)      + (shift[tid] * t);
+            //printf("TID %d IDX %d\n", tid, idx);
             
             if (idx < F * T && idx > 0 ) {  
                 // blank hit
