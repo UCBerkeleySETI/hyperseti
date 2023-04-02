@@ -208,7 +208,7 @@ class GulpPipeline(object):
 
         blankdict = self.config['pipeline'].get('blank_hits', None)
 
-        if isinstance(n_blank, dict):
+        if blankdict is not None:
             n_padding = blankdict['padding']
             n_blank = blankdict['n_blank']
             
@@ -225,20 +225,20 @@ class GulpPipeline(object):
                 self.hitsearch()
 
             n_hits_iter = len(self.peaks) - n_hits_last_iter
-            proglog.info(f"GulpPipeline.run: New hits: {n_hits_iter}")
+            proglog.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: New hits: {n_hits_iter}")
             
             if self.config['hitsearch'].get('merge_boxcar_trials', True):
                 logger.info(f"GulpPipeline.run: merging hits")
                 self.peaks = merge_hits(self.peaks)
 
             if n_blank > 1:
-                if n_hits_iter > n_hits_last_iter:
+                if n_hits_iter > 0:
                     logger.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: blanking hits")
                     
                     self.data_array = blank_hits_gpu(self.data_array, self.peaks, padding=n_padding)
                     n_hits_last_iter = n_hits_iter
                 else:
-                    proglog.info(f"GulpPipeline.run: No new hits found, breaking! (iteration {blank_count + 1} / {n_blank})")
+                    proglog.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: No new hits found, breaking!")
                     break
 
         t1 = time.time()

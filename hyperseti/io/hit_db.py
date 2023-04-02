@@ -83,6 +83,9 @@ class HitDatabase(object):
         """
         self.filename = filename
         self.h5 = h5py.File(filename, mode=mode)
+        if mode == 'w':
+            self.h5.attrs['CLASS']   = 'HYPERSETI_DB'
+            self.h5.attrs['VERSION'] = HYPERSETI_VERSION
 
     def __del__(self):
         self.h5.close()
