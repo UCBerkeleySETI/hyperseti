@@ -161,7 +161,8 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
                 'f_start': frequency_peaks,
                 'snr': intensity,
                 'driftrate_idx': dcoords,
-                'channel_idx': fcoords, 
+                'channel_idx': fcoords,
+                'gulp_channel_idx': np.copy(fcoords), 
                 'beam_idx': beam_idx
             }
 

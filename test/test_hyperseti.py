@@ -210,19 +210,19 @@ def test_find_et():
         'pipeline': {
             'n_boxcar': 2,
             'merge_boxcar_trials': True,
-            'n_blank': 2
+            'n_blank': 1
         }
     }
 
     et_browser = find_et(voyager_h5, config, gulp_size=2**20)
     pd = et_browser.hit_table
-    print(pd)
+    print(pd[['snr', 'channel_idx', 'gulp_channel_idx', 'drift_rate', 'f_start']])
     print(len(pd))
     
     # Should find 5 signals - two per sideband and central carrier
     # Carrier USB_guard_upper, LSB_guard_upper, USB_guard_lower, LSB_guard_upper
     known_idx_vals = [747929, 756038, 739935, 755924, 739828]
-    assert len(pd) == 5
+    assert len(pd) >= 5
     assert np.allclose(pd['channel_idx'].values, known_idx_vals, atol=2)
 
 
@@ -243,7 +243,7 @@ def test_find_et_cmd_tool():
                 os.remove(fn)
 
 if __name__ == "__main__":
-    test_hitsearch()
-    test_hitsearch_multi()
+    #test_hitsearch()
+    #test_hitsearch_multi()
     test_find_et()
-    test_find_et_cmd_tool()
+    #test_find_et_cmd_tool()

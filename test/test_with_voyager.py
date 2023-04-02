@@ -83,7 +83,6 @@ def test_with_voyager():
     
         # dframe column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
         print("Returned dataframe:\n", dframe)
-        print(dframe[['channel_idx', 'driftrate_idx']])
         print(dframe.dtypes)
         list_drate = dframe["drift_rate"].tolist()
 
@@ -97,7 +96,19 @@ def test_with_voyager():
         for drate in list_drate:
             print("Observed drift rate = {}, should be negative.".format(drate))
             assert drate <= 0.0
-        return dframe
+
+        # Second iteration -- use blank_hits dict
+        config['pipeline']['blank_hits'] = {'n_blank': 2, 'padding': 10}
+
+        hit_browser = find_et(voyager_h5, config, 
+                        gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
+                        filename_out='./test_voyager_hits.csv',
+                        log_output=True,
+                        log_config=True
+                        )
+                        
+        dframe = hit_browser.hit_table
+        print(dframe[['f_start', 'snr', 'channel_idx', 'gulp_channel_idx', 'drift_rate']])
 
     finally:
         for file_ext in ('.log', '.csv', '.yaml'):

@@ -180,7 +180,7 @@ class GulpPipeline(object):
         if _peaks is not None:
 
             #_peaks['snr'] /= np.sqrt(boxcar_size)
-            proglog.info(f"\t Hits in gulp: {len(_peaks)}")
+            logger.info(f"\t Hits in gulp: {len(_peaks)}")
             
             # Concatenating an empty table can cause loss of dtypes
             if len(self.peaks) == 0:
@@ -200,11 +200,21 @@ class GulpPipeline(object):
 
         self.preprocess()
 
-        n_boxcar = self.config['pipeline'].get('n_boxcar', 1)
-        n_blank  = self.config['pipeline'].get('n_blank', 1)
-        n_boxcar = 1 if n_boxcar is None else n_boxcar     # None value breaks loop
-        n_blank  = 1 if n_blank is None else n_blank       # None value breaks loop
+        n_boxcar  = self.config['pipeline'].get('n_boxcar', 1)
+        n_blank   = self.config['pipeline'].get('n_blank', 1)
+        n_boxcar  = 1 if n_boxcar is None else n_boxcar     # None value breaks loop
+        n_blank   = 1 if n_blank is None else n_blank       # None value breaks loop
+        n_padding = 4 # Default padding value
+
+        blankdict = self.config['pipeline'].get('blank_hits', None)
+
+        if isinstance(n_blank, dict):
+            n_padding = blankdict['padding']
+            n_blank = blankdict['n_blank']
+            
+
         boxcar_trials = list(map(int, 2**np.arange(0, n_boxcar)))
+
     
         n_hits_last_iter = 0
         for blank_count in range(n_blank):
@@ -215,16 +225,17 @@ class GulpPipeline(object):
                 self.hitsearch()
 
             n_hits_iter = len(self.peaks) - n_hits_last_iter
-            logger.debug(f"GulpPipeline.run: New hits: {n_hits_iter}")
-
+            proglog.info(f"GulpPipeline.run: New hits: {n_hits_iter}")
+            
             if self.config['hitsearch'].get('merge_boxcar_trials', True):
                 logger.info(f"GulpPipeline.run: merging hits")
                 self.peaks = merge_hits(self.peaks)
 
             if n_blank > 1:
                 if n_hits_iter > n_hits_last_iter:
-                    logger.info(f"GulpPipeline.run: blanking hits, (iteration {blank_count + 1} / {n_blank})")
-                    self.data_array = blank_hits_gpu(self.data_array, self.peaks)
+                    logger.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: blanking hits")
+                    
+                    self.data_array = blank_hits_gpu(self.data_array, self.peaks, padding=n_padding)
                     n_hits_last_iter = n_hits_iter
                 else:
                     proglog.info(f"GulpPipeline.run: No new hits found, breaking! (iteration {blank_count + 1} / {n_blank})")
@@ -236,6 +247,10 @@ class GulpPipeline(object):
             logger.info(f"GulpPipeline.run: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
         else:
             logger.info(f"GulpPipeline.run #{self._called_count}: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
+        
+        self.peaks['blank_idx'] = blank_count
+        self.peaks['n_blank']   = n_blank
+
         return self.peaks
 
 @timeme
