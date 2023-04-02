@@ -6,6 +6,8 @@ from hyperseti.normalize import normalize
 from hyperseti.kurtosis import sk_flag
 from hyperseti.hits import hitsearch
 from hyperseti.dedoppler import dedoppler
+from hyperseti.io import from_h5
+from hyperseti.hit_browser import HitBrowser
 
 import setigen as stg
 from astropy import units as u
@@ -83,9 +85,10 @@ def test_blank_hits():
         'preprocess': {
             'sk_flag': False,
             'normalize': True,
+            'poly_fit': 5,
         },
         'sk_flag': {
-            'n_sigma': 1,
+            'n_sigma': 5,
         },
         'dedoppler': {
             'kernel': 'ddsk',
@@ -95,18 +98,20 @@ def test_blank_hits():
         },
 
         'hitsearch': {
-            'threshold': 25,
-            'min_fdistance': None
+            'threshold': 20,
+            'min_fdistance': 50
         },
         'pipeline': {
-            'n_boxcar': 4,
+            'n_boxcar': 5,
             'merge_boxcar_trials': True
         }
     }
     pipeline = GulpPipeline(d, config)
     df = pipeline.run()
     db = blank_hits(d, df)
+    print(df[['snr', 'channel_idx', 'gulp_channel_idx', 'drift_rate']])
     db_data0 = cp.copy(db.data)
+
 
     for idx in start_idxs:
         assert db.data[0,0, idx] == 0
@@ -118,7 +123,10 @@ def test_blank_hits():
 
     pipeline = GulpPipeline(d, config)
     df = pipeline.run()
+    print(df[['snr', 'channel_idx', 'gulp_channel_idx', 'drift_rate']])
+
     db = blank_hits_gpu(d, df)
+
 
     for idx in start_idxs:
         assert db.data[0,0, idx] == 0
@@ -126,25 +134,50 @@ def test_blank_hits():
 
 def test_voyager_blanking():
     """ Test blanking on main DC spike """
-    obs_id = obs_list[0]
-    darr = from_h5(os.path.join(FILTERBANK_DATA_PATH, obs_id))
+
+    darr = from_h5(voyager_h5)
     darr = darr.sel({'frequency': slice(0, 2**20)})
     darr.data = cp.asarray(darr.data)
 
     flags = sk_flag(darr)
     darr = normalize(darr, flags)
     dd = dedoppler(darr, max_dd=1)
-    hits = hitsearch(dd, threshold=100)
+    hits = hitsearch(dd, threshold=50)
     darr = blank_hits_gpu(darr, hits)
 
     hit_browser = HitBrowser(darr, hits)
     hx = hit_browser.extract_hit(0, padding=100)
+    print(hit_browser.hit_table[['snr', 'channel_idx', 'gulp_channel_idx', 'drift_rate']])
 
     assert cp.asnumpy(hx.data[..., 100]).sum() == 0
     assert cp.asnumpy(hx.data[..., 50]).sum() > 0
+    print("Single gulp passed!")
+
+    # Test with offset 
+    # Read middle [2^18] -> [2^18 2^18] <- [2^18]
+    darr = from_h5(voyager_h5)
+    darr = darr.sel({'frequency': slice(2**18, 3*2**18)})
+    darr.data = cp.asarray(darr.data)
+
+    flags = sk_flag(darr)
+    darr = normalize(darr, flags)
+    dd = dedoppler(darr, max_dd=1)
+    hits = hitsearch(dd, threshold=50)
+    darr = blank_hits_gpu(darr, hits)
+
+    # DC BIN should be ZERO
+    print(darr.data[..., 262144].T)
+    print(darr.data[0, 0, 262144-6:262144+6+1])
+
+    for hit in hits.iterrows():
+        row_idx, htbl = hit
+        gid = htbl['gulp_channel_idx']
+        assert(darr.data[0, 0, int(gid)].sum() == 0)
+    print("Offset gulp passed!")
 
 
 if __name__ == "__main__":
     test_blank_hits()
     test_blank_edges()
     test_blank_extrema()
+    test_voyager_blanking()

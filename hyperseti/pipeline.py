@@ -180,7 +180,7 @@ class GulpPipeline(object):
         if _peaks is not None:
 
             #_peaks['snr'] /= np.sqrt(boxcar_size)
-            proglog.info(f"\t Hits in gulp: {len(_peaks)}")
+            logger.info(f"\t Hits in gulp: {len(_peaks)}")
             
             # Concatenating an empty table can cause loss of dtypes
             if len(self.peaks) == 0:
@@ -215,15 +215,16 @@ class GulpPipeline(object):
                 self.hitsearch()
 
             n_hits_iter = len(self.peaks) - n_hits_last_iter
-            logger.debug(f"GulpPipeline.run: New hits: {n_hits_iter}")
-
+            proglog.info(f"GulpPipeline.run: New hits: {n_hits_iter}")
+            
             if self.config['hitsearch'].get('merge_boxcar_trials', True):
                 logger.info(f"GulpPipeline.run: merging hits")
                 self.peaks = merge_hits(self.peaks)
 
             if n_blank > 1:
                 if n_hits_iter > n_hits_last_iter:
-                    logger.info(f"GulpPipeline.run: blanking hits, (iteration {blank_count + 1} / {n_blank})")
+                    logger.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: blanking hits")
+                    
                     self.data_array = blank_hits_gpu(self.data_array, self.peaks)
                     n_hits_last_iter = n_hits_iter
                 else:
