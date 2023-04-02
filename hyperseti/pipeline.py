@@ -237,6 +237,10 @@ class GulpPipeline(object):
             logger.info(f"GulpPipeline.run: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
         else:
             logger.info(f"GulpPipeline.run #{self._called_count}: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
+        
+        self.peaks['blank_idx'] = blank_count
+        self.peaks['n_blank']   = n_blank
+
         return self.peaks
 
 @timeme

@@ -111,7 +111,7 @@ def test_blank_hits():
     db = blank_hits(d, df)
     print(df[['snr', 'channel_idx', 'gulp_channel_idx', 'drift_rate']])
     db_data0 = cp.copy(db.data)
-
+    print(df.columns)
 
     for idx in start_idxs:
         assert db.data[0,0, idx] == 0

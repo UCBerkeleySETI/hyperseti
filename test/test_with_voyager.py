@@ -83,7 +83,6 @@ def test_with_voyager():
     
         # dframe column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
         print("Returned dataframe:\n", dframe)
-        print(dframe[['channel_idx', 'driftrate_idx']])
         print(dframe.dtypes)
         list_drate = dframe["drift_rate"].tolist()
 
