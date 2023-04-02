@@ -45,6 +45,19 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
     N_tot     = np.product(data_array.data.shape)
     N_unflagged = (N_tot - N_flagged)
 
+    flag_fraction =  N_flagged / N_tot
+    ## flag_correction =  N_tot / (N_tot - N_flagged) # <---------------------- unused
+    logger.debug(f"Flagged fraction: {flag_fraction:2.4f}")
+    if flag_fraction > 0.2:
+        logger.warning(f"High flagged fraction: {flag_fraction:2.3f}")
+    if flag_fraction > 0.98:
+        logger.critical(f"Too much data flagged: {flag_fraction:2.3f}")
+        
+        # Ignore mask and ignore this data channel
+        # TODO: How to make user notice if in a batch run?
+        mask = cp.zeros(n_chan, dtype='bool')
+        data_array.data = cp.ones_like(data_array.data)
+
     t0p = time.time()
     
     for ii in range(n_ifs):
@@ -62,7 +75,8 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
             except TypeError:
                 # WAR for TypeError: expected non-empty vector for x 
                 logger.critical(f"Error encountered in poly fitting!")
-                pass
+                dfit = cp.compress(~mask, data_array.data[:, ii].mean(axis=0))
+        
 
         # compute mean and stdev
         dmean = cp.nanmean(dfit)
@@ -75,11 +89,6 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
     t1p = time.time()
     logger.debug(f"Mean+Std time: {(t1p-t0p)*1e3:2.2f}ms")
 
-    flag_fraction =  N_flagged / N_tot
-    ## flag_correction =  N_tot / (N_tot - N_flagged) # <---------------------- unused
-    logger.debug(f"Flagged fraction: {flag_fraction:2.4f}")
-    if flag_fraction > 0.2:
-        logger.warning(f"High flagged fraction: {flag_fraction:2.3f}")
 
     # Add means and STDEV as attributes to data array
     pp_dict = { 'mean': d_mean_ifs, 
