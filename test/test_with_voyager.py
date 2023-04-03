@@ -108,7 +108,7 @@ def test_with_voyager():
                         )
                         
         dframe = hit_browser.hit_table
-        print(dframe[['f_start', 'snr', 'channel_idx', 'gulp_channel_idx', 'drift_rate']])
+        print(dframe[['f_start', 'snr', 'channel_idx', 'gulp_channel_idx', 'drift_rate', 'extent_lower', 'extent_upper']])
 
     finally:
         for file_ext in ('.log', '.csv', '.yaml'):

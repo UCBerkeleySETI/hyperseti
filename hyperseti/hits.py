@@ -95,6 +95,58 @@ def merge_hits(hitlist):
     
     return hits
 
+def get_signal_extent(data, d0, p0, g0, threshold=10):
+    """ Find the extent (bandwidth) of a signal 
+    
+    Args:
+        data (cp.ndarray): Data array (dedopp, beam_idx, channel)
+        g0 (int): Gulp index (channel)
+        d0 (int): Dedoppler index
+        p0 (int): beam index (pol)
+        threshold (float): S/N threshold to use for signal > threshold criterion
+
+    Returns:
+        edge_l, edge_u (int, int): Lower and upper offsets before threshold 
+    """    
+    edge_l, edge_u = -1, 1
+    
+    if data[d0, p0, g0] < threshold:
+        raise RuntimeError("Signal < threshold. Check indexing is correct")
+
+    while data[d0, p0, g0+edge_u] > threshold:
+        #print(data_array.data[d0, p0, g0+edge_u])
+        edge_u *= 2
+    
+    while data[d0, p0, g0+edge_l] > threshold:
+        #print(data_array.data[d0, p0, g0+edge_l])
+        edge_l *= 2    
+        
+    return edge_l, edge_u
+
+def get_signal_extents(dedopp_array, hits, threshold=10):
+    """ Find the extent (bandwidth) of hits
+    
+    Args:
+        dedopp_array (DataArray): Data array (dedopp, beam_idx, channel)
+        hits (pd.DataFrame)
+
+    Returns:
+        edges_l, edges_u (np.array, np.array): Lower and upper offsets before threshold 
+    """ 
+
+    edges_l = np.zeros(len(hits))  
+    edges_u = np.zeros(len(hits))  
+    d_col = hits['driftrate_idx']
+    p_col = hits['beam_idx'] 
+    g_col = hits['gulp_channel_idx']
+
+    for ii in range(len(hits)):
+        logger.debug(d_col[ii], p_col[ii], g_col[ii], dedopp_array.data[d_col[ii], p_col[ii], g_col[ii]])
+        e_l, e_u = get_signal_extent(dedopp_array.data, d_col[ii], p_col[ii], g_col[ii], threshold=threshold)
+        edges_l[ii] = e_l
+        edges_u[ii] = e_u 
+
+    return edges_l, edges_u  
 
 def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwargs):
     """ Search for hits using argrelmax method in cusignal
@@ -163,7 +215,7 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
                 'driftrate_idx': dcoords,
                 'channel_idx': fcoords,
                 'gulp_channel_idx': np.copy(fcoords), 
-                'beam_idx': beam_idx
+                'beam_idx': np.ones_like(fcoords, dtype='int32') * beam_idx
             }
 
             # Check if we have a slice of data. If so, add slice start point
@@ -184,8 +236,16 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
             for key, val in metadata.items():
                 if isinstance(val, (int, float)):
                     results[key] = val
+            
+            # Convert into dataframe
+            results = pd.DataFrame(results)
 
-            dfs.append(pd.DataFrame(results))
+            # Compute and append extent (signal bandwidth)
+            edges_l, edges_u = get_signal_extents(dedopp_array, results, threshold=threshold)
+            results['extent_lower'] = edges_l
+            results['extent_upper'] = edges_u
+
+            dfs.append(results)
         
             t1 = time.time()
             logger.debug(f"hitsearch: Peak find to dataframe: {(t1-t0)*1e3:2.2f}ms")

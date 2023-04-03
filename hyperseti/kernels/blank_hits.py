@@ -3,7 +3,7 @@ import cupy as cp
 blank_hits_kernel = cp.RawKernel(r'''
 extern "C" __global__
     __global__ void blankHitsKernel
-        (float *data, int *cidx, int *shift, int *boxcar_size, int N_pad, int F, int P, int T, int B)
+        (float *data, int *cidx, int *shift, int *N_pad_lower, int *N_pad_upper, int F, int P, int T, int B)
         /* Each thread computes a different dedoppler sum for a given channel
          
          N_pad: Padding either side of hit
@@ -40,15 +40,21 @@ extern "C" __global__
                  
                 // apply padding. Theoretically neighbouring hits can cause multiple writes
                 // to the same memory index, but as we're setting to zero not an issue
-                for (int p = 1; p < N_pad + boxcar_size[tid]; p++) {
-                   if (idx > p) {
-                      // TODO: This can still blank edge of previous spectra
-                      data[idx - p] = 0.0; 
-                    }
+                int N_up = N_pad_upper[tid];
+                int N_lo = N_pad_lower[tid];
+
+                for (int p = 1; p < N_up; p++) {
                     if (idx < F * T - p) {
                       data[idx + p] = 0.0; 
-                    }    
-                } // for int p
+                    }
+                  }
+                for (int p = -1; p > N_lo; p--) {   
+                   if (idx > p) {
+                      // TODO: This can still blank edge of previous spectra
+                      data[idx + p] = 0.0; 
+                    }
+                  }
+
               } // if idx < F * T
             } // for int t
         } // if idx < B  
