@@ -46,13 +46,14 @@ class HitBrowser(object):
             db = hit_db.HitDatabase(db, mode='w')
         db.add_obs(obs_id, self.hit_table, input_filename=self.data_array._filename)
     
-    def extract_hit(self, hit_idx: int, padding: int, space='cpu') -> DataArray:
+    def extract_hit(self, hit_idx: int, padding: int, space='cpu', apply_preprocessing: bool=True) -> DataArray:
         """ Extract a hit from the data_array 
         
         Args:
             hit_idx (int): ID of hit to plot (DataFrame iloc)
             padding (int): Number of channels to pad around hit
             space (str): Space where data is loaded, either 'cpu' or 'gpu'
+            apply_preprocessing (bool): Apply preprocessing from hit table
         
         Returns:
             data_sel (DataFrame): Extracted DataArray object 
@@ -63,19 +64,25 @@ class HitBrowser(object):
         f_step    = self.data_array.frequency.step.to('Hz').value
 
         chan_idx = int(hit['channel_idx'])
+        gulp_chan_idx = int(hit['gulp_channel_idx'])
         beam_idx   = int(hit['beam_idx'])
         drift_rate = hit['drift_rate']
         n_chan_drift = int(drift_rate * t_elapsed) // 2
-        n_box        = int(hit['boxcar_size']) // 2
-
+        ex_l = int(hit['extent_lower'])  #Note: always -ve
+        ex_u = int(hit['extent_upper'])
         
-        chan0 = chan_idx - padding - n_box
-        chanX = chan_idx + padding + n_box 
+        chan0 = chan_idx - padding + ex_l
+        chanX = chan_idx + padding + ex_u 
+
+        gulp_chan0 = gulp_chan_idx - padding + ex_l
+        gulp_chanX = gulp_chan_idx + padding + ex_u 
 
         if n_chan_drift * f_step < 0: 
             chan0 -= abs(n_chan_drift) 
+            gulp_chan0 -= abs(n_chan_drift) 
         else:
             chanX += abs(n_chan_drift) 
+            gulp_chanX += abs(n_chan_drift) 
 
         data_sel = self.data_array.sel(
             {'frequency': slice(chan0, chanX)}
@@ -84,6 +91,21 @@ class HitBrowser(object):
             data_sel.data = cp.asnumpy(data_sel.data)
         else:
             data_sel.data = cp.asarray(data_sel.data)
+        
+        if apply_preprocessing:
+            if hit.get('n_poly', 0) > 1:
+                poly_coeffs = np.zeros(int(hit['n_poly'] + 1))
+                for pc_idx in range(int(hit['n_poly'])+1):
+                    poly_coeffs[pc_idx] = hit[f'b0_gulp_poly_c{pc_idx}']
+
+                x = np.arange(gulp_chan0, gulp_chanX)
+                p    = np.poly1d(poly_coeffs)
+                pfit   = p(x).astype('float32')
+                
+            else:
+                pfit = 0
+            data_sel.data  = (data_sel.data - pfit - hit[f'b{beam_idx}_gulp_mean']) /  hit[f'b{beam_idx}_gulp_std']
+
         return data_sel    
 
     def _overlay_hit(self, hit_idx):

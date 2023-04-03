@@ -148,8 +148,8 @@ def get_signal_extents(dedopp_array, hits, threshold=10):
         edges_l, edges_u (np.array, np.array): Lower and upper offsets before threshold 
     """ 
 
-    edges_l = np.zeros(len(hits))  
-    edges_u = np.zeros(len(hits))  
+    edges_l = np.zeros(len(hits), dtype='int32')  
+    edges_u = np.zeros(len(hits), dtype='int32')  
     d_col = hits['driftrate_idx']
     p_col = hits['beam_idx'] 
     g_col = hits['gulp_channel_idx']

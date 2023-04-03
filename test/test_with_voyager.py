@@ -27,6 +27,7 @@ import numpy as np
 from hyperseti import find_et
 from hyperseti.log import update_levels, get_logger
 from hyperseti.utils import time_logger
+from hyperseti.io.hit_db import HitDatabase
 
 try:
     from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
@@ -109,6 +110,21 @@ def test_with_voyager():
                         
         dframe = hit_browser.hit_table
         print(dframe[['f_start', 'snr', 'channel_idx', 'gulp_channel_idx', 'drift_rate', 'extent_lower', 'extent_upper']])
+
+        # Third time -- add in poly fit
+        config['preprocess']['poly_fit'] = 5
+        hit_browser = find_et(voyager_h5, config, 
+                        gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
+                        filename_out='./test_voyager_hits.csv',
+                        log_output=True,
+                        log_config=True
+                        )
+                        
+        dframe = hit_browser.hit_table
+        print(dframe.dtypes)
+
+        db = HitDatabase('test_voyager_hits.hitdb', mode='w')
+        hit_browser.to_db(db, 'voyager')
 
     finally:
         for file_ext in ('.log', '.csv', '.yaml'):

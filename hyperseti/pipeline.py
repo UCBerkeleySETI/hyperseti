@@ -168,6 +168,8 @@ class GulpPipeline(object):
         # sqrt(N_timesteps) is taken into account within dedoppler kernel
         conf = deepcopy(self.config)        # This deepcopy avoids overwriting original threshold value
         boxcar_size = conf['dedoppler'].get('boxcar_size', 1)
+        blank_count = conf['pipeline'].get('blank_count', 1)
+
         _threshold0 = conf['hitsearch']['threshold']
         #conf['hitsearch']['threshold'] = _threshold0 * np.sqrt(boxcar_size)
 
@@ -175,18 +177,24 @@ class GulpPipeline(object):
         if conf['dedoppler'].get('kernel', 'dedoppler') == 'ddsk':
             conf['hitsearch']['sk_data'] = self.dedopp_sk
 
+        # RUN HITSEARCH!
         _peaks = hitsearch(self.dedopp, **conf['hitsearch'])
         
-        if _peaks is not None:
 
+        self._peaks_last_iter = _peaks   # Keep a copy of most recent peaks
+        
+        if _peaks is not None:
+            _peaks['blank_count'] = blank_count
             #_peaks['snr'] /= np.sqrt(boxcar_size)
             logger.info(f"\t Hits in gulp: {len(_peaks)}")
             
             # Concatenating an empty table can cause loss of dtypes
+
             if len(self.peaks) == 0:
                 self.peaks = _peaks
             else:
                 self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
+
     @timeme   
     def run(self) -> pd.DataFrame:
         """ Main pipeline runner 
@@ -212,31 +220,35 @@ class GulpPipeline(object):
             n_padding = blankdict['padding']
             n_blank = blankdict['n_blank']
             
-
         boxcar_trials = list(map(int, 2**np.arange(0, n_boxcar)))
-
     
         n_hits_last_iter = 0
+        
         for blank_count in range(n_blank):
+            new_peaks_this_blanking_iter = []
+            n_hits_blanking_iter = 0
             for boxcar_idx, boxcar_size in enumerate(boxcar_trials):
                 logger.debug(f"GulpPipeline.run: boxcar_size {boxcar_size}, ({boxcar_idx + 1} / {len(boxcar_trials)})")
                 self.config['dedoppler']['boxcar_size'] = boxcar_size
                 self.dedoppler()
                 self.hitsearch()
 
-            n_hits_iter = len(self.peaks) - n_hits_last_iter
-            proglog.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: New hits: {n_hits_iter}")
+                if self._peaks_last_iter is not None:
+                    n_hits_blanking_iter += len(self._peaks_last_iter)
+                    new_peaks_this_blanking_iter.append(self._peaks_last_iter)
+
+            proglog.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: New hits: {n_hits_blanking_iter}")
             
             if self.config['hitsearch'].get('merge_boxcar_trials', True):
                 logger.info(f"GulpPipeline.run: merging hits")
                 self.peaks = merge_hits(self.peaks)
 
             if n_blank > 1:
-                if n_hits_iter > 0:
+                if n_hits_blanking_iter > 0:
                     logger.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: blanking hits")
-                    
-                    self.data_array = blank_hits_gpu(self.data_array, self.peaks, padding=n_padding)
-                    n_hits_last_iter = n_hits_iter
+                    new_peaks_this_blanking_iter = pd.concat(new_peaks_this_blanking_iter, ignore_index=True) 
+                    self.data_array = blank_hits_gpu(self.data_array, new_peaks_this_blanking_iter, padding=n_padding)
+                    n_hits_last_iter = n_hits_blanking_iter
                 else:
                     proglog.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: No new hits found, breaking!")
                     break
@@ -248,7 +260,6 @@ class GulpPipeline(object):
         else:
             logger.info(f"GulpPipeline.run #{self._called_count}: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
         
-        self.peaks['blank_idx'] = blank_count
         self.peaks['n_blank']   = n_blank
 
         return self.peaks
@@ -331,6 +342,14 @@ def find_et(filename: str,
                     hits[f'b{beam_idx}_gulp_mean'] = cp.asnumpy(d_arr.attrs['preprocess']['mean'][beam_idx])
                     hits[f'b{beam_idx}_gulp_std']  = cp.asnumpy(d_arr.attrs['preprocess']['std'][beam_idx])
                     hits[f'b{beam_idx}_gulp_flag_frac'] = cp.asnumpy(d_arr.attrs['preprocess'].get('flagged_fraction', 0))
+                
+
+                if d_arr.attrs['preprocess'].get('n_poly', 0) > 1:
+                    n_poly = d_arr.attrs['preprocess']['n_poly']
+                    hits['n_poly'] = n_poly
+                    for pp in range(int(n_poly + 1)):
+                        hits[f'b{beam_idx}_gulp_poly_c{pp}'] = cp.asnumpy(d_arr.attrs['preprocess']['poly_coeffs'][beam_idx, pp])
+
             out.append(hits)
     if len(out) == 0:
         dframe = create_empty_hits_table()

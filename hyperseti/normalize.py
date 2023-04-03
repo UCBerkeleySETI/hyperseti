@@ -39,6 +39,8 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
 
     # Do polynomial fit and compute stats (with masking)
     d_mean_ifs, d_std_ifs = cp.zeros(n_ifs), cp.zeros(n_ifs)
+    if poly_fit > 0:
+        d_poly_ifs = cp.zeros((n_ifs, poly_fit + 1))
 
     N_masked = mask.sum()
     N_flagged = N_masked * n_ifs * n_int
@@ -68,14 +70,18 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
         if poly_fit > 0:
             try:
                 # WAR: int64 dtype causes issues in cupy 10 (19.04.2022)
-                p    = cp.poly1d(cp.polyfit(xc, dfit, poly_fit))
+                poly_coeffs = cp.polyfit(xc, dfit, poly_fit)
+                p    = cp.poly1d(poly_coeffs)
                 fit   = p(x)
                 dfit  -=  p(xc)
                 data_array.data[:, ii] = data_array.data[:, ii] - fit
             except TypeError:
                 # WAR for TypeError: expected non-empty vector for x 
                 logger.critical(f"Error encountered in poly fitting!")
+                poly_coeffs = np.zeros(poly_fit)
                 dfit = cp.compress(~mask, data_array.data[:, ii].mean(axis=0))
+            
+            d_poly_ifs[ii] = poly_coeffs
         
 
         # compute mean and stdev
@@ -94,8 +100,13 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
     pp_dict = { 'mean': d_mean_ifs, 
                 'std': d_std_ifs,
                 'flagged_fraction': flag_fraction,
-                'poly_fit': poly_fit
                 }
+                
+    if poly_fit > 0:
+        pp_dict['n_poly'] = poly_fit
+        pp_dict['poly_coeffs'] = d_poly_ifs
+
+    # Attach preprocessing data to data array
     data_array.attrs['preprocess'] = pp_dict
 
     #  Apply to original data
