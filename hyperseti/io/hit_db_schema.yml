@@ -1,0 +1,105 @@
+# Hit details - primary
+snr:
+  description: Signal-to-noise ratio of detected hit
+  dtype: float64
+  mandatory: true
+f_start:
+  description: Frequency of detected hit at first timestep (MHz)
+  dtype: float64
+  mandatory: true
+  units: MHz
+drift_rate:
+  description: Drift rate trial for detected hit (Hz/s)
+  dtype: float64,
+  units: Hz/s
+  mandatory: true
+
+# Hit details - secondary
+extent_lower:
+  description: Extent of detected signal in doppler space, lower extent (# channels)
+  dtype: int32
+  mandatory: true
+extent_upper:  
+  description: Extent of detected signal in doppler space, upper extent (# channels)
+  dtype: int32
+  mandatory: true
+ddsk:
+  description: Spectral Kurtosis computed along dedoppler path (DDSK)
+  dtype: float32
+  mandatory: false
+n_integration:
+  description: Number of timestep within the file
+  dtype: int64
+  mandatory: true
+  
+# Primary data indexes
+channel_idx:  
+  description: Index of hit on channel axis
+  dtype: int32
+  mandatory: true
+gulp_channel_idx:  
+  description: Index of hit within gulp, on channel axis
+  dtype: int32
+  mandatory: true
+beam_idx:  
+  description: Index of hit within gulp, on beam/pol axis
+  dtype: int32
+  mandatory: true
+driftrate_idx:
+  description: Index of hit within gulp, on drift rate axis
+  dtype: int32
+  mandatory: true
+
+# Pipeline information
+n_blank:
+  description: Number of signal blanking iterations in search pipeline
+  dtype: int64
+  mandatory: false
+blank_count:
+  description: Count (index) for signal blanking iteration
+  dtype: int64
+  mandatory: false
+boxcar_size:
+  description: Size of boxcar mean filter used before hit search
+  dtype: int64
+  mandatory: true
+
+# Gulp information
+gulp_idx:
+  description: Index of gulp from within the data array
+  dtype: int64
+  mandatory: true
+gulp_size:
+  description: Size of each gulp
+  dtype: int64
+  mandatory: true
+hits_in_gulp:
+  description: Number of hits detected in gulp
+  dtype: int64
+  mandatory: false
+
+# Preprocessing information 
+n_poly:
+  description: Number of coefficients in polynomial bandpass fit
+  dtype: int64
+  mandatory: false
+b0_gulp_mean:
+  description: Mean computed during preprocessing normalization for beam 0 (b0)
+  dtype: float64
+  mandatory: false
+b0_gulp_std:
+  description: Stdev computed during preprocessing normalization for beam 0 (b0)
+  dtype: float64
+  mandatory: false
+b0_gulp_flag_frac:
+  description: Fraction of data flagged with SK flagger during normalization for beam 0 (b0)
+  dtype: float64
+  mandatory: false
+b0_gulp_poly_c0:
+  description: Polynomial coefficient 0 for poly fit (c0), beam 0 (b0)
+  dtype: float64
+  mandatory: false
+b0_gulp_poly_c1:
+  description: Polynomial coefficient 1 for poly fit (c1), beam 0 (b0)
+  dtype: float64
+  mandatory: false
