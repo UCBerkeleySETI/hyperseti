@@ -255,7 +255,7 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
             results = pd.DataFrame(results)
 
             # Compute and append extent (signal bandwidth)
-            edges_l, edges_u = get_signal_extents(dedopp_array, results, threshold=threshold)
+            edges_l, edges_u = get_signal_extents(dedopp_array, results, threshold=threshold/2) # Go 3 dB lower than actual threshold
             results['extent_lower'] = edges_l
             results['extent_upper'] = edges_u
 
