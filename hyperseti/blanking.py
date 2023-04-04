@@ -124,16 +124,21 @@ def blank_hits_gpu(data_array: DataArray, df_hits: pd.DataFrame, padding: int=4)
 
         d_gpu = data_array.data
         N_time, N_pol, N_chan = d_gpu.shape
-        cidxs_gpu = cp.asarray(df_hits['gulp_channel_idx'], dtype='int32')
 
-        boxcar_size_gpu = cp.asarray(df_hits['boxcar_size'], dtype='int32')
+        cidxs_gpu = cp.asarray(df_hits['gulp_channel_idx'], dtype='int32')
+        #boxcar_size_gpu = cp.asarray(df_hits['boxcar_size'], dtype='int32')
+        N_pad_lower = cp.asarray(df_hits['extent_lower'], dtype='int32') - padding
+        N_pad_upper = cp.asarray(df_hits['extent_upper'], dtype='int32') + padding
+
+        logger.debug(N_pad_lower)
+        logger.debug(N_pad_upper)
 
         # Convert dedoppler Hz/s into channels/timestep (can't use driftrate_idx in case they used 'stepped')
         df, dt = data_array.frequency.step.to('Hz').value, data_array.time.step.to('s').value
         dd_shift_gpu = cp.asarray(np.round(df_hits['drift_rate'] / (df / dt)), dtype='int32')
 
         blank_hits_kernel((N_grid, 1, 1), (N_threads, 1, 1), 
-                        (d_gpu, cidxs_gpu, dd_shift_gpu, boxcar_size_gpu, padding, N_chan, N_pol, N_time, N_blank)) 
+                        (d_gpu, cidxs_gpu, dd_shift_gpu, N_pad_lower, N_pad_upper, N_chan, N_pol, N_time, N_blank)) 
 
         data_array.data = d_gpu
         return data_array
