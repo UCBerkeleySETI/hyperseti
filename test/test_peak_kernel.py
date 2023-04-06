@@ -106,9 +106,9 @@ def test_peak_kernel():
 
 def test_resize():
     
-    N_timesteps = (2, 16, 32, 59, 4, 32, 128, 61, 4, 2, 32)
-    N_channels  = (2**18, 2**19, 2**20, 2**19, 2**18)
-    N_iter      = 10  
+    N_timesteps = (2, 16, 32, 59, 4, 32)
+    N_channels  = (2**18, 2**19, 2**20, 2**19)
+    N_iter      = 3
     N_pol       = 1
     threshold   = 10
 

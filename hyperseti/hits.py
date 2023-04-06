@@ -112,6 +112,8 @@ def get_signal_extent(data, d0, p0, g0, threshold=10):
     if data[d0, p0, g0] < threshold:
         raise RuntimeError("Signal < threshold. Check indexing is correct")
 
+    N_gulp = data.shape[2]
+
     # Search for upper edge
     eu_found = False
     g0_u = g0
@@ -120,6 +122,11 @@ def get_signal_extent(data, d0, p0, g0, threshold=10):
         while data[d0, p0, g0_u+edge_u] > threshold:
             #print(data_array.data[d0, p0, g0+edge_u])
             edge_u *= 2
+            # Have we hit upper limit?
+            if g0_u + edge_u > N_gulp - 1: 
+                g0_u = N_gulp -1
+                eu_found = True
+                break
         if edge_u == 1 or edge_u // 2 == 1:
             eu_found = True
         g0_u += edge_u // 2
@@ -131,11 +138,18 @@ def get_signal_extent(data, d0, p0, g0, threshold=10):
         edge_l = -1
         while data[d0, p0, g0_l+edge_l] > threshold:
             edge_l *= 2
+            # Have we hit lower limit?
+            if g0_l + edge_l <= 0: 
+                g0_l = 0
+                el_found = True
+                break
         if edge_l == -1 or edge_l // 2 == -1:
             el_found = True
         g0_l += edge_l // 2
 
-    return g0_l - g0, g0_u - g0 + 1
+
+
+    return g0_l - g0, g0_u - g0 
 
 def get_signal_extents(dedopp_array, hits, threshold=10):
     """ Find the extent (bandwidth) of hits

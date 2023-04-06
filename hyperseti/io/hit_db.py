@@ -25,6 +25,9 @@ HERE = Path(__file__).parent.absolute()
 SCHEMA_YML_PATH = os.path.join(HERE, 'hit_db_schema.yml')
 SCHEMA_DICT = load_config(SCHEMA_YML_PATH)
 
+#logging
+from ..log import get_logger
+logger = get_logger('hyperseti.io.hit_db')
 
 def generate_metadata(input_filename: str=None, input_filepath: str=None) -> dict:
     """ Create basic metadata for data progeny 
@@ -63,17 +66,18 @@ def get_col_schema(name: str) -> dict:
     """
 
     # Regex: does col start with b0_ ... bX_
-    pat_beam = 'b(\d+)_(\w+)'
+    pat_beam = r'b(\d+)_(\w+)'
     beam_match = re.search(pat_beam, name)
     if beam_match:
         beam_id = beam_match.group(1)
+        col_name = beam_match.group(2)
         
         # Regex: check if it is a poly coefficient (endswith _c0 ... _cX)
-        pat_coeff = '(\w+)_c(\d+)'
+        pat_coeff = r'(\w+)_c(\d+)$'
         coeff_match = re.search(pat_coeff, beam_match.group(2))
         if coeff_match:
             col_name = coeff_match.group(1)
-            coeff_id = coeff_match.group(2)
+            coeff_id = int(coeff_match.group(2))
             
             d = SCHEMA_DICT[f'b{0}_{col_name}_c{0}']
             # Replace 0 indexes with actual index values
