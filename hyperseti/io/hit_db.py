@@ -1,3 +1,8 @@
+
+import os
+import re
+import pprint
+from pathlib import Path
 import h5py
 import hdf5plugin
 import pandas as pd
@@ -13,6 +18,13 @@ from ..version import HYPERSETI_VERSION
 from ..hit_browser import HitBrowser
 from ..data_array import DataArray
 from hyperseti.io.load_data import load_data
+from hyperseti.io.load_config import load_config
+
+# READ SCHEMA INFO
+HERE = Path(__file__).parent.absolute()
+SCHEMA_YML_PATH = os.path.join(HERE, 'hit_db_schema.yml')
+SCHEMA_DICT = load_config(SCHEMA_YML_PATH)
+
 
 def generate_metadata(input_filename: str=None, input_filepath: str=None) -> dict:
     """ Create basic metadata for data progeny 
@@ -36,6 +48,49 @@ def generate_metadata(input_filename: str=None, input_filepath: str=None) -> dic
         user_dict['input_filepath'] = input_filepath
 
     return user_dict
+
+def get_col_schema(name: str) -> dict:
+    """ Read column information from schema 
+
+    Args:
+        name (str): Name of column to lookup
+
+    Notes:
+        This handles regex lookup for 'bXX_colname_cYY'
+    
+    Returns:
+        col_info (dict): Information about column, as read from schema
+    """
+
+    # Regex: does col start with b0_ ... bX_
+    pat_beam = 'b(\d+)_(\w+)'
+    beam_match = re.search(pat_beam, name)
+    if beam_match:
+        beam_id = beam_match.group(1)
+        
+        # Regex: check if it is a poly coefficient (endswith _c0 ... _cX)
+        pat_coeff = '(\w+)_c(\d+)'
+        coeff_match = re.search(pat_coeff, beam_match.group(2))
+        if coeff_match:
+            col_name = coeff_match.group(1)
+            coeff_id = coeff_match.group(2)
+            
+            d = SCHEMA_DICT[f'b{0}_{col_name}_c{0}']
+            # Replace 0 indexes with actual index values
+            d['description'] = d['description'].replace('coefficient 0', f'coefficient {coeff_id}')
+            d['description'] = d['description'].replace('(c0)', f'(c{coeff_id})')
+            d['description'] = d['description'].replace('(c0)', f'(c{coeff_id})')
+            d['description'] = d['description'].replace('beam 0', f'beam {beam_id}')
+            d['description'] = d['description'].replace('(b0)', f'(b{beam_id})')
+        else:
+            d = SCHEMA_DICT[f'b{0}_{col_name}']
+            # Replace 0 indexes with actual index values
+            d['description'] = d['description'].replace('beam 0', f'beam {beam_id}')
+            d['description'] = d['description'].replace('(b0)', f'(b{beam_id})')
+    else:
+        d = SCHEMA_DICT[name]
+    return d
+
 
 
 class HitDatabase(object):
@@ -118,7 +173,19 @@ class HitDatabase(object):
         """
         obs_group = self.h5.create_group(obs_id)
         for key in hit_table.columns:
-            obs_group.create_dataset(key, data=hit_table[key])
+            try:
+                col_md = get_col_schema(key)
+            except KeyError:
+                logger.warning(f"Column ID {key} not in schema.")
+                col_md = {'dtype': None}    # WAR to ensure create_dataset works
+
+            dset = obs_group.create_dataset(key, data=hit_table[key], 
+                                            dtype=col_md['dtype'])
+
+            # Add other schema metadata
+            for md in ('description', 'units'):
+                if col_md.get(md, None):
+                    dset.attrs[md] = col_md[md]
         
         # Generate metadata
         for key, val in generate_metadata().items():
@@ -158,6 +225,21 @@ class HitDatabase(object):
         d = {}
         for key, val in self.h5[obs_id].attrs.items():
             d[key] = val
+        return d
+
+    def get_obs_schema(self,  obs_id: str) -> dict:
+        """ Retrieve schema information from the HDF5 database 
+
+        Args:
+            obs_id (str): Name of observation metadata to retrieve
+        
+        Returns:
+            schema (dict): Metadata dictionary
+        """
+        d = {}
+        for dset_name, dset in self.h5[obs_id].items():
+            d[dset_name] = dict(dset.attrs)
+            d[dset_name]['dtype'] = dset.dtype
         return d
 
     def get_obs_config(self,  obs_id: str) -> dict:
