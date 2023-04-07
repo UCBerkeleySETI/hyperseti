@@ -39,8 +39,14 @@ def flip_data():
 
 
 if __name__ == "__main__":
+
     if not os.path.exists(DATADIR):
         print(f"Creating directory {DATADIR}")
         os.mkdir(DATADIR)
+
+    if not os.path.exists(FIGDIR):
+        print(f"Creating directory {FIGDIR}")
+        os.mkdir(DATFIGDIRADIR)
+        
     download_test_data()
     flip_data()
