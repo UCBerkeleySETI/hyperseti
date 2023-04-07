@@ -17,7 +17,7 @@ from ..hit_browser import HitBrowser
 from ..data_array import DataArray
 from . import load_data
 from . import load_config
-from .hit_db_schema import get_col_schema
+from .hit_db_schema import get_col_schema, get_schema
 
 
 #logging
@@ -164,8 +164,19 @@ class HitDatabase(object):
         """
         obs_group = self.h5[obs_id]
         obs_dict = {}
-        for key, dset in obs_group.items():
-            obs_dict[key] = dset[:]
+        schema  = get_schema()
+
+        # Use schema to guide loading (preserves column order, identifies extra cols)
+        obs_keys    = list(obs_group.keys())
+        schema_keys = list(schema.keys())
+        for key in schema_keys:
+            if key in obs_keys:
+                obs_keys.pop(obs_keys.index(key)) # Remove from list
+                obs_dict[key] = obs_group[key][:]
+        if len(obs_keys) > 0:
+            for key in obs_keys:
+                logger.warning(f"Obs key {key} is not in schema, attempting to load anyway")
+                obs_dict[key] = obs_group[key][:]
         return pd.DataFrame(obs_dict)
     
     def get_obs_metadata(self,  obs_id: str) -> dict:

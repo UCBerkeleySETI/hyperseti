@@ -4,12 +4,14 @@ import re
 from pathlib import Path
 from copy import deepcopy
 from . import load_config
+from ..version import HYPERSETI_VERSION
 
 # READ SCHEMA INFO
 HERE = Path(__file__).parent.absolute()
 SCHEMA_YML_PATH = os.path.join(HERE, 'hit_db_schema.yml')
 SCHEMA_DICT = load_config(SCHEMA_YML_PATH)
 SCHEMA_DICT['_schema_path'] = SCHEMA_YML_PATH
+SCHEMA_DICT['_schema_version'] = HYPERSETI_VERSION
 
 def get_col_schema(name: str) -> dict:
     """ Read column information from schema 
@@ -41,8 +43,6 @@ def get_col_schema(name: str) -> dict:
             # Replace placehold indexes with actual index values
             # deepcopy makes sure SCHEMA_DICT is not modified
             d = deepcopy(SCHEMA_DICT[f'bX_{col_name}_cY'])
-            print(f'HERE: coefficient {coeff_id} (c{coeff_id})')
-            print(f"HERE2: {d}")
             d['description'] = d['description'].replace('coefficient Y (cY)',
                                                         f'coefficient {coeff_id} (c{coeff_id})')
         else:
@@ -52,3 +52,6 @@ def get_col_schema(name: str) -> dict:
     else:
         d = deepcopy(SCHEMA_DICT[name])
     return d
+
+def get_schema():
+    return SCHEMA_DICT
