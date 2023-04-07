@@ -7,7 +7,7 @@ import cupy as cp
 from copy import deepcopy
 
 # Dask SVG HTML plotting
-from .thirdparty import svg
+from .thirdparty.svg import svg
 
 # hyperseti
 from .dimension_scale import DimensionScale, TimeScale, ArrayBasedDimensionScale
