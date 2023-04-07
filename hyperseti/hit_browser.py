@@ -10,6 +10,9 @@ from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
 from hyperseti.data_array import DataArray
 from hyperseti.dedoppler import dedoppler, calc_delta_dd
 
+#logging
+from .log import get_logger
+logger = get_logger('hyperseti.hit_browser')
 
 class HitBrowser(object):
     """ Class for browsing hits after running pipeline 
@@ -93,18 +96,21 @@ class HitBrowser(object):
             data_sel.data = cp.asarray(data_sel.data)
         
         if apply_preprocessing:
-            if hit.get('n_poly', 0) > 1:
-                poly_coeffs = np.zeros(int(hit['n_poly'] + 1))
-                for pc_idx in range(int(hit['n_poly'])+1):
-                    poly_coeffs[pc_idx] = hit[f'b0_gulp_poly_c{pc_idx}']
+            if hit.get('b0_gulp_mean', None):
+                if hit.get('n_poly', 0) > 1:
+                    poly_coeffs = np.zeros(int(hit['n_poly'] + 1))
+                    for pc_idx in range(int(hit['n_poly'])+1):
+                        poly_coeffs[pc_idx] = hit[f'b0_gulp_poly_c{pc_idx}']
 
-                x = np.arange(gulp_chan0, gulp_chanX)
-                p    = np.poly1d(poly_coeffs)
-                pfit   = p(x).astype('float32')
-                
+                    x = np.arange(gulp_chan0, gulp_chanX)
+                    p    = np.poly1d(poly_coeffs)
+                    pfit   = p(x).astype('float32')
+                    
+                else:
+                    pfit = 0
+                data_sel.data  = (data_sel.data - pfit - hit[f'b{beam_idx}_gulp_mean']) /  hit[f'b{beam_idx}_gulp_std']
             else:
-                pfit = 0
-            data_sel.data  = (data_sel.data - pfit - hit[f'b{beam_idx}_gulp_mean']) /  hit[f'b{beam_idx}_gulp_std']
+                logger.warning("Could not read normalization info from hit table")
 
         return data_sel    
 

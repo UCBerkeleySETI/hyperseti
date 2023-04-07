@@ -1,11 +1,12 @@
-from hyperseti.io.hit_db import HitDatabase, generate_metadata
+from hyperseti.io.hit_db import HitDatabase, generate_metadata, get_col_schema
 from hyperseti.io import from_h5, load_config
 from hyperseti.hit_browser import HitBrowser
+
 
 import pandas as pd
 from pprint import pprint
 import os
-
+import h5py
 
 import pytest
 
@@ -81,7 +82,40 @@ def test_browser():
         if os.path.exists(dbfn):
             os.remove(dbfn)
 
+def test_col_schema():
+    cs = get_col_schema('b101_gulp_poly_c9')
+    print(cs)
+    assert(cs['description'] == 'Polynomial fit coefficient 9 (c9), beam 101 (b101)')
+
+    with pytest.raises(KeyError):
+        cs = get_col_schema('unknown_column')
+
+def test_read_back_col_schema():
+    dbfn = 'test_db.h5'
+    try:
+        # Create database
+        db = HitDatabase(dbfn, mode='w')
+        df = pd.read_csv(voyager_csv)
+        print(df)
+        db.add_obs('voyager', df)
+
+        schema_out = db.get_obs_schema('voyager')
+        pprint(schema_out)
+
+        del(db)  # Close h5 file
+
+        h = h5py.File('test_db.h5')
+        print(list(h.items()))
+
+        print(list(h['voyager/snr'].attrs.items()))
+        print(list(h['voyager/drift_rate'].attrs.items()))
+    finally:
+        if os.path.exists(dbfn):
+            os.remove(dbfn)
+
 if __name__ == "__main__":
     test_hit_db()
     test_generate_metadata()
     test_browser()
+    test_col_schema()
+    test_read_back_col_schema()

@@ -1,3 +1,6 @@
+
+import os
+import pprint
 import h5py
 import hdf5plugin
 import pandas as pd
@@ -12,7 +15,14 @@ import sys
 from ..version import HYPERSETI_VERSION
 from ..hit_browser import HitBrowser
 from ..data_array import DataArray
-from hyperseti.io.load_data import load_data
+from . import load_data
+from . import load_config
+from .hit_db_schema import get_col_schema, get_schema
+
+
+#logging
+from ..log import get_logger
+logger = get_logger('hyperseti.io.hit_db')
 
 def generate_metadata(input_filename: str=None, input_filepath: str=None) -> dict:
     """ Create basic metadata for data progeny 
@@ -118,7 +128,19 @@ class HitDatabase(object):
         """
         obs_group = self.h5.create_group(obs_id)
         for key in hit_table.columns:
-            obs_group.create_dataset(key, data=hit_table[key])
+            try:
+                col_md = get_col_schema(key)
+            except KeyError:
+                logger.warning(f"Column ID {key} not in schema.")
+                col_md = {'dtype': None}    # WAR to ensure create_dataset works
+
+            dset = obs_group.create_dataset(key, data=hit_table[key], 
+                                            dtype=col_md['dtype'])
+
+            # Add other schema metadata
+            for md in ('description', 'units'):
+                if col_md.get(md, None):
+                    dset.attrs[md] = col_md[md]
         
         # Generate metadata
         for key, val in generate_metadata().items():
@@ -142,8 +164,19 @@ class HitDatabase(object):
         """
         obs_group = self.h5[obs_id]
         obs_dict = {}
-        for key, dset in obs_group.items():
-            obs_dict[key] = dset[:]
+        schema  = get_schema()
+
+        # Use schema to guide loading (preserves column order, identifies extra cols)
+        obs_keys    = list(obs_group.keys())
+        schema_keys = list(schema.keys())
+        for key in schema_keys:
+            if key in obs_keys:
+                obs_keys.pop(obs_keys.index(key)) # Remove from list
+                obs_dict[key] = obs_group[key][:]
+        if len(obs_keys) > 0:
+            for key in obs_keys:
+                logger.warning(f"Obs key {key} is not in schema, attempting to load anyway")
+                obs_dict[key] = obs_group[key][:]
         return pd.DataFrame(obs_dict)
     
     def get_obs_metadata(self,  obs_id: str) -> dict:
@@ -158,6 +191,21 @@ class HitDatabase(object):
         d = {}
         for key, val in self.h5[obs_id].attrs.items():
             d[key] = val
+        return d
+
+    def get_obs_schema(self,  obs_id: str) -> dict:
+        """ Retrieve schema information from the HDF5 database 
+
+        Args:
+            obs_id (str): Name of observation metadata to retrieve
+        
+        Returns:
+            schema (dict): Metadata dictionary
+        """
+        d = {}
+        for dset_name, dset in self.h5[obs_id].items():
+            d[dset_name] = dict(dset.attrs)
+            d[dset_name]['dtype'] = dset.dtype
         return d
 
     def get_obs_config(self,  obs_id: str) -> dict:
