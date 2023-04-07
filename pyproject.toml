@@ -1,0 +1,36 @@
+[tool.poetry]
+name        = "hyperseti"
+version     = "1.0.0"
+description = "GPU-accelerated code for searching radio astronomy spectral datasets for narrowband technosignatures (SETI)"
+authors     = ["Danny C. Price"]
+license     = "MIT"
+readme      = "README.md"
+
+[tool.poetry.dependencies]
+python      = "^3.8"
+numpy       = "^1.21.0"
+cupy        = "^12.0.0"
+pandas      = "^2.0.0"
+h5py        = "^3.8.0"
+pyyaml      = "^6.0.0"
+Logbook     = "^1.5.3"
+astropy     = "^5.2.2"
+setigen     = "^2.4.0"
+hdf5plugin  = "^4.1.1"
+
+[project.scripts]
+findET = "hyperseti.findET:cmd_tool"
+tsdat  = "hyperseti.tsdat:cmd_tool" 
+
+[tool.poetry.group.dev.dependencies]
+pytest          = "^7.2.2"
+codecov         = "^2.1.12"
+pytest-codecov  = "^0.5.1"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--verbose --cov=hyperseti test/"
+
+[build-system]
+requires        = ["poetry-core"]
+build-backend   = "poetry.core.masonry.api"
