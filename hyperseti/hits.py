@@ -226,7 +226,6 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
         ##intensity, fcoords, dcoords = pf.hitsearch(dedopp_data, beam_id=beam_idx, threshold=threshold, min_spacing=min_fdistance)
         intensity, fcoords, dcoords = peak_find(imgdata, threshold=threshold, min_spacing=min_fdistance)
         #print(intensity, fcoords, dcoords)
-        #intensity, fcoords, dcoords = find_peaks_argrelmax(imgdata, threshold=threshold, order=min_fdistance)
 
         t1 = time.time()
         logger.debug(f"hitsearch: Peak find time: {(t1-t0)*1e3:2.2f}ms")
