@@ -34,11 +34,19 @@ In pipelines, smearing correction can be enabled by setting `config['dedoppler']
 Note that S/N calculations will be incorrect if smearing correction is used along with multiple boxcar trials,
 so use one approach or the other. Smearing correction will be faster in general than multiple boxcar trials.
 
-
-### Iterative blanking
+### Doppler 'butterflies' 
 
 To find a single 'hit' in dedoppler space requires finding the local maxima, and figuring out which pixels are associated with each local maxima. In dedoppler space, a narrowband signal will produce a 'butterfly' pattern 
-(or 'footprint'), which has a local maxima at the optimal drift rate trial. The footprint can cover a large fraction of the search space, particularly when searching for high drift rate signals. 
+(or 'footprint'), which narrows toward a 'waist' at which at the optimal drift rate trial. At this waist point,
+signal power is maximally concentrated; as you move away from the waist the signal power is spread out over multiple channels creating the butterfly 'wings'. The butterfly footprint for each hit can cover a large fraction of the search space, particularly when searching for high drift rate signals.
+
+#### Signal extent
+
+If the hit is not a perfect narrowband signal, the width of the butterfly waist is determined by the signal's 
+intrinsic bandwidth. The `hyperseti.hits.get_signal_extent` method is called on each hit to estimate its extent:
+that is, the signals' apparent bandwidth at the optimal dedoppler trial that maximizes signal-to-noise. 
+
+### Iterative blanking
 
 Our local maxima approach to finding hits requires setting a minimum distance within which all other maxima are ignored. This minimum distance means that if there are other bona-fide hits within the excluded zone, they will be missed. Our solution to this is called 'iterative blanking'. After finding the highest S/N hits, we blank these in the original input spectra (i.e. in frequency-time space, where the signals have smaller footprints). The code then re-searches the dedoppler space for other hits.
 
@@ -65,40 +73,3 @@ hit_browser.view_hit(0, padding=128, plot='dual')
 ![image](https://user-images.githubusercontent.com/713251/227728999-1bec6e2f-bfca-4ab7-ae59-d08010ad8a8d.png)
 
 
-### Storing hits in a `HitDatabase`
-
-Hyperseti implements a simple HDF5-backed database for storing hits from multiple observations. These files can be accessed via the `hyperseti.io.hit_db.HitDatabase` class. 
-
-The `HitDatabase` class provides:
-
-* `hit_db.list_obs()` - List all observations within the database file.
-* `hit_db.add_obs()`  - Add a new observation to database.
-* `hit_db.get_obs()`  - Retrieve hit data table from the database.
-* `get_obs_metadata()` - Retrieve metadata about an observation.
-* `hit_db.browse_obs()` - Return a `HitBrowser` object for given obs_id.
-
-#### Data model notes:
-
-Within the HDF5 file, a new group is created in the root for each observation.
-Table data are a column store, one dataset per column, i.e.:
-
-```
-GROUP "/" {
-    GROUP "proxima_cen" {
-        DATASET "beam_idx"
-        DATASET "boxcar_size"
-        DATASET "snr"
-        DATASET ...}
-    GROUP "alpha_cen" {
-        DATASET "beam_idx"
-        DATASET "boxcar_size"
-        DATASET "snr"
-        DATASET ...}
-    GROUP ... {
-        DATASET ...
-    }  
-}
-```
-
-The database may optionally provide paths to data files for each observation. Metadata are stored
-as attributes. 

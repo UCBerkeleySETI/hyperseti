@@ -24,6 +24,7 @@ quantify the prevalence of intelligent life within the Universe.
    usage/quickstart
    usage/config
    usage/data_array
+   usage/hit_db
 
 .. toctree::
    :maxdepth: 2

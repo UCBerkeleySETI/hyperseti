@@ -54,13 +54,15 @@ class HitDatabase(object):
     HitDatabase provides:
         hit_db.list_obs() - List all observations within the database file.
         hit_db.add_obs()  - Add a new observation to database.
-        hit_db.get_obs()  - Retrieve hit data table from the database.
-    
+        hit_db.get_obs()  - Retrieve hit data table from the database as DataFrame
+        hit_db.get_obs_schema() - Retrieve a description of the columns based on hit_db schema
+        hit_db.get_obs_config() - Retrieve the observation pipeline config YAML (if present)
+        hit_db.get_obs_metadata() - Retrieve observation metadata dict
+        hit_db.browse_obs() - Return a HitBrowser object to browse data
+
     Notes:
         This is intended for storing results from a hyperseti run on multiple files.
-        It is not intended as a long-term SQL-style hit database. 
-        This is currently basic, and API may change so that more information can
-        be stored (e.g. logs, config, and other things for reproducability)
+        It is not intended as a long-term SQL-style hit database.
     
     Data model notes:
         Within the HDF5 file, a new group is created in the root for each observation.
@@ -83,6 +85,13 @@ class HitDatabase(object):
             }  
         }
         ```
+
+        The file format can be identified by the following attributes in the root group:
+        ```
+        CLASS = 'HYPERSETI_DB'
+        VERSION = 'X.Y.Z'
+        ```
+        
     """
     def __init__(self, filename: str, mode: str='r'):
         """ Initialize HitDatabase object
