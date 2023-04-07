@@ -10,8 +10,7 @@ pip install git+https://github.com/ucberkeleyseti/hyperseti
 
 hyperseti uses the GPU heavily, so a working CUDA environment is needed, and
 requires Python 3.7 or above.
-hyperseti relies upon `cupy`, and currently uses a single function, 
-`argrelmax` from `cusignal`. These are part of [rapids](https://rapids.ai/start.html)
+hyperseti relies upon `cupy`. This is part of [rapids](https://rapids.ai/start.html)
 and are easiest to install using `conda`. If starting from scratch, this should get you most of
 the way there:
 

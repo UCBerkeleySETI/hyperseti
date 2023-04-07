@@ -7,7 +7,6 @@ import os
 
 from astropy import units as u
 
-from .peak import find_peaks_argrelmax
 from .kernels.peak_finder import peak_find
 
 from .data_array import DataArray
@@ -184,7 +183,7 @@ def get_signal_extents(dedopp_array, hits, threshold=10):
     return edges_l, edges_u  
 
 def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwargs):
-    """ Search for hits using argrelmax method in cusignal
+    """ Search for hits using custom relative maxima kernel
     
     Args:
         dedopp (np.array): Dedoppler search array of shape (N_trial, N_beam, N_chan)
@@ -227,7 +226,6 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
         ##intensity, fcoords, dcoords = pf.hitsearch(dedopp_data, beam_id=beam_idx, threshold=threshold, min_spacing=min_fdistance)
         intensity, fcoords, dcoords = peak_find(imgdata, threshold=threshold, min_spacing=min_fdistance)
         #print(intensity, fcoords, dcoords)
-        #intensity, fcoords, dcoords = find_peaks_argrelmax(imgdata, threshold=threshold, order=min_fdistance)
 
         t1 = time.time()
         logger.debug(f"hitsearch: Peak find time: {(t1-t0)*1e3:2.2f}ms")
