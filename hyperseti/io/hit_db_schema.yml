@@ -79,23 +79,24 @@ hits_in_gulp:
   mandatory: false
 
 # Preprocessing information 
+# Placehold vars: X runs from [0, N_beam], Y runs from [0, N_poly_coeffs]
 n_poly:
   description: Number of coefficients in polynomial bandpass fit
   dtype: int32
   mandatory: false
-b0_gulp_mean:
-  description: Mean computed during preprocessing normalization for beam 0 (b0)
+bX_gulp_mean:
+  description: Mean computed during preprocessing normalization for beam X (bX)
   dtype: float32
   mandatory: false
-b0_gulp_std:
-  description: Stdev computed during preprocessing normalization for beam 0 (b0)
+bX_gulp_std:
+  description: Stdev computed during preprocessing normalization for beam X (bX)
   dtype: float32
   mandatory: false
-b0_gulp_flag_frac:
-  description: Fraction of data flagged with SK flagger during normalization for beam 0 (b0)
+bX_gulp_flag_frac:
+  description: Fraction of data flagged with SK flagger during normalization for beam X (bX)
   dtype: float32
   mandatory: false
-b0_gulp_poly_c0:
-  description: Polynomial coefficient 0 for poly fit (c0), beam 0 (b0)
+bX_gulp_poly_cY:
+  description: Polynomial fit coefficient Y (cY), beam X (bX)
   dtype: float32
   mandatory: false

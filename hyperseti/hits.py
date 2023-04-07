@@ -112,42 +112,49 @@ def get_signal_extent(data, d0, p0, g0, threshold=10):
     if data[d0, p0, g0] < threshold:
         raise RuntimeError("Signal < threshold. Check indexing is correct")
 
-    N_gulp = data.shape[2]
+    N_chan = data.shape[2]
 
     # Search for upper edge
     eu_found = False
     g0_u = g0
     while not eu_found:
         edge_u = 1
-        while data[d0, p0, g0_u+edge_u] > threshold:
-            #print(data_array.data[d0, p0, g0+edge_u])
-            edge_u *= 2
-            # Have we hit upper limit?
-            if g0_u + edge_u > N_gulp - 1: 
-                g0_u = N_gulp -1
-                eu_found = True
-                break
-        if edge_u == 1 or edge_u // 2 == 1:
+        try:
+            while data[d0, p0, g0_u+edge_u] > threshold:
+                #print(data_array.data[d0, p0, g0+edge_u])
+                edge_u *= 2
+                # Have we hit upper limit?
+                if g0_u + edge_u > N_chan - 1: 
+                    g0_u = N_chan -1
+                    eu_found = True
+                    break
+            if edge_u == 1 or edge_u // 2 == 1:
+                eu_found    = True
+            g0_u += edge_u // 2
+        except IndexError:
+            g0_u = N_chan - 1
             eu_found = True
-        g0_u += edge_u // 2
+
 
     # Search for lower edge
     el_found = False
     g0_l = g0
     while not el_found:
         edge_l = -1
-        while data[d0, p0, g0_l+edge_l] > threshold:
-            edge_l *= 2
-            # Have we hit lower limit?
-            if g0_l + edge_l <= 0: 
-                g0_l = 0
+        try:
+            while data[d0, p0, g0_l+edge_l] > threshold:
+                edge_l *= 2
+                # Have we hit lower limit?
+                if g0_l + edge_l <= 0: 
+                    g0_l = 0
+                    el_found = True
+                    break
+            if edge_l == -1 or edge_l // 2 == -1:
                 el_found = True
-                break
-        if edge_l == -1 or edge_l // 2 == -1:
+            g0_l += edge_l // 2
+        except IndexError:
+            g0_l = g0
             el_found = True
-        g0_l += edge_l // 2
-
-
 
     return g0_l - g0, g0_u - g0 
 
@@ -269,7 +276,8 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
             results = pd.DataFrame(results)
 
             # Compute and append extent (signal bandwidth)
-            edges_l, edges_u = get_signal_extents(dedopp_array, results, threshold=threshold/2) # Go 3 dB lower than actual threshold
+            threshold_ex = np.max((5, threshold/2)) # Minimum 5-sigma, default is 3 dB below detection threshold (i.e. 1/2)
+            edges_l, edges_u = get_signal_extents(dedopp_array, results, threshold=threshold_ex) 
             results['extent_lower'] = edges_l
             results['extent_upper'] = edges_u
 

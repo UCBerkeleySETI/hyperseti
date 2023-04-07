@@ -85,7 +85,7 @@ def test_browser():
 def test_col_schema():
     cs = get_col_schema('b101_gulp_poly_c9')
     print(cs)
-    assert(cs['description'] == 'Polynomial coefficient 9 for poly fit (c9), beam 101 (b101)')
+    assert(cs['description'] == 'Polynomial fit coefficient 9 (c9), beam 101 (b101)')
 
     with pytest.raises(KeyError):
         cs = get_col_schema('unknown_column')
