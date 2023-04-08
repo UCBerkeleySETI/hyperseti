@@ -9,7 +9,7 @@ readme      = "README.md"
 [tool.poetry.dependencies]
 python      = "~3.8"
 numpy       = "~1.21"
-cupy        = "~11."
+cupy        = "~11.0"
 pandas      = "~2.0"
 h5py        = "~3.8"
 pyyaml      = "~6.0"
