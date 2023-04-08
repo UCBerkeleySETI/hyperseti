@@ -1,4 +1,4 @@
-## Storage format
+## Storing hits with HitDatabase 
 
 Hyperseti implements a simple HDF5-backed database for storing hits from multiple observations. These files can be accessed via the `hyperseti.io.hit_db.HitDatabase` class. 
 

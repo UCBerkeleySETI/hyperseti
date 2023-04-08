@@ -40,6 +40,8 @@ To find a single 'hit' in dedoppler space requires finding the local maxima, and
 (or 'footprint'), which narrows toward a 'waist' at which at the optimal drift rate trial. At this waist point,
 signal power is maximally concentrated; as you move away from the waist the signal power is spread out over multiple channels creating the butterfly 'wings'. The butterfly footprint for each hit can cover a large fraction of the search space, particularly when searching for high drift rate signals.
 
+![butterfly](https://user-images.githubusercontent.com/713251/230712277-7aed5bc5-cff3-4684-b220-5f9a7b018f82.png)
+
 #### Signal extent
 
 If the hit is not a perfect narrowband signal, the width of the butterfly waist is determined by the signal's 
