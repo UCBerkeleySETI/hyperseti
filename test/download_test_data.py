@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(FIGDIR):
         print(f"Creating directory {FIGDIR}")
-        os.mkdir(DATFIGDIRADIR)
+        os.mkdir(FIGDIR)
         
     download_test_data()
     flip_data()
