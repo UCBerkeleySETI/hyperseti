@@ -1,0 +1,26 @@
+name: hyperseti
+channels:
+  - conda-forge
+dependencies:
+  - cupy
+  - cutensor
+  - jupyterlab
+  - ipywidgets
+  - h5py
+  - hdf5plugin
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - logbook
+  - astropy
+  - pyyaml
+test:
+  - pytest
+  - pytest-cov
+  - pytest-runner
+  - pytest-order
+  - codecov 
+build:
+  - python
+  - poetry

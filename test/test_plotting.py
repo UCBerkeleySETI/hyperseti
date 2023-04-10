@@ -12,12 +12,11 @@ import numpy as np
 
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
 
-try:
-    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_yaml
-except:
-    from file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_yaml
+from hyperseti.test_data import voyager_h5, voyager_yaml, tmp_file, tmp_dir
 import os
 
+synthetic_fil = tmp_file('synthetic.fil')
+test_fig_dir = tmp_dir('test_figs')
 
 def test_hitsearch_plotting():
     """ Test hit search routine with multiple signals """

@@ -14,19 +14,17 @@ from datetime import datetime
 import setigen as stg
 import pylab as plt
 import numpy as np
+import os
 
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
-try:
-    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
-except:
-    from file_defs import synthetic_fil, test_fig_dir, voyager_h5
-import os
+from hyperseti.test_data import voyager_h5, tmp_dir, tmp_file
 
 import logbook
 import hyperseti
 
-#hyperseti.dedoppler.logger.level = logbook.DEBUG
-#hyperseti.utils.logger.level = logbook.DEBUG
+synthetic_fil = tmp_file('synthetic.fil')
+test_fig_dir  = tmp_dir('test_figs')
+
 
 def test_dedoppler():
     """ Basic tests of the dedoppler functionality """

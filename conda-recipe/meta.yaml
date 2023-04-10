@@ -1,0 +1,35 @@
+{% set pyproject = load_file_data("../pyproject.toml", from_recipe_dir=True) %}
+{% set requirements = load_file_data("../requirements.yaml", from_recipe_dir=True) %}
+{% set poetry = pyproject.get('tool', {}).get('poetry') %}
+
+package:
+  name: {{ poetry.get('name') }}
+  version: {{ poetry.get('version') }}
+
+about:
+  home: {{ poetry.get('homepage') }}
+  license:  {{ poetry.get('license') }}
+  summary: {{ poetry.get('description') }}
+  description: {{ poetry.get('description') }}
+  dev_url: {{ poetry.get('repository') }}
+  doc_url: {{ poetry.get('documentation') }}
+  doc_source_url: {{ poetry.get('repository') }}/tree/master/docs
+
+source:
+  path: ../
+
+requirements:
+  build:
+    {% for dep in requirements["build"] %}
+    - {{ dep.lower() }}
+    {% endfor %}
+  run:
+    {% for dep in requirements["dependencies"] %}
+    - {{ dep.lower() }}
+    {% endfor %}
+
+test:
+  requires:
+    {% for dep in requirements["test"] %}
+    - {{ dep.lower() }}
+    {% endfor %}

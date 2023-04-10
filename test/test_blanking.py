@@ -14,10 +14,7 @@ from astropy import units as u
 import cupy as cp
 import numpy as np
 
-try:
-    from .file_defs import voyager_fil, voyager_h5
-except:
-    from file_defs import voyager_fil, voyager_h5
+from hyperseti.test_data import voyager_fil, voyager_h5
 
 def generate_data_array_multihits():
     metadata = {'fch1': 6095.214842353016*u.MHz, 
