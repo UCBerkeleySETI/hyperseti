@@ -25,7 +25,9 @@ GPU_ID = 3
 
 
 def test_tsdat():
-    v_sym = os.symlink(voyager_h5, PATH_TEST_DIR + '/voyager.h5', target_is_directory=False)
+    v_sym = os.path.join(PATH_TEST_DIR, 'voyager.h5')
+    if not os.path.exists(v_sym):
+        os.symlink(voyager_h5, v_sym, target_is_directory=False)
 
     # Run findET
     t1 = time.time()

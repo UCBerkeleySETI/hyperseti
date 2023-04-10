@@ -15,7 +15,7 @@ voyager_h5 = download_file("http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.
 voyager_fil = download_file("http://blpd0.ssl.berkeley.edu/Voyager_data/Voyager1.single_coarse.fine_res.fil",
                             pkgname='hyperseti', cache=True, show_progress=True)                           
 
-CACHE_DIR = os.path.join(os.path.dirname(voyager_h5), '../')
+CACHE_DIR = os.path.join(os.path.dirname(voyager_h5), '../../../')
 if not os.path.exists(os.path.join(CACHE_DIR, 'tmp')):
     os.mkdir(os.path.join(CACHE_DIR, 'tmp'))
 
@@ -44,18 +44,17 @@ def flip_data(voyager_h5):
         print("Done.")
     return voyager_h5_flipped
 
-def tmp_file(filename):
+voyager_h5_flipped = flip_data(voyager_h5)
+voyager_csv  = os.path.join(HERE, 'Voyager1.single_coarse.fine_res.csv')
+voyager_yaml = os.path.join(HERE, 'Voyager1.single_coarse.fine_res.yaml')
+
+def tmp_file(filename: str) -> str:
     if not os.path.exists(os.path.join(CACHE_DIR, 'tmp')):
         os.mkdir(os.path.join(CACHE_DIR, 'tmp'))
     tmp_filename = os.path.join(CACHE_DIR, 'tmp', filename)
     return tmp_filename
 
-def tmp_dir(dirname):
+def tmp_dir(dirname: str) -> str:
     if not os.path.exists(os.path.join(CACHE_DIR, 'tmp', dirname)):
         os.mkdir(os.path.join(CACHE_DIR, 'tmp', dirname))
     return os.path.join(CACHE_DIR, 'tmp', dirname)
-
-voyager_h5_flipped = flip_data(voyager_h5)
-
-voyager_csv  = os.path.join(HERE, 'Voyager1.single_coarse.fine_res.csv')
-voyager_yaml = os.path.join(HERE, 'Voyager1.single_coarse.fine_res.yaml')
