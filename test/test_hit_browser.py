@@ -6,10 +6,7 @@ import cupy as cp
 import pandas as pd
 import os
 
-try:
-    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_csv
-except:
-    from file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_csv
+from hyperseti.test_data import voyager_h5, voyager_csv
 
 def test_browser():
     try:

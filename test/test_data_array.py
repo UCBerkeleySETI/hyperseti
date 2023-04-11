@@ -1,8 +1,5 @@
 from hyperseti.io import from_fil, from_h5
-try:
-    from .file_defs import voyager_fil, voyager_h5
-except:
-    from file_defs import voyager_fil, voyager_h5
+from hyperseti.test_data import voyager_fil, voyager_h5
 
 import numpy as np
 import cupy as cp

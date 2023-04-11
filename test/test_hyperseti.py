@@ -11,19 +11,16 @@ from astropy import units as u
 import setigen as stg
 import pylab as plt
 import numpy as np
+import os
 
 from hyperseti.plotting import imshow_dedopp, imshow_waterfall, overlay_hits
-try:
-    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_yaml
-except:
-    from file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_yaml
-import os
+from hyperseti.test_data import voyager_h5, voyager_yaml, tmp_file, tmp_dir
+
+synthetic_fil = tmp_file('synthetic.fil')
+test_fig_dir  = tmp_dir('test_figs')
 
 import logbook
 import hyperseti
-#hyperseti.dedoppler.logger.level = logbook.DEBUG
-#hyperseti.utils.logger.level = logbook.DEBUG
-#hyperseti.hyperseti.logger.level = logbook.DEBUG
 
 def test_hitsearch():
     """ Test the hit search routines """

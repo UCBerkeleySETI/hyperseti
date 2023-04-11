@@ -29,10 +29,7 @@ from hyperseti.log import update_levels, get_logger
 from hyperseti.utils import time_logger
 from hyperseti.io.hit_db import HitDatabase
 
-try:
-    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
-except:
-    from file_defs import synthetic_fil, test_fig_dir, voyager_h5
+from hyperseti.test_data import voyager_h5, tmp_file
 
 # Other parameters:
 GULP_SIZE = 1048576
@@ -75,7 +72,7 @@ def test_with_voyager():
 
         hit_browser = find_et(voyager_h5, config, 
                         gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
-                        filename_out='./test_voyager_hits.csv',
+                        filename_out=tmp_file('./test_voyager_hits.csv'),
                         log_output=True,
                         log_config=True
                         )
@@ -87,9 +84,9 @@ def test_with_voyager():
         print(dframe.dtypes)
         list_drate = dframe["drift_rate"].tolist()
 
-        assert os.path.exists('test_voyager_hits.csv')
-        assert os.path.exists('test_voyager_hits.yaml')
-        assert os.path.exists('test_voyager_hits.log')
+        assert os.path.exists(tmp_file('test_voyager_hits.csv'))
+        assert os.path.exists(tmp_file('test_voyager_hits.yaml'))
+        assert os.path.exists(tmp_file('test_voyager_hits.log'))
 
         # This is a quick test to check if smaller gulps are taking the channel offset into account
         assert np.alltrue(dframe['channel_idx'] > 739000)
@@ -103,7 +100,7 @@ def test_with_voyager():
 
         hit_browser = find_et(voyager_h5, config, 
                         gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
-                        filename_out='./test_voyager_hits.csv',
+                        filename_out=tmp_file('./test_voyager_hits.csv'),
                         log_output=True,
                         log_config=True
                         )
@@ -115,7 +112,7 @@ def test_with_voyager():
         config['preprocess']['poly_fit'] = 5
         hit_browser = find_et(voyager_h5, config, 
                         gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
-                        filename_out='./test_voyager_hits.csv',
+                        filename_out=tmp_file('./test_voyager_hits.csv'),
                         log_output=True,
                         log_config=True
                         )
@@ -123,15 +120,15 @@ def test_with_voyager():
         dframe = hit_browser.hit_table
         print(dframe.dtypes)
 
-        db = HitDatabase('test_voyager_hits.hitdb', mode='w')
+        db = HitDatabase(tmp_file('test_voyager_hits.hitdb'), mode='w')
         hit_browser.to_db(db, 'voyager')
 
     finally:
-        for file_ext in ('.log', '.csv', '.yaml'):
+        for file_ext in ('.log', '.csv', '.yaml', '.hitdb'):
             cleanup=True
             if cleanup:
-                if os.path.exists('test_voyager_hits' + file_ext):
-                    os.remove('test_voyager_hits' + file_ext)
+                if os.path.exists(tmp_file('test_voyager_hits' + file_ext)):
+                    os.remove(tmp_file('test_voyager_hits' + file_ext))
 
 if __name__ == "__main__":
     dframe = test_with_voyager()

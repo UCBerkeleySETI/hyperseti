@@ -8,10 +8,7 @@ from hyperseti.pipeline import logger
 import logbook
 logger.level = logbook.WARNING
 
-try:
-    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5
-except:
-    from file_defs import synthetic_fil, test_fig_dir, voyager_h5
+from hyperseti.test_data import voyager_h5
 
 from hyperseti.pipeline import GulpPipeline, find_et
 

@@ -46,7 +46,7 @@ def get_col_schema(name: str) -> dict:
             d['description'] = d['description'].replace('coefficient Y (cY)',
                                                         f'coefficient {coeff_id} (c{coeff_id})')
         else:
-            d = deepcopy(SCHEMA_DICT[f'b{0}_{col_name}'])
+            d = deepcopy(SCHEMA_DICT[f'bX_{col_name}'])
         d['description'] = d['description'].replace('beam X (bX)', 
                                             f'beam {beam_id} (b{beam_id})')
     else:

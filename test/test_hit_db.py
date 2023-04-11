@@ -10,10 +10,7 @@ import h5py
 
 import pytest
 
-try:
-    from .file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_csv, voyager_yaml
-except:
-    from file_defs import synthetic_fil, test_fig_dir, voyager_h5, voyager_csv, voyager_yaml
+from hyperseti.test_data import voyager_h5, voyager_csv, voyager_yaml
 
 def test_hit_db():
     try:
