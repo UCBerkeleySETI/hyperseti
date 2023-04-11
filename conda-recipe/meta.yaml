@@ -27,7 +27,6 @@ requirements:
     {% for dep in requirements["dependencies"] %}
     - {{ dep.lower() }}
     {% endfor %}
-
 test:
   requires:
     {% for dep in requirements["test"] %}

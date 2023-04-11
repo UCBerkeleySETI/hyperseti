@@ -1,22 +1,21 @@
 name: hyperseti
 channels:
   - conda-forge
+  - nvidia
 dependencies:
   - cupy
-  - cutensor
-  - jupyterlab
-  - ipywidgets
   - h5py
-  - hdf5plugin
   - numpy
   - scipy
   - pandas
   - matplotlib
-  - logbook
   - astropy
   - pyyaml
+  - hdf5plugin
+  - logbook
 test:
   - pytest
+  - coverage
   - pytest-cov
   - pytest-runner
   - pytest-order
@@ -24,3 +23,7 @@ test:
 build:
   - python
   - poetry
+docs:
+  - sphinx     
+  - sphinx-rtd-theme
+  - myst-parser

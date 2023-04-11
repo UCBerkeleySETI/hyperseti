@@ -2,30 +2,28 @@
 
 ### Installation
 
-Theoretically, just type:
-
-```
-pip install git+https://github.com/ucberkeleyseti/hyperseti
-```
-
 hyperseti uses the GPU heavily, so a working CUDA environment is needed, and
-requires Python 3.7 or above.  hyperseti relies upon `cupy`, which is easiest to install using `conda` (or `mamba`). If starting from scratch, this should get you most of the way there:
+requires Python 3.7 or above.  hyperseti relies upon `cupy`, which is easiest to install using `conda` (or `mamba`). 
+
+To install from conda/mamba package:
 
 ```
-conda create -n hyper -c nvidia -c conda-forge python=3.10 cudatoolkit=11.3 cupy jupyterlab ipywidgets
+conda install -c technosignatures hyperseti
 ```
 
-Where `cudatoolkit=XX` should match your installed CUDA version. Jupyterlab and ipywidgets are optional, but useful for a base environment.
+If starting from scratch, this should get you most of the way there:
+
+```
+conda create -n hyper -c nvidia -c conda-forge python=3.10 cupy jupyterlab ipywidgets
+```
+
+Jupyterlab and ipywidgets are optional, but useful for a base environment.
 
 From there:
+
 ```
 conda activate hyper
-git clone https://github.com/UCBerkeleySETI/hyperseti
-cd hyperseti
-pip install -r requirements.txt
-pip install -r requirements_test.txt
-pip install -r docs/requirements.txt
-pip install .
+pip install git+https://github.com/ucberkeleyseti/hyperseti
 ```
 
 
