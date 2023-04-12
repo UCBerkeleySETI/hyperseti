@@ -162,7 +162,3 @@ def cmd_tool(args=None):
             snr = float(row[3])
             channel_idx = int(row[4])
             write_tophit_line(fd, tophit_count, channel_idx, hit_freq, drift_rate, snr)
-
-
-if __name__ == "__main__":
-    cmd_tool()

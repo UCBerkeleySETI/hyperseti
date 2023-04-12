@@ -4,7 +4,7 @@ import numpy as np
 
 HANDLED_FUNCTIONS = {}
 
-def implements(numpy_function):
+def implements(numpy_function): #pragma: no cover
     """Register an __array_function__ implementation for MyArray objects.
     
     See https://numpy.org/neps/nep-0018-array-function-protocol.html
