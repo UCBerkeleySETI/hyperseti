@@ -7,6 +7,7 @@ from turbo_seti import run_pipelines
 from hyperseti import find_et
 from hyperseti.tsdat import cmd_tool as gendat
 from hyperseti.test_data import voyager_h5, tmp_dir
+import pytest
 
 # File path definitions.
 PATH_TEST_DIR = tmp_dir("test_tsdat")
@@ -23,11 +24,13 @@ MIN_DRIFT_RATE = 0.00001
 SNR_THRESHOLD = 25.0
 GPU_ID = 3
 
+v_sym = os.path.join(PATH_TEST_DIR, 'voyager.h5')
+if not os.path.exists(v_sym):
+    os.symlink(voyager_h5, v_sym, target_is_directory=False)
+
 
 def test_tsdat():
-    v_sym = os.path.join(PATH_TEST_DIR, 'voyager.h5')
-    if not os.path.exists(v_sym):
-        os.symlink(voyager_h5, v_sym, target_is_directory=False)
+
 
     # Run findET
     t1 = time.time()
@@ -65,5 +68,17 @@ def test_tsdat():
     parms = [PATH_TEST_DIR, "-o", PATH_TEST_DIR]
     run_pipelines.main(parms)
 
+
+def test_tsdat_errors():
+    import mock
+    with pytest.raises(SystemExit):
+        parms = ["-M", str(MAX_DRIFT_RATE), "-l", "16", "-o", PATH_TEST_DIR, 'missing_file.csv', v_sym]
+        gendat(parms)
+
+    with pytest.raises(SystemExit):
+        parms = ["-M", str(MAX_DRIFT_RATE), "-l", "16", "-o", PATH_TEST_DIR, PATH_HITS_CSV, 'missing_file.h5']
+        gendat(parms)
+
 if __name__ == "__main__":
     test_tsdat()
+    test_tsdat_errors()

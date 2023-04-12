@@ -19,7 +19,7 @@ CACHE_DIR = os.path.join(os.path.dirname(voyager_h5), '../../../')
 if not os.path.exists(os.path.join(CACHE_DIR, 'tmp')):
     os.mkdir(os.path.join(CACHE_DIR, 'tmp'))
 
-def flip_data(voyager_h5):
+def flip_data(voyager_h5): #pragma: no cover
     """ Flip Voyager data along frequency axis.
 
     The flipped file is used to check logic works when frequency is inverted.
@@ -49,12 +49,14 @@ voyager_csv  = os.path.join(HERE, 'Voyager1.single_coarse.fine_res.csv')
 voyager_yaml = os.path.join(HERE, 'Voyager1.single_coarse.fine_res.yaml')
 
 def tmp_file(filename: str) -> str:
+    """ Create a temporary file in ~/.hyperseti"""
     if not os.path.exists(os.path.join(CACHE_DIR, 'tmp')):
         os.mkdir(os.path.join(CACHE_DIR, 'tmp'))
     tmp_filename = os.path.join(CACHE_DIR, 'tmp', filename)
     return tmp_filename
 
 def tmp_dir(dirname: str) -> str:
+    """ Create a temporary directory in ~/.hyperseti"""
     if not os.path.exists(os.path.join(CACHE_DIR, 'tmp', dirname)):
         os.mkdir(os.path.join(CACHE_DIR, 'tmp', dirname))
     return os.path.join(CACHE_DIR, 'tmp', dirname)

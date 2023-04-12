@@ -116,6 +116,8 @@ def test_raises():
 
     with pytest.raises(IndexError):
         ds[100000]
+    
+    with pytest.raises(IndexError):
         ts[100000]
     
     with pytest.raises(TypeError): 
@@ -125,8 +127,17 @@ def test_raises():
     
     with pytest.raises(ValueError):
         ds.index(-1)
+    
+    with pytest.raises(ValueError):
         ds.index(np.arange(-1, 1, 0.1))
+
+    with pytest.raises(ValueError):
         ds.index(1001, -9)
+    
+    with pytest.raises(TypeError):
+        np.concatenate((ds, ds))
+    
+
   
 def test_index():
     # Test index() method works with quantities
