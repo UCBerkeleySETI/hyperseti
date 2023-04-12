@@ -23,7 +23,6 @@ astropy     = ">=5.2"
 setigen     = ">=2.4"
 hdf5plugin  = ">=4.1"
 matplotlib  = ">=3.7"
-blimpy      = ">=2.1"
 
 [project.scripts]
 findET = "hyperseti.findET:cmd_tool"
@@ -32,6 +31,7 @@ tsdat  = "hyperseti.tsdat:cmd_tool"
 [tool.poetry.group.test.dependencies]
 pytest           = ">=7.2"
 turbo_seti       = ">=2.3"
+blimpy           = ">=2.1"
 
 [tool.poetry.group.docs.dependencies]
 coverage         = ">=7.2"
