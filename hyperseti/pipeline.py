@@ -7,7 +7,7 @@ import h5py
 
 from astropy import units as u
 import setigen as stg
-from blimpy.io import sigproc
+
 from copy import deepcopy
 
 from .dedoppler import dedoppler, calc_ndrift
@@ -21,6 +21,7 @@ from .blanking import blank_edges, blank_extrema, blank_hits_gpu
 from .hit_browser import HitBrowser
 from .version import HYPERSETI_VERSION
 from .data_array import DataArray
+from .thirdparty import sigproc
 
 #logging
 from .log import get_logger
