@@ -6,7 +6,7 @@ from hyperseti.thirdparty import sigproc
 from hyperseti.dimension_scale import TimeScale, DimensionScale
 from hyperseti.data_array import DataArray
 
-def from_fil(filename):
+def from_fil(filename: str) -> DataArray:
     """ Create a DataArray from a sigproc filterbank file
     
     Args:

@@ -17,7 +17,7 @@ from .log import get_logger
 logger = get_logger('hyperseti.hits')
 
 
-def create_empty_hits_table(sk_col=False):
+def create_empty_hits_table(sk_col: bool=False):
     """ Create empty pandas dataframe for hit data
 
     Args:
@@ -51,7 +51,7 @@ def create_empty_hits_table(sk_col=False):
     return hits
 
 
-def merge_hits(hitlist):
+def merge_hits(hitlist: pd.DataFrame):
     """ Group hits corresponding to different boxcar widths and return hit with max SNR 
     
     Args:
@@ -94,7 +94,7 @@ def merge_hits(hitlist):
     
     return hits
 
-def get_signal_extent(data, d0, p0, g0, threshold=10):
+def get_signal_extent(data, d0: int, p0: int, g0: int, threshold: float=10):
     """ Find the extent (bandwidth) of a signal 
     
     Args:
@@ -106,6 +106,11 @@ def get_signal_extent(data, d0, p0, g0, threshold=10):
 
     Returns:
         edge_l, edge_u (int, int): Lower and upper offsets before threshold 
+    
+    Notes:
+        Uses a logarithmic-style search strategy, moving by n_step * 2. Not guaranteed
+        not to overshoot and jump over an edge point for closely spaced signals > threshold.
+        TODO: Implement in CUDA 
     """    
     
     if data[d0, p0, g0] < threshold:
@@ -157,7 +162,7 @@ def get_signal_extent(data, d0, p0, g0, threshold=10):
 
     return g0_l - g0, g0_u - g0 
 
-def get_signal_extents(dedopp_array, hits, threshold=10):
+def get_signal_extents(dedopp_array: DataArray, hits: pd.DataFrame, threshold: int=10) -> (np.ndarray, np.ndarray):
     """ Find the extent (bandwidth) of hits
     
     Args:
@@ -182,7 +187,8 @@ def get_signal_extents(dedopp_array, hits, threshold=10):
 
     return edges_l, edges_u  
 
-def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwargs):
+def hitsearch(dedopp_array: DataArray, threshold: int=10, min_fdistance: int=100, 
+              sk_data: DataArray=None, **kwargs) -> pd.DataFrame:
     """ Search for hits using custom relative maxima kernel
     
     Args:
@@ -190,7 +196,7 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
         metadata (dict): Dictionary of metadata needed to convert from indexes to frequencies etc
         threshold (float): Threshold value (absolute) above which a peak can be considered
         min_fdistance (int): Minimum distance in pixels to nearest peak along frequency axis
-        sk_data (DataArray): array of 
+        sk_data (DataArray): array of SK values 
     
     Returns:
         results (pd.DataFrame): Pandas dataframe of results, with columns 
@@ -205,12 +211,11 @@ def hitsearch(dedopp_array, threshold=10, min_fdistance=100, sk_data=None, **kwa
     
     drift_trials = np.asarray(dedopp_array.drift_rate.data)
 
-    # TODO: Get this out of loop? 
+    # TODO: Reinstate memory management?
     # Set kernel size to be 2^(N-1)
     #K = 2**(int(np.log2(min_fdistance)))
     #pf = PeakFinder()
     #pf.init(N_chan=dedopp_array.shape[2], N_time=dedopp_array.shape[0], K=K)  
-
 
     t0 = time.time()
     dfs = []

@@ -6,7 +6,7 @@ import setigen as stg
 from hyperseti.dimension_scale import TimeScale, DimensionScale
 from hyperseti.data_array import DataArray
 
-def from_setigen(stg_frame):
+def from_setigen(stg_frame: stg.Frame) -> DataArray:
     """ Create a DataArray from a setigen Frame object 
     
     Args:

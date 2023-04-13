@@ -1,10 +1,13 @@
+from __future__ import annotations
 from astropy.units import Unit, Quantity
 from astropy.time import Time, TimeDelta
 import numpy as np
+from typing import Any, Callable
+
 
 HANDLED_FUNCTIONS = {}
 
-def implements(numpy_function): #pragma: no cover
+def implements(numpy_function: Callable[[], Any]): #pragma: no cover
     """Register an __array_function__ implementation for MyArray objects.
     
     See https://numpy.org/neps/nep-0018-array-function-protocol.html
@@ -14,7 +17,7 @@ def implements(numpy_function): #pragma: no cover
         return func
     return decorator
 
-def isscalar(x):
+def isscalar(x: Quantity) -> bool:
     """ Check if x is scalar """
     # Quantity does not return True with np.isscalar, even if q.isscalar=True
     if isinstance(x, (Quantity, Time, TimeDelta)):
@@ -22,29 +25,34 @@ def isscalar(x):
     else:
         return np.isscalar(x)
 
-def issamelength(a, b):
+def issamelength(a: np.ndarray, b: np.ndarray) -> bool:
     """ Check two arrays are same lengths """
     if len(a) == len(b):
         return True
     else:
         return False 
 
-def to_quantity(x, unit):
+def to_quantity(x: np.ndarray, unit: str) -> Quantity:
     """ Force x to be astropy.Quantity """
     if isinstance(x, Quantity):
         return x.to(unit)
     else:
         return Quantity(x, unit=unit)
 
-def check_lengths(a, b):
+def check_lengths(a: np.ndarray, b: np.ndarray):
     """ Check len(a) == len(b) and raise ValueError if not """
     # Quantity does not return True with np.isscalar, even if q.isscalar=True
     if not issamelength(a, b):
         raise ValueError(f"Lengths of DimensionScales do not match: {len(a)} vs {len(b)}")
 
 class ArrayBasedDimensionScale(object):
-    """ TODO """
-    def __init__(self, name, np_array, units=None):
+    """ A dimension scale object that is backed by a numpy array 
+    
+    Notes:
+        Primary use case is for stepped dedoppler plan, where dimension has non-linear
+        step sizes. 
+    """
+    def __init__(self, name: str, np_array: np.ndarray, units: str=None):
         self.name = name
         self.data = np_array
         self.units     = Unit(units) if isinstance(units, str) else units
@@ -52,7 +60,7 @@ class ArrayBasedDimensionScale(object):
         self.ndim  = np_array.ndim
         self.dtype = np_array.dtype
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int) -> ArrayBasedDimensionScale:
         """ Allow indexing with scale[i] """
         return ArrayBasedDimensionScale(self.name, self.data[i], self.units)
 
@@ -114,7 +122,7 @@ class DimensionScale(object):
         [4] https://numpy.org/devdocs/user/basics.dispatch.html
     
     """
-    def __init__(self, name, val_start, val_step, n_step, units=None):
+    def __init__(self, name: str, val_start: float, val_step: float, n_step: int, units: str=None):
         self.name = name
         if isinstance(val_start, Quantity):
             self.val_start = val_start.to(units).value
@@ -131,30 +139,30 @@ class DimensionScale(object):
         self.dtype = np.dtype('float64')
     
     @property
-    def step(self):
+    def step(self) -> Quantity:
         return Quantity(self.val_step, unit=self.units)
     
     @property
-    def start(self):
+    def start(self) -> Quantity:
         return Quantity(self.val_start, unit=self.units)
 
-    def _generate_array(self, start_idx=None, stop_idx=None):
+    def _generate_array(self, start_idx: int=None, stop_idx: int=None):
         """ Generate an numpy array from this DimensionScale object
         
-        This is called by __array__() with no args for np.asarray support.
+        This is called by __array__() with no args for np.asarray support
         """
         start_idx = 0 if start_idx is None else start_idx
         stop_idx = self.n_step if stop_idx is None else stop_idx
         return np.arange(start_idx, stop_idx) * self.val_step + self.val_start
 
-    def __len__(self):
+    def __len__(self) -> int:
         """ Return length of array, called when len(x) is used on the object """
         return self.n_step
         
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<DimensionScale '{self.name}': start {self.val_start} {self.units} step {self.val_step} {self.units} nstep {self.n_step} >"
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int) -> DimensionScale:
         """ Supports indexing of the DimensionScale, e.g. ds[0:10:2] """
         if isinstance(i, slice):
             skip  = 1 if i.step is None else i.step
@@ -170,7 +178,7 @@ class DimensionScale(object):
                 raise IndexError(f"Index ({i}) is out of axis bound ({self.n_step})")
             return i * self.val_step + self.val_start
     
-    def __array__(self):
+    def __array__(self) -> np.ndarray:
         """ Returns an evaluated numpy array when np.asarray called. 
         
         See https://numpy.org/neps/nep-0030-duck-array-protocol.html
@@ -186,7 +194,7 @@ class DimensionScale(object):
         """
         return self
     
-    def __array_function__(self, func, types, args, kwargs):
+    def __array_function__(self, func: Callable[[], Any], types: tuple, args, kwargs):
         if func not in HANDLED_FUNCTIONS:
             return NotImplemented
         # Note: this allows subclasses that don't override
@@ -195,7 +203,7 @@ class DimensionScale(object):
             return NotImplemented
         return HANDLED_FUNCTIONS[func](*args, **kwargs)
     
-    def __add__(self, other):
+    def __add__(self, other: DimensionScale) -> DimensionScale:
         """ Implement element-wise addition support with unit handling """
         if isscalar(other):
             other = to_quantity(other, self.units)
@@ -209,7 +217,7 @@ class DimensionScale(object):
             new_val_step = (self.val_step + other_val_step) * self.units
             return DimensionScale(self.name, new_val.value, new_val_step.value, self.n_step, units=new_val.unit)
 
-    def __sub__(self, other):
+    def __sub__(self, other: DimensionScale) -> DimensionScale:
         """ Implement element-wise subtraction support with unit handling """
         if isscalar(other):
             other = to_quantity(other, self.units)
@@ -223,7 +231,7 @@ class DimensionScale(object):
             new_val_step = (self.val_step - other_val_step) * self.units
             return DimensionScale(self.name, new_val.value, new_val_step.value, self.n_step, units=new_val.unit)
 
-    def __mul__(self, other):
+    def __mul__(self, other: DimensionScale) -> DimensionScale:
         """ Implement element-wise muliplication support with unit handling """
         if isscalar(other):
             other = to_quantity(other, self.units)
@@ -237,7 +245,7 @@ class DimensionScale(object):
             new_val_step = (self.val_step * other_val_step) * self.units
             return DimensionScale(self.name, new_val.value, new_val_step.value, self.n_step, units=new_val.unit)
 
-    def __truediv__(self, other):
+    def __truediv__(self, other: DimensionScale) -> DimensionScale:
         """ Implement element-wise muliplication support with unit handling """
         if isscalar(other):
             other = to_quantity(other, self.units)
@@ -251,7 +259,7 @@ class DimensionScale(object):
             new_val_step = (self.val_step / other_val_step) * self.units
             return DimensionScale(self.name, new_val.value, new_val_step.value, self.n_step, units=new_val.unit)
     
-    def to(self, new_unit):
+    def to(self, new_unit: str) -> DimensionScale:
         """ Convert units (using astropy units) 
         
         Returns a copy of the DimensionScale with units converted to new_unit
@@ -262,12 +270,16 @@ class DimensionScale(object):
         new_val_step = current_val_step.to(new_unit)
         return DimensionScale(self.name, new_val.value, new_val_step.value, self.n_step, units=new_val.unit)
     
-    def generate(self, start_idx=None, stop_idx=None):
+    def generate(self, start_idx: int=None, stop_idx: int=None) -> Quantity:
         """ Generate an astropy.Quantity array from this DimensionScale object """
         return Quantity(self._generate_array(start_idx, stop_idx), unit=self.units)
     
-    def index(self, val, val2=None):
-        """ Lookup the closest index where DimensionScale equals value """
+    def index(self, val: float, val2: float=None) -> int:
+        """ Lookup the closest index where DimensionScale equals value 
+        
+        Notes:
+            I don't recall why this originally supported val2, but left for legacy reasons.
+        """
         #x = x0 + i * dx
         # i = (x - x0) / dx
         if isinstance(val, Quantity):
@@ -295,7 +307,8 @@ class TimeScale(DimensionScale):
     This is a subclass of DimensionScale, but uses astropy.Time and TimeDelta 
     to better handle time slicing.
     """
-    def __init__(self, name, time_start, time_step, n_step, time_format='unix', time_delta_format='sec'):
+    def __init__(self, name: str, time_start: float, time_step: float, 
+                 n_step: int, time_format: str='unix', time_delta_format: str='sec'):
             
         time_start_unix = Time(time_start, format=time_format).to_value('unix')
         time_step_sec   = TimeDelta(time_step, format=time_delta_format).to_value('sec')
@@ -303,39 +316,39 @@ class TimeScale(DimensionScale):
         self.time_format = time_format
         self.time_delta_format = time_delta_format
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         t0 = self.time_start
         dt = self.time_delta
         return f"<TimeScale '{self.name}': start {t0} {self.time_format} step {dt} {self.time_delta_format} nstep {self.n_step} >"
     
     @property
-    def time_start(self):
+    def time_start(self) -> Time:
         t = Time(self.val_start, format='unix')
         t.format = self.time_format
         return t
 
     @property
-    def time_delta(self):
+    def time_delta(self) -> TimeDelta:
         t = TimeDelta(self.val_step, format='sec')
         t.format = self.time_delta_format
         return t
     
     @property
-    def step(self):
+    def step(self) -> Quantity:
         return Quantity(self.val_step, unit='s')
     
     @property
-    def elapsed(self):
+    def elapsed(self) -> TimeDelta:
         t = TimeDelta(self.val_step * self.n_step, format='sec').to('s')
         return t
     
-    def generate(self, start_idx=None, stop_idx=None):
+    def generate(self, start_idx: int=None, stop_idx: int=None) -> Time:
         """ Generate an astropy.Time array from this TimeScale object """
         t = Time(self._generate_array(start_idx, stop_idx), format='unix')
         t.format = self.time_format
         return t
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: slice) -> TimeScale:
         """ Supports indexing of the TimeScale, e.g. ts[0:10:2] """
         if isinstance(i, slice):
             skip  = 1 if i.step is None else i.step

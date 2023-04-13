@@ -19,7 +19,7 @@ CACHE_DIR = os.path.join(os.path.dirname(voyager_h5), '../../../')
 if not os.path.exists(os.path.join(CACHE_DIR, 'tmp')):
     os.mkdir(os.path.join(CACHE_DIR, 'tmp'))
 
-def flip_data(voyager_h5): #pragma: no cover
+def flip_data(voyager_h5: str): #pragma: no cover
     """ Flip Voyager data along frequency axis.
 
     The flipped file is used to check logic works when frequency is inverted.

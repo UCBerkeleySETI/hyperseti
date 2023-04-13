@@ -1,5 +1,7 @@
+from __future__ import annotations
 import numpy as np
 import os
+from typing import Any, Callable
 from astropy.coordinates import SkyCoord
 from astropy.units import Quantity
 import itertools
@@ -33,13 +35,13 @@ class DataArray(object):
     not call this directly.
     
     Constructor must have:
-        data: np.array like (e.g. h5py dataset, np.memmap dataset)
+        data: np.array like (e.g. h5py dataset, np.memmap dataset, cp.array)
         dims: tuple of dimension labels, e.g. (time, frequency)
         scales: dict of {dim: DimensionScale}
         attrs: dict of metadata attributes (can be anything)
     """
-    def __init__(self, data, dims, scales, attrs, units=None, 
-                 slice_info=None, parent_shape=None):
+    def __init__(self, data: np.ndarray, dims: tuple, scales: tuple, attrs:tuple, units: tuple=None, 
+                 slice_info: tuple=None, parent_shape: tuple=None):
         
         # Check correct setup
         assert isinstance(attrs, dict)
@@ -67,11 +69,13 @@ class DataArray(object):
         self._is_slice = False if slice_info is None else True
     
     @property
-    def shape(self):
+    def shape(self) -> tuple:
+        """ Return data shape """
         return self.data.shape
 
     @property
-    def space(self):
+    def space(self) -> str:
+        """ Return data memory space (GPU or CPU) """
         if isinstance(self.data, cp.ndarray):
             return 'gpu'
         else:
@@ -79,10 +83,11 @@ class DataArray(object):
     
     @property
     def dtype(self):
+        """ Return dtype"""
         return self.data.dtype
     
     @property
-    def metadata(self):
+    def metadata(self) -> dict:
         """ Split off metadata and return array + dict
         
         Args:
@@ -108,11 +113,11 @@ class DataArray(object):
 
         return metadata
         
-    def __repr__(self):
+    def __repr__(self) -> str:
         r = f"<DataArray: shape={self.shape}, dims={self.dims}>"
         return r
     
-    def _repr_html_(self):
+    def _repr_html_(self) -> str:
         
         chunks = [(s,) for s in self.data.shape]
         arr_img = svg(chunks)
@@ -191,7 +196,7 @@ class DataArray(object):
         """
         return self.data    
     
-    def sel(self, sel, space=None):
+    def sel(self, sel: dict, space: str=None) -> DataArray:
         """ Select subset of data using slices along specified dimension.
         
         Args:
@@ -223,11 +228,13 @@ class DataArray(object):
                          slice_info=slices, parent_shape=self.data.shape)
     
 
-    def iterate_through_data(self, dims, overlap={}, space=None):
+    def iterate_through_data(self, dims: tuple, overlap: dict={}, space: str=None):
         """ Generator to iterate through chunks of data
         
         Args:
-            dims (dict): Dictionary of {dim: chunk_size}.
+            dims (dict): Dictionary of {dim: chunk_size}
+            overlap (dict): Dictionary of overlap {dim: n_overlap}
+            space (str): cpu or gpu memory space 
         
         Example usage:
             # iterate over blocks of frequency and time
@@ -265,7 +272,7 @@ class DataArray(object):
             selector = {key: slice for key, slice in zip(dims, slices)}
             yield self.sel(selector, space=space)
 
-    def apply_transform(self, transform, *args, **kwargs):
+    def apply_transform(self, transform: Callable[[], Any], *args, **kwargs):
         """ Apply a tranformation function (e.g. np.log) to the data 
         
         Args:
@@ -288,18 +295,23 @@ class DataArray(object):
             raise RuntimeError(f"Could not interpret {transform} as cupy/numpy or callable function")
         self.data = func(self.data, *args, **kwargs)
     
-    def split_metadata(self):
+    def split_metadata(self) -> tuple[np.ndarray, dict]:
+        """ Split metadata from data
+        
+        Returns:
+            data, metadata (array + dict)
+        """
         return split_metadata(self)
     
     def __len__(self):
         return len(self.data)
 
 
-def from_metadata(darray, metadata, dims=None, units=None):
+def from_metadata(darray: np.ndarray, metadata: dict, dims: tuple=None, units: tuple=None) -> DataArray:
     """ Create a data array from an array + metadata 
     
     Args:
-        darray (array-like): Data array
+        darray (array-like): Data array (np.array, cp.array, h5py.dataset np.memmap, etc)
         metadata (dict): Metadata dictionary
         dims (list): Names for dimensions of darray
     
@@ -334,7 +346,7 @@ def from_metadata(darray, metadata, dims=None, units=None):
     d = DataArray(darray, dims, scales, attrs, units)
     return d
 
-def split_metadata(data_array):
+def split_metadata(data_array: DataArray) -> tuple[np.ndarray, dict]:
     """ Split off metadata and return array + dict
     
     Args:
