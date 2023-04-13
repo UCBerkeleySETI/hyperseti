@@ -53,5 +53,6 @@ def get_col_schema(name: str) -> dict:
         d = deepcopy(SCHEMA_DICT[name])
     return d
 
-def get_schema():
+def get_schema() -> dict:
+    """ Return the schema dictionary """
     return SCHEMA_DICT

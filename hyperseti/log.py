@@ -24,8 +24,16 @@ logging.getLogger('hdf5plugin').setLevel(logging.ERROR)
 
 from .singletons import logger_name_list, logger_list
 
+LOG_LEVELS = {
+    'critical': logbook.CRITICAL,
+    'error': logbook.ERROR,
+    'warning': logbook.WARNING,
+    'notice': logbook.NOTICE,
+    'info': logbook.INFO,
+    'debug': logbook.DEBUG
+}
 
-def set_log_level(level, debug=[]):
+def set_log_level(level: str, debug: list=[]):
     """ Set global logging level for hyperseti calls
     
     Args:
@@ -34,7 +42,7 @@ def set_log_level(level, debug=[]):
     """
     update_levels(level, debug)
 
-def update_levels(arg_group_level, arg_debug_name_list=[]):
+def update_levels(arg_group_level: str, arg_debug_name_list: list=[]):
     """ Update logging levels 
     
     Args:
@@ -47,17 +55,10 @@ def update_levels(arg_group_level, arg_debug_name_list=[]):
         For each element of the logger_name_list & logger_list (singletons).
 
     """
-    levels = {
-        'critical': logbook.CRITICAL,
-        'error': logbook.ERROR,
-        'warning': logbook.WARNING,
-        'notice': logbook.NOTICE,
-        'info': logbook.INFO,
-        'debug': logbook.DEBUG
-    }
 
-    if arg_group_level in levels.keys():
-        arg_group_level = levels[arg_group_level]
+    if arg_group_level in LOG_LEVELS.keys():
+        arg_group_level = LOG_LEVELS[arg_group_level]
+    print("HERE", arg_group_level)
 
     for ix, logger_name in enumerate(logger_name_list):
         if logger_name in arg_debug_name_list:
@@ -66,14 +67,24 @@ def update_levels(arg_group_level, arg_debug_name_list=[]):
             logger_list[ix].level = arg_group_level
 
 
-def get_logger(arg_name):
+def get_logger(arg_name: str, level: str=None) -> Logger:
     """ Called when the signal processing functions are being 
     loaded by Python. Each call returns a logger object whose level will be 
     updated later. Successive calls build up 2 singleton lists: logger_list 
     and logger_name_list.
+
+    Args:
+        arg_name (str): Logger name, e.g. hyperseti.utils
+        level (str or None): Sets logger level to one of (critical, error, warning, notice, info, debug)
     """
-    logger = Logger(arg_name)
-    logger.level = logbook.WARNING
-    logger_name_list.append(arg_name)
-    logger_list.append(logger)
+    if arg_name in logger_name_list:
+        logger = logger_list[logger_name_list.index(arg_name)]
+    else:
+        logger = Logger(arg_name)
+        logger.level = logbook.WARNING
+        logger_name_list.append(arg_name)
+        logger_list.append(logger)
+
+    if level is not None:
+        logger.level = LOG_LEVELS.get(level, level)   
     return logger

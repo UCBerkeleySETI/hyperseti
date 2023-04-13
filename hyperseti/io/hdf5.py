@@ -9,7 +9,7 @@ from hyperseti.data_array import DataArray
 import hdf5plugin
 import h5py
 
-def from_h5(filename):
+def from_h5(filename: str) -> DataArray:
     """ Create a DataArray from a HDF5 file 
     
     Args:
