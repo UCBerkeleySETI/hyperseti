@@ -118,9 +118,13 @@ class GulpPipeline(object):
         if self.config['preprocess'].get('normalize', False):
             poly_fit = self.config['preprocess'].get('poly_fit', 0)
             if self.config['preprocess'].get('sk_flag', False):
-                logger.info(f"GulpPipeline.preprocess: Applying sk_flag before normalization")
-                sk_flag_opts = self.config.get('sk_flag', {})
-                mask = sk_flag(self.data_array, **sk_flag_opts)
+                if self.data_array.data.shape[0] < 2:
+                    mask = None
+                    logger.warning("GulpPipeline.preprocess: Not enough timesteps in file to SK flag!")
+                else:
+                    logger.info(f"GulpPipeline.preprocess: Applying sk_flag before normalization")
+                    sk_flag_opts = self.config.get('sk_flag', {})
+                    mask = sk_flag(self.data_array, **sk_flag_opts)
             else:
                 mask = None
 
@@ -270,7 +274,8 @@ def find_et(filename: str,
             pipeline_config: dict, 
             filename_out: str=None, 
             filetype_out: str=None,
-            gulp_size: int=2**20, 
+            gulp_size: int=2**20,
+            n_overlap: int=0, 
             sort_hits: bool=True,
             log_config: bool=False,
             log_output: bool=False,
@@ -289,6 +294,7 @@ def find_et(filename: str,
         log_config (bool): If set, will log pipeline configuration to YAML file.
         sort_hits (bool): Sort hits by SNR after hitsearch is complete.
         gulp_size (int): Number of channels to process in one 'gulp' ('gulp' can be == 'coarse channel')
+        n_overlap (int): Number of channels to overlap when reading data from DataArray
         gpu_id (int): GPU device ID to use.
    
     Returns:
@@ -326,7 +332,9 @@ def find_et(filename: str,
     attach_gpu_device(gpu_id)
     counter = 0
     n_gulps = ds.data.shape[-1] // gulp_size
-    for d_arr in ds.iterate_through_data({'frequency': gulp_size}, space='gpu'):
+    for d_arr in ds.iterate_through_data(dims={'frequency': gulp_size}, 
+                                         overlap={'frequency': n_overlap}, 
+                                         space='gpu'):
         counter += 1
         proglog.info(f"Progress {counter}/{n_gulps}")
         pipeline = GulpPipeline(d_arr, pipeline_config, gpu_id=gpu_id)

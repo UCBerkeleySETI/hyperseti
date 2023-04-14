@@ -1,6 +1,6 @@
 [tool.poetry]
 name            = "hyperseti"
-version         = "1.0.0"
+version         = "1.1.0"
 description     = "GPU-accelerated code for searching radio astronomy spectral datasets for narrowband technosignatures (SETI)"
 authors         = ["Danny C. Price"]
 license         = "MIT"

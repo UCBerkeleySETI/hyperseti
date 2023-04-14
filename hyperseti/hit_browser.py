@@ -119,7 +119,18 @@ class HitBrowser(object):
         hit['channel_idx'] = 0              # Set to zero as we are plotting offsets
         overlay_hits(hit)
     
-    def view_hit(self, hit_idx:int, padding: int=128, 
+    def hit_summary(self, hit_idx:int) -> pd.DataFrame:
+        """ Returns hit info """
+        z = {
+            'name': self.data_array.attrs['source'],
+            'snr': f'{self.hit_table.snr.iloc[hit_idx]:.3f} σ',
+            'f_start': f'{self.hit_table.f_start.iloc[hit_idx]} MHz',
+            'drift_rate': f'{self.hit_table.drift_rate.iloc[hit_idx]:.5f} Hz/s',
+            }
+        
+        return pd.DataFrame(z.values(), index=z.keys(), columns=("",)).T
+    
+    def view_hit(self, hit_idx:int, padding: int=128, show_summary: bool=True,
                  plot: str='waterfall', overlay_hit: bool=False, plot_config: dict={}):
         """ Plot hits in database (postage stamp style)
 
@@ -140,6 +151,8 @@ class HitBrowser(object):
         """
         
         hit_darr = self.extract_hit(hit_idx, padding, space='cpu')
+    
+        
         obs_len, delta_dd = calc_delta_dd(hit_darr)
                     
         if plot not in ('waterfall', 'dedoppler', 'ddsk', 'dual'):
@@ -188,6 +201,9 @@ class HitBrowser(object):
         
         if overlay_hit:
             self._overlay_hit(hit_idx)
+
+        if show_summary:
+            return self.hit_summary(hit_idx)
 
         
 

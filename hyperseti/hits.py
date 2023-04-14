@@ -283,6 +283,7 @@ def hitsearch(dedopp_array: DataArray, threshold: int=10, min_fdistance: int=100
             edges_l, edges_u = get_signal_extents(dedopp_array, results, threshold=threshold_ex) 
             results['extent_lower'] = edges_l
             results['extent_upper'] = edges_u
+            results['signal_extent']  = (np.abs(edges_l) + np.abs(edges_u)) * np.abs(dedopp_array.frequency.step.to('Hz').value)
 
             dfs.append(results)
         

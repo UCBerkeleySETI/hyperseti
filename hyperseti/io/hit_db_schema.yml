@@ -33,14 +33,19 @@ driftrate_idx:
   mandatory: true
 
 # Hit details - secondary
+signal_extent:
+  description: Extent of signal in doppler space (Hz)
+  dtype: float64
+  mandatory: false
+  unit: Hz
 extent_lower:
   description: Extent of detected signal in doppler space, lower extent (# channels)
   dtype: int32
-  mandatory: true
+  mandatory: false
 extent_upper:  
   description: Extent of detected signal in doppler space, upper extent (# channels)
   dtype: int32
-  mandatory: true
+  mandatory: false
 ddsk:
   description: Spectral Kurtosis computed along dedoppler path (DDSK)
   dtype: float32

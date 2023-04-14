@@ -48,6 +48,14 @@ def test_data_array_basic():
     print(d)
     html = d._repr_html_()
 
+def test_overlap():
+    d = from_h5(voyager_h5)
+    gen = d.iterate_through_data({'frequency': 8000}, overlap={'frequency': 4000})
+    g0 = next(gen)
+    g1 = next(gen)  
+    assert g0.slice_info[2] == slice(0, 8000, None)
+    assert g1.slice_info[2] == slice(4000, 12000, None)
+
 def test_asarray():
     d = from_h5(voyager_h5)
     d_np = np.asarray(d)
@@ -123,6 +131,7 @@ def test_from_metadata():
 
 if __name__ == "__main__":
     test_load_voyager()
+    test_overlap()
     test_data_array_basic()
     test_asarray()
     test_apply_transform()
