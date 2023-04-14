@@ -323,3 +323,26 @@ def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None
         return dedopp_array, dedopp_sk_array
     else:
         return dedopp_array
+
+
+def dedoppler_simple(data_array: DataArray, drift_rate: u.Quantity):
+    """ Simple dedoppler algorithm for removing a given drift rate
+    
+    Args:
+        data_array (DataArray): Data with (time, beam, frequency) axes
+        drift_rate (Quantity | float): Drift rate to compensate for
+    
+    Returns:
+        data_array (DataArray): Dedoppler'd data array
+    """
+
+
+    n_drift = calc_ndrift(data_array, drift_rate)
+    n_t     = data_array.data.shape[0]
+    
+    for bb in range(data_array.data.shape[1]):
+        for ii in range(1, n_t):
+            n_roll = int((ii / n_t) * n_drift)
+            data_array.data[ii, bb] = np.roll(data_array.data[ii, bb], n_roll - n_drift // 2)
+
+    return data_array

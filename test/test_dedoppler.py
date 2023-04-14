@@ -1,4 +1,4 @@
-from hyperseti.dedoppler import dedoppler
+from hyperseti.dedoppler import dedoppler, dedoppler_simple
 from hyperseti.filter import apply_boxcar
 from hyperseti.normalize import normalize
 from hyperseti.hits import hitsearch, merge_hits
@@ -188,8 +188,45 @@ def test_dedoppler_boxcar():
     imshow_dedopp(dedopp, 'channel', 'driftrate')
     plt.savefig(os.path.join(test_fig_dir, 'test_dedoppler_boxcar.png'))
     plt.show()
-    
+
+def test_dedoppler_simple():
+    import setigen as stg
+    from astropy import units as u
+    from hyperseti.io import from_setigen, load_data
+
+    metadata = {'fch1': 1000*u.MHz, 'dt': 10*u.s, 'df': 2.5*u.Hz}
+
+    n_t = 128
+    n_f = 2**10
+
+    frame = stg.Frame(fchans=n_f*u.pixel,
+                    tchans=n_t*u.pixel,
+                    df=metadata['df'],
+                    dt=metadata['dt'],
+                    fch1=metadata['fch1'])
+    MEAN, STD = 10, 1
+    test_tones = [
+    {'f_start': frame.get_frequency(index=2**9), 'drift_rate': -0.10*u.Hz/u.s, 'snr': 100, 'width': 2.5*u.Hz},
+    ]
+
+    noise = frame.add_noise(x_mean=MEAN, x_std=STD, noise_type='gaussian')
+
+    for tone in test_tones:
+        signal = frame.add_signal(stg.constant_path(f_start=tone['f_start'],
+                                                drift_rate=tone['drift_rate']),
+                            stg.constant_t_profile(level=frame.get_intensity(snr=tone['snr'])),
+                            stg.gaussian_f_profile(width=tone['width']),
+                            stg.constant_bp_profile(level=1))
+
+    d = from_setigen(frame)
+    xd = dedoppler_simple(d, -0.1)
+    xd_norm = (xd.data.squeeze() - MEAN) / STD
+    xd_norm = xd_norm.mean(axis=0) * np.sqrt(n_t)
+
+    assert np.max(xd_norm) > 50
+
 if __name__ == "__main__":
     test_dedoppler()
     test_dedoppler_boxcar()
+    test_dedoppler_simple()
     
