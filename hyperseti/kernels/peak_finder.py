@@ -1,6 +1,8 @@
 import numpy as np
 import cupy as cp
 
+from .kernel_manager import KernelManager
+
 # 1D search kernel along slow-varying axis
 max_kernel = cp.RawKernel(r'''
 extern "C" __global__
@@ -123,7 +125,7 @@ def find_max_reduce(maxval_gpu: cp.ndarray, maxidx_gpu: cp.ndarray, maxval_k_gpu
                       (maxval_gpu, maxidx_gpu, maxval_k_gpu, maxidx_f_gpu, maxidx_t_gpu, N_chan, K))
 
 
-class PeakFinder(object):
+class PeakFinderMan(KernelManager):
     """ Finds peaks in 2D arrays 
 
     Divides array up along fast-varying axis into blocks of size K, 
@@ -144,7 +146,7 @@ class PeakFinder(object):
         and will likely crash if N_chan % K != 0
     """
     def __init__(self):
-        pass
+        super().__init__('PeakFinder')
     
     def init(self, N_chan: int, N_time: int, K: int):
         """ Initialize peak finder (allocate memory) 
@@ -167,12 +169,11 @@ class PeakFinder(object):
         self.N_time = N_time
         
         # Allocate on GPU
-        self.maxval_gpu = cp.asarray(maxval)
-        self.maxidx_gpu = cp.asarray(maxidx)
-        self.maxval_k_gpu = cp.asarray(maxval_k)
-        self.maxidx_f_gpu = cp.asarray(maxidx_f)
-        self.maxidx_t_gpu = cp.asarray(maxidx_t)
-        
+        self.workspace['maxval_gpu'] = cp.asarray(maxval)
+        self.workspace['maxidx_gpu'] = cp.asarray(maxidx)
+        self.workspace['maxval_k_gpu'] = cp.asarray(maxval_k)
+        self.workspace['maxidx_f_gpu'] = cp.asarray(maxidx_f)
+        self.workspace['maxidx_t_gpu'] = cp.asarray(maxidx_t)
     
     def execute(self, d_gpu: cp.ndarray):
         """ Execute peak finder """
@@ -180,11 +181,13 @@ class PeakFinder(object):
             assert d_gpu.shape == (self.N_time, self.N_chan)
         except AssertionError:
             raise RuntimeError(f"Array dimensions {d_gpu.shape} do not match those passed during init() ({self.N_time}, {self.N_chan})")
-        find_max_1D(d_gpu, self.maxval_gpu, self.maxidx_gpu)
-        find_max_reduce(self.maxval_gpu, self.maxidx_gpu, self.maxval_k_gpu, 
-                        self.maxidx_f_gpu, self.maxidx_t_gpu, self.K)
+        
+        ws = self.workspace
+        find_max_1D(d_gpu, ws['maxval_gpu'], ws['maxidx_gpu'])
+        find_max_reduce(ws['maxval_gpu'], ws['maxidx_gpu'], ws['maxval_k_gpu'], 
+                        ws['maxidx_f_gpu'], ws['maxidx_t_gpu'], self.K)
 
-        return self.maxval_k_gpu, self.maxidx_f_gpu, self.maxidx_t_gpu
+        return ws['maxval_k_gpu'], ws['maxidx_f_gpu'], ws['maxidx_t_gpu']
     
     def find_peaks(self, d_gpu: cp.ndarray, return_space: str='cpu'):
         """ Find peaks in data 
@@ -192,11 +195,12 @@ class PeakFinder(object):
         Args:
             d_gpu (cp.ndarray): 2D data array to search
         """
+        ws = self.workspace
         self.execute(d_gpu)
         if return_space != 'cpu':
-            return self.maxval_k_gpu, self.maxidx_f_gpu, self.maxidx_t_gpu
+            return ws['maxval_k_gpu'], ws['maxidx_f_gpu'], ws['maxidx_t_gpu']
         else:
-            return cp.asnumpy(self.maxval_k_gpu), cp.asnumpy(self.maxidx_f_gpu), cp.asnumpy(self.maxidx_t_gpu)
+            return cp.asnumpy(ws['maxval_k_gpu']), cp.asnumpy(ws['maxidx_f_gpu']), cp.asnumpy(ws['maxidx_t_gpu'])
 
     def hitsearch(self, d_arr: cp.ndarray, threshold: float, min_spacing: float, beam_id: int=0, return_space: str='cpu'):
         """ Find peaks in data above threshold
@@ -213,10 +217,10 @@ class PeakFinder(object):
 
         self.execute(d_gpu)
 
-        mask  = self.maxval_k_gpu > threshold
-        hits  = cp.asnumpy(self.maxval_k_gpu[mask])
-        idx_f = cp.asnumpy(self.maxidx_f_gpu[mask])
-        idx_t = cp.asnumpy(self.maxidx_t_gpu[mask])
+        mask  = self.workspace['maxval_k_gpu'] > threshold
+        hits  = cp.asnumpy(self.workspace['maxval_k_gpu'][mask])
+        idx_f = cp.asnumpy(self.workspace['maxidx_f_gpu'][mask])
+        idx_t = cp.asnumpy(self.workspace['maxidx_t_gpu'][mask])
 
         if len(hits) < 1:
             return hits, idx_f, idx_t       # return empty lists
@@ -255,94 +259,20 @@ class PeakFinder(object):
 
             return df[:, 1], df[:, 2].astype('int32'), df[:, 3].astype('int32')
 
-
-    def __del__(self):
-        """ Free memory when deleted 
-        
-        See https://docs.cupy.dev/en/stable/user_guide/memory.html
-        """
-        #mempool = cp.get_default_memory_pool()
-        #self.maxval_gpu   = None
-        #self.maxidx_gpu   = None
-        #self.maxval_k_gpu = None
-        #self.maxidx_f_gpu = None
-        #self.maxidx_t_gpu = None
-        #mempool.free_all_blocks()
-        pass
 
 def peak_find(dedopp_data: cp.ndarray, threshold: float, min_spacing: float, beam_id: int=0):
+        """ Find peaks in data above threshold
+
+        Also applies a third-stage filter to ensure hits have a minimum spacing
+        
+        Args:
+            dedopp_data (cp.ndarray): (dedopp, beam, freq) data array to search
+        """
         K = 2**(int(np.log2(min_spacing)))
         N_chan=dedopp_data.shape[1]
-        N_time=dedopp_data.shape[0]
-
-        # Initialize empty arrays
-        maxval = np.zeros(N_chan, dtype='float32')
-        maxidx = np.zeros(N_chan, dtype='int32')
-        maxval_k = np.zeros(N_chan // K, dtype='float32')
-        maxidx_f = np.zeros(N_chan // K, dtype='int32')
-        maxidx_t = np.zeros(N_chan // K, dtype='int32')
-
-        # Allocate on GPU
-        maxval_gpu = cp.asarray(maxval)
-        maxidx_gpu = cp.asarray(maxidx)
-        maxval_k_gpu = cp.asarray(maxval_k)
-        maxidx_f_gpu = cp.asarray(maxidx_f)
-        maxidx_t_gpu = cp.asarray(maxidx_t)
-
-        # Execute 
-        find_max_1D(dedopp_data, maxval_gpu, maxidx_gpu)
-        #maxval_gpu = cp.max(dedopp_data, axis=0)
-        #maxidx_gpu = cp.argmax(dedopp_data, axis=0)
+        N_time=dedopp_data.shape[0]    
         
-        find_max_reduce(maxval_gpu, maxidx_gpu, maxval_k_gpu, maxidx_f_gpu, maxidx_t_gpu, K)
-        #M         = cp.max(maxval_gpu.reshape((-1, K)), axis=1)
-        #M_offset  = K * cp.arange(maxval_gpu.shape[0] // K)
-        #M_k_idx   = cp.argmax(maxval_gpu.reshape((-1, K)), axis=1)
-        #M_f_idx   = M_k_idx + M_offset
-        #M_t_idx   = maxidx_gpu[M_k_idx + M_offset] 
-        #maxval_k_gpu = M 
-        #maxidx_f_gpu = M_f_idx
-        #maxidx_t_gpu = M_t_idx
-
-        # Find hits above threshold
-        mask  = maxval_k_gpu > threshold
-        hits  = cp.asnumpy(maxval_k_gpu[mask])
-        idx_f = cp.asnumpy(maxidx_f_gpu[mask])
-        idx_t = cp.asnumpy(maxidx_t_gpu[mask])
-
-        if len(hits) < 1:
-            return hits, idx_f, idx_t       # return empty lists
-        else:
-            # Final stage: we need to make sure only one maxima within
-            # The minimum spacing. We loop through and assign to groups
-            # Then find the maximum for each group.
-            # TODO: Speed up this code
-            df = np.column_stack((np.arange(len(hits)), hits, idx_f, idx_t))
-
-            ## Sort into groups
-            groups = []
-            cur = df[0]
-            g = [cur, ]
-
-            for row in df[1:]:
-                if row[2] - cur[2] < min_spacing:
-                    g.append(row)
-                else:
-                    groups.append(g)
-                    g = [row, ]
-                cur = row
-            groups.append(g)
-
-            df = []
-            for g in groups:
-                if len(g) == 1:
-                    df.append(g[0])
-                else:
-                    mv, mi = g[0][1], 0
-                    for i, h in enumerate(g[1:]):
-                        if mv < h[1]:
-                            mv, mi = h[1], i + 1 
-                    df.append(g[mi])
-            df = np.array(df)        
-
-            return df[:, 1], df[:, 2].astype('int32'), df[:, 3].astype('int32')
+        pf = PeakFinderMan()
+        pf.init(N_chan=N_chan, N_time=N_time, K=K)
+        maxval_gpu, maxidx_f_gpu, maxidx_t_gpu = pf.hitsearch(dedopp_data, threshold, min_spacing, beam_id=beam_id)
+        return maxval_gpu, maxidx_f_gpu, maxidx_t_gpu

@@ -44,12 +44,12 @@ extern "C" __global__
                 int N_lo = N_pad_lower[tid];
 
                 for (int p = 1; p < N_up; p++) {
-                    if (idx < F * T - p) {
+                    if (idx + p < F * T) {
                       data[idx + p] = 0.0; 
                     }
                   }
                 for (int p = -1; p > N_lo; p--) {   
-                   if (idx > p) {
+                   if (idx + p > 0) {
                       // TODO: This can still blank edge of previous spectra
                       data[idx + p] = 0.0; 
                     }
