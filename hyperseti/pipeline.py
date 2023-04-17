@@ -22,6 +22,7 @@ from .hit_browser import HitBrowser
 from .version import HYPERSETI_VERSION
 from .data_array import DataArray
 from .thirdparty import sigproc
+from .kernels import DedopplerMan, PeakFinderMan, SmearCorrMan, BlankHitsMan
 
 #logging
 from .log import get_logger
@@ -103,6 +104,14 @@ class GulpPipeline(object):
         if config['dedoppler']['apply_smearing_corr'] and n_boxcar > 1:
             logger.warning("GulpPipeline: combining dedoppler/apply_smearing_corr and pipeline/n_boxcar > 1 may produce strange results. Or it may not. Not sure yet.")
 
+        # Create kernel managers
+        self.kernel_managers = {
+            'dedoppler': DedopplerMan(),
+            'blank_hits': BlankHitsMan(),
+            'peak_find': PeakFinderMan(),
+            'smear_corr': SmearCorrMan()
+        }
+
     @timeme
     def preprocess(self):
         """ Apply preprocessing steps 
@@ -153,12 +162,15 @@ class GulpPipeline(object):
         """ Apply dedoppler transform to gulp """
         # Check if kernel is computing DD + SK
         kernel = self.config['dedoppler'].get('kernel', None)
+
         if kernel == 'ddsk':
             logger.info("GulpPipeline.dedoppler: Running DDSK dedoppler kernel")
-            self.dedopp, self.dedopp_sk = dedoppler(self.data_array, **self.config['dedoppler'])
+            self.dedopp, self.dedopp_sk = dedoppler(self.data_array, **self.config['dedoppler'], 
+                                                    mm=self.kernel_managers['dedoppler'], 
+                                                    mm_sc=self.kernel_managers['smear_corr'])
         else:
             logger.info("GulpPipeline.dedoppler: Running standard dedoppler kernel")
-            self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'])
+            self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'], mm=self.kernel_managers['dedoppler'])
             self.dedopp_sk = None
     
     @timeme
@@ -183,7 +195,7 @@ class GulpPipeline(object):
             conf['hitsearch']['sk_data'] = self.dedopp_sk
 
         # RUN HITSEARCH!
-        _peaks = hitsearch(self.dedopp, **conf['hitsearch'])
+        _peaks = hitsearch(self.dedopp, **conf['hitsearch'], mm=self.kernel_managers['peak_find'])
         
 
         self._peaks_last_iter = _peaks   # Keep a copy of most recent peaks
@@ -252,7 +264,7 @@ class GulpPipeline(object):
                 if n_hits_blanking_iter > 0:
                     logger.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: blanking hits")
                     new_peaks_this_blanking_iter = pd.concat(new_peaks_this_blanking_iter, ignore_index=True) 
-                    self.data_array = blank_hits_gpu(self.data_array, new_peaks_this_blanking_iter, padding=n_padding)
+                    self.data_array = blank_hits_gpu(self.data_array, new_peaks_this_blanking_iter, padding=n_padding, mm=self.kernel_managers['blank_hits'])
                     n_hits_last_iter = n_hits_blanking_iter
                 else:
                     proglog.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: No new hits found, breaking!")
@@ -274,8 +286,8 @@ def find_et(filename: str,
             pipeline_config: dict, 
             filename_out: str=None, 
             filetype_out: str=None,
-            gulp_size: int=2**20,
-            n_overlap: int=0, 
+            gulp_size: int=None,
+            n_overlap: int=None, 
             sort_hits: bool=True,
             log_config: bool=False,
             log_output: bool=False,
@@ -316,6 +328,13 @@ def find_et(filename: str,
         config_out = os.path.splitext(filename_out)[0] + '.yaml'
         with open(config_out, 'w') as json_out:
             yaml.dump(pipeline_config, json_out)
+    
+    if gulp_size is None: 
+        gulp_size = pipeline_config['find_et']['gulp_size']
+    if n_overlap is None:
+        n_overlap = pipeline_config.get('find_et', {}).get('n_overlap', 0)
+    if gpu_id is None:
+        gpu_id = pipeline_config.get('find_et', {}).get('gpu_id', 0)
 
     msg = f"find_et: hyperseti version {HYPERSETI_VERSION}"
     proglog.info(msg)
@@ -382,6 +401,10 @@ def find_et(filename: str,
 
     if log_output:
         print(f"find_et: Output logged to {logfile_out}")
+
+    #if proglog.level >= logbook.DEBUG:
+    #    for k, mm in pipeline.kernel_managers.items():
+    #        proglog.debug(mm.info())
 
     return HitBrowser(ds, dframe)
     

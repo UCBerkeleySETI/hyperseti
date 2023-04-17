@@ -22,16 +22,18 @@ class KernelManager(object):
 
     def info(self):
         """ Print information about memory usage and block size """
+        info_str = ""
         mem_usage = 0
         print(f"--- {self.name} workspace ---")
         for k, v in self.workspace.items():
-            print(f"{k}: \t {v.nbytes // 2**20} MiB")
+            print(f"{k}: \t {v.nbytes // 2**20} MiB shape: {v.shape}")
             mem_usage += v.nbytes
-        print(f"Total: \t {mem_usage // 2**20} MiB \n")
+        info_str += f"Total: \t {mem_usage // 2**20} MiB \n"
         
-        print(f"--- {self.name} grid dimensions ---")
-        print(f"Grid:  \t {self._grid}")
-        print(f"Block: \t {self._block}\n")
+        info_str += f"--- {self.name} grid dimensions ---"
+        info_str += f"Grid:  \t {self._grid}"
+        info_str += f"Block: \t {self._block}\n"
+        return info_str
 
     def init(self):
         """ This function should be supplied by the user, and should set:

@@ -58,7 +58,6 @@ def update_levels(arg_group_level: str, arg_debug_name_list: list=[]):
 
     if arg_group_level in LOG_LEVELS.keys():
         arg_group_level = LOG_LEVELS[arg_group_level]
-    print("HERE", arg_group_level)
 
     for ix, logger_name in enumerate(logger_name_list):
         if logger_name in arg_debug_name_list:
