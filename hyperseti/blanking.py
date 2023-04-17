@@ -6,7 +6,7 @@ import pandas as pd
 from astropy import units as u
 
 from .data_array import DataArray
-from .kernels.blank_hits import blank_hits_kernel
+from .kernels.blank_hits import BlankHitsMan
 
 #logging
 from .log import get_logger
@@ -98,12 +98,14 @@ def blank_hits(data_array: DataArray, df_hits: pd.DataFrame, padding: int=4) -> 
         data_array = blank_hit(data_array, f0, drate, padding=padding+box_width)
     return data_array
 
-def blank_hits_gpu(data_array: DataArray, df_hits: pd.DataFrame, padding: int=4) -> DataArray:
+def blank_hits_gpu(data_array: DataArray, df_hits: pd.DataFrame, padding: int=4, mm: BlankHitsMan=None) -> DataArray:
     """ Blank all hits in a data_array 
     Calls blank_hit() iteratively
     Args:
         data_array (DataArray): data array to apply blanking to
         df_hits (pd.DataFrame): pandas dataframe of hits to blank
+        padding (int): Extra padding around hit, in channels
+        mm (BlankHitsMan): Pre-initialized kernel manager (optional)
     
     Returns:
         data_array (DataArray): Blanked data array
@@ -123,22 +125,26 @@ def blank_hits_gpu(data_array: DataArray, df_hits: pd.DataFrame, padding: int=4)
         logger.debug(f"blank_hits: Kernel shape (grid, block) {(N_grid, ), (N_threads,)}")
 
         d_gpu = data_array.data
-        N_time, N_pol, N_chan = d_gpu.shape
+        N_time, N_beam, N_chan = d_gpu.shape
 
         cidxs_gpu = cp.asarray(df_hits['gulp_channel_idx'], dtype='int32')
         #boxcar_size_gpu = cp.asarray(df_hits['boxcar_size'], dtype='int32')
         N_pad_lower = cp.asarray(df_hits['extent_lower'], dtype='int32') - padding
         N_pad_upper = cp.asarray(df_hits['extent_upper'], dtype='int32') + padding
 
-        logger.debug(N_pad_lower)
-        logger.debug(N_pad_upper)
+        #logger.debug(N_pad_lower)
+        #logger.debug(N_pad_upper)
 
         # Convert dedoppler Hz/s into channels/timestep (can't use driftrate_idx in case they used 'stepped')
         df, dt = data_array.frequency.step.to('Hz').value, data_array.time.step.to('s').value
         dd_shift_gpu = cp.asarray(np.round(df_hits['drift_rate'] / (df / dt)), dtype='int32')
 
-        blank_hits_kernel((N_grid, 1, 1), (N_threads, 1, 1), 
-                        (d_gpu, cidxs_gpu, dd_shift_gpu, N_pad_lower, N_pad_upper, N_chan, N_pol, N_time, N_blank)) 
+        if isinstance(mm, BlankHitsMan):
+            bm = mm
+        else:
+            bm = BlankHitsMan()
+        bm.init(N_time, N_beam, N_chan, N_blank)
+        bm.execute(d_gpu, cidxs_gpu, dd_shift_gpu, N_pad_lower, N_pad_upper) 
 
         data_array.data = d_gpu
         return data_array

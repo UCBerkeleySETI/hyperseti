@@ -163,7 +163,8 @@ def plan_optimal(N_time: int, N_dopp_lower: int, N_dopp_upper: int) -> np.array:
 
 
 def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None, boxcar_size: int=1, 
-              kernel: str='dedoppler', apply_smearing_corr: bool=False, plan: str='stepped') -> DataArray:
+              kernel: str='dedoppler', apply_smearing_corr: bool=False, plan: str='stepped',
+              mm: DedopplerMan=None) -> DataArray:
     """ Apply brute-force dedoppler kernel to data
     
     Args:
@@ -221,7 +222,10 @@ def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None
     N_dopp = len(dd_shifts)
     
     # Run dedoppler kernel
-    ddman = DedopplerMan()
+    if isinstance(mm, DedopplerMan):
+        ddman = mm
+    else:
+        ddman = DedopplerMan()
     ddman.init(N_time, N_beam, N_chan, N_dopp, kernel=kernel)
 
     if kernel == 'ddsk':

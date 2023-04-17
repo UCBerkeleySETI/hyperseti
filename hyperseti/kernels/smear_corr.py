@@ -60,6 +60,9 @@ class SmearCorrMan(KernelManager):
     """ Kernel manager for smearing correction """
     def __init__(self):
         super().__init__('SmearCorrMan')
+        self.N_chan    = None
+        self.N_beam    = None
+        self.N_dedopp  = None
     
     def init(self, N_dedopp: int, N_beam: int, N_chan: int):
         """ Initialize (or reinitialize) kernel 
@@ -69,16 +72,22 @@ class SmearCorrMan(KernelManager):
             N_beam (int): Number of beams in input data
             N_chan (int): Number of frequency channels
         """
-        self.N_chan = N_chan
-        self.N_beam  = N_beam
-        self.N_dedopp  = N_dedopp
+        reinit = False
+        if N_chan != self.N_chan: reinit = True
+        if N_beam != self.N_beam: reinit = True
+        if N_dedopp != self.N_dedopp: reinit = True
 
-        odata = np.zeros(shape=(N_dedopp, N_beam, N_chan), dtype='float32')
-        self.workspace['odata'] = cp.asarray(odata)
+        if reinit:
+            self.N_chan    = N_chan
+            self.N_beam    = N_beam
+            self.N_dedopp  = N_dedopp
 
-        N_grid = np.min((N_chan, 1024))
-        self._grid  = (N_grid, )
-        self._block = (N_chan // self._grid[0], ) 
+            odata = np.zeros(shape=(N_dedopp, N_beam, N_chan), dtype='float32')
+            self.workspace['odata'] = cp.asarray(odata)
+
+            N_grid = np.min((N_chan, 1024))
+            self._grid  = (N_grid, )
+            self._block = (N_chan // self._grid[0], ) 
 
     def execute(self, dedopp_array: DataArray) -> DataArray:
         """ Execute kernel on dedoppler data array """
@@ -93,7 +102,7 @@ class SmearCorrMan(KernelManager):
         return dedopp_array
 
 
-def apply_smear_corr(dedopp_array: DataArray) -> DataArray:
+def apply_smear_corr(dedopp_array: DataArray, mm: SmearCorrMan=None) -> DataArray:
     """ Apply smearing correction 
 
     An optimal boxcar is applied per row of drift rate. This retrieves
@@ -102,6 +111,7 @@ def apply_smear_corr(dedopp_array: DataArray) -> DataArray:
     
     Args:
         data_array (DataArray): Array to apply boxcar filters to
+        mm (SmearCorrMan): Pre-initialized kernel manager (optional)
     
     Returns:
          data_array (DataArray): Array with boxcar filters applied.
@@ -110,7 +120,10 @@ def apply_smear_corr(dedopp_array: DataArray) -> DataArray:
         This is a GPU kernel version of dedoppler.apply_boxcar_drift
         This will not work for N_b > 1 at the moment!
     """
-    sc = SmearCorrMan()
+    if isinstance(mm, SmearCorrMan):
+        sc = mm
+    else:
+        sc = SmearCorrMan()
     sc.init(*dedopp_array.shape)
     dedopp_array = sc.execute(dedopp_array)
     return dedopp_array

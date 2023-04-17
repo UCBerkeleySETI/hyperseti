@@ -1,4 +1,5 @@
 from hyperseti.dedoppler import dedoppler, dedoppler_simple
+from hyperseti.kernels.dedoppler import DedopplerMan
 from hyperseti.filter import apply_boxcar
 from hyperseti.normalize import normalize
 from hyperseti.hits import hitsearch, merge_hits
@@ -40,12 +41,17 @@ def test_dedoppler():
                 'dims': ('time', 'beam_id', 'frequency')}
 
     dedopp_array = from_metadata(cp.asarray(test_data), metadata_in)
-    
     dedopp_array = dedoppler(dedopp_array, boxcar_size=1, max_dd=1.0)
     print("type(dedopp):", type(dedopp_array))
     print("dedopp.data:", dedopp_array.data)
     print("np.max(dedopp.data):", np.max(dedopp_array.data), ", np.sum(test_data[:, :, 511]):", np.sum(test_data[:, :, 511]))
-    
+
+    # Test kernel manager
+    mm = DedopplerMan()
+    dedopp_array = from_metadata(cp.asarray(test_data), metadata_in)
+    dedopp_array = dedoppler(dedopp_array, boxcar_size=1, max_dd=1.0, mm=mm)
+    print(mm.info())    
+
     #TODO: Recalculate
     #assert np.max(dedopp.data) == np.sum(test_data[:, :, 511])
     
@@ -116,6 +122,8 @@ def test_dedoppler():
 
     # Finish off figure plotting
     plt.show()
+
+
 
 def test_dedoppler_boxcar():
     """ Test that boxcar averaging works as expected """
