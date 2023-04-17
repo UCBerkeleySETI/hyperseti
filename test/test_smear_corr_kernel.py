@@ -7,7 +7,7 @@ from hyperseti.io import from_setigen
 from hyperseti.dedoppler import dedoppler
 from hyperseti.normalize import normalize
 from hyperseti.data_array import DataArray
-from hyperseti.kernels.smear_corr import apply_smear_corr
+from hyperseti.kernels.smear_corr import apply_smear_corr, SmearCorrMan
 
 from hyperseti.log import get_logger
 logger = get_logger('hyperseti.dedoppler', 'info')
@@ -92,6 +92,12 @@ def test_smear_corr():
     odata = cp.asnumpy(dd_smear.data).squeeze()
 
     assert np.allclose(odata[:, 10:-10], refdata[:, 10:-10])
+
+    # Test kernel manager
+    mm = SmearCorrMan()
+    dd = dedoppler(d, max_dd=2, plan='optimal')
+    dd_smear = apply_smear_corr(dd, mm=mm)
+    print(mm.info())
 
 if __name__ == "__main__":
     test_smear_corr()

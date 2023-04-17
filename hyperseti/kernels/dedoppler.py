@@ -133,10 +133,16 @@ extern "C" __global__
 
 ''', 'dedopplerWithKurtosisKernel')
 
+
 class DedopplerMan(KernelManager):
     """ Kernel manager for smearing correction """
     def __init__(self):
         super().__init__('DedopplerMan')
+        self.N_time  = None
+        self.N_chan  = None
+        self.N_beam  = None
+        self.N_dopp  = None
+        self.kernel  = None
     
     def init(self, N_time: int, N_beam: int, N_chan: int, N_dopp: int, kernel='dedoppler'):
         """ Initialize (or reinitialize) kernel 
@@ -145,32 +151,42 @@ class DedopplerMan(KernelManager):
             N_dopp (int): Number of dedoppler trials in input data
             N_chan (int): Number of frequency channels
         """
-        self.N_time = N_time
-        self.N_chan = N_chan
-        self.N_beam  = N_beam
-        self.N_dopp  = N_dopp
 
-        self.kernel = kernel
+        reinit = False
+        if N_time != self.N_time: reinit = True
+        if N_chan != self.N_chan: reinit = True
+        if N_beam != self.N_beam: reinit = True
+        if N_dopp != self.N_dopp: reinit = True
+        if kernel != self.kernel: reinit = True
 
-        # Allocate GPU memory for dedoppler data
-        self.workspace['dedopp'] = cp.zeros((N_dopp, N_beam, N_chan), dtype=cp.float32)
-        if self.kernel == 'ddsk':
-            self.workspace['dedopp_sk'] =  cp.zeros((N_dopp, N_beam, N_chan), dtype=cp.float32)
+        if reinit:
+            logger.debug(f'DedopplerMan: Reinitializing')
+            self.N_time = N_time
+            self.N_chan = N_chan
+            self.N_beam  = N_beam
+            self.N_dopp  = N_dopp
 
-        if N_beam > 1:
-          self.workspace['_dedopp'] = cp.zeros((N_dopp, N_chan), dtype=cp.float32)
-          if self.kernel == 'ddsk':
-              self.workspace['_dedopp_sk'] =  cp.zeros((N_dopp, N_chan), dtype=cp.float32)
-        else:
-            self.workspace['_dedopp'] = self.workspace['dedopp']
-        if self.kernel == 'ddsk':
-            self.workspace['_dedopp_sk'] =  self.workspace['dedopp_sk']
+            self.kernel = kernel
 
-        # Setup grid and block dimensions
-        F_block = np.min((N_chan, 1024))
-        F_grid  = N_chan // F_block
-        self._grid = (F_grid, N_dopp)
-        self._block = (F_block,)
+            # Allocate GPU memory for dedoppler data
+            self.workspace['dedopp'] = cp.zeros((N_dopp, N_beam, N_chan), dtype=cp.float32)
+            if self.kernel == 'ddsk':
+                self.workspace['dedopp_sk'] =  cp.zeros((N_dopp, N_beam, N_chan), dtype=cp.float32)
+
+            if N_beam > 1:
+                self.workspace['_dedopp'] = cp.zeros((N_dopp, N_chan), dtype=cp.float32)
+                if self.kernel == 'ddsk':
+                    self.workspace['_dedopp_sk'] =  cp.zeros((N_dopp, N_chan), dtype=cp.float32)
+            else:
+                self.workspace['_dedopp'] = self.workspace['dedopp']
+                if self.kernel == 'ddsk':
+                    self.workspace['_dedopp_sk'] =  self.workspace['dedopp_sk']
+
+            # Setup grid and block dimensions
+            F_block = np.min((N_chan, 1024))
+            F_grid  = N_chan // F_block
+            self._grid = (F_grid, N_dopp)
+            self._block = (F_block,)
 
 
     def execute(self, data_array: DataArray, dd_shifts_gpu: cp.ndarray, boxcar_size: int=1) -> DataArray:

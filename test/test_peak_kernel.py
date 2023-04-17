@@ -1,6 +1,6 @@
 import numpy as np
 import cupy as cp
-from hyperseti.kernels.peak_finder import PeakFinderMan
+from hyperseti.kernels.peak_finder import PeakFinderMan, peak_find
 from hyperseti.normalize import normalize
 from hyperseti.io import from_h5
 
@@ -140,7 +140,14 @@ def test_hitsearch():
     mv, f_idx, t_idx = pf.hitsearch(vs.data, threshold=3, min_spacing=100)
     print(mv, f_idx, t_idx)
 
+    # Test manual peak_find
+    peak_find(vs.data, threshold=3, min_spacing=100, mm=pf)
+    peak_find(vs.data, threshold=3, min_spacing=100)
+    print(pf.info())
+
+
+
 if __name__ == "__main__":
-     test_peak_kernel()
+     #test_peak_kernel()
      test_hitsearch()
-     test_resize()
+     #test_resize()

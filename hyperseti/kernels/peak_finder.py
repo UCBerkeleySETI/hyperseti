@@ -260,7 +260,7 @@ class PeakFinderMan(KernelManager):
             return df[:, 1], df[:, 2].astype('int32'), df[:, 3].astype('int32')
 
 
-def peak_find(dedopp_data: cp.ndarray, threshold: float, min_spacing: float, beam_id: int=0):
+def peak_find(dedopp_data: cp.ndarray, threshold: float, min_spacing: float, beam_id: int=0, mm: PeakFinderMan=None):
         """ Find peaks in data above threshold
 
         Also applies a third-stage filter to ensure hits have a minimum spacing
@@ -269,10 +269,14 @@ def peak_find(dedopp_data: cp.ndarray, threshold: float, min_spacing: float, bea
             dedopp_data (cp.ndarray): (dedopp, beam, freq) data array to search
         """
         K = 2**(int(np.log2(min_spacing)))
-        N_chan=dedopp_data.shape[1]
+        N_chan=dedopp_data.shape[2]
+        N_beam=dedopp_data.shape[1]
         N_time=dedopp_data.shape[0]    
         
-        pf = PeakFinderMan()
+        if isinstance(mm, PeakFinderMan):
+            pf = mm
+        else:
+            pf = PeakFinderMan()
         pf.init(N_chan=N_chan, N_time=N_time, K=K)
         maxval_gpu, maxidx_f_gpu, maxidx_t_gpu = pf.hitsearch(dedopp_data, threshold, min_spacing, beam_id=beam_id)
         return maxval_gpu, maxidx_f_gpu, maxidx_t_gpu
