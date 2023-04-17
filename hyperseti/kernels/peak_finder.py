@@ -269,7 +269,8 @@ def peak_find(dedopp_data: cp.ndarray, threshold: float, min_spacing: float, bea
             dedopp_data (cp.ndarray): (dedopp, beam, freq) data array to search
         """
         K = 2**(int(np.log2(min_spacing)))
-        N_chan=dedopp_data.shape[1]
+        N_chan=dedopp_data.shape[2]
+        N_beam=dedopp_data.shape[1]
         N_time=dedopp_data.shape[0]    
         
         if isinstance(mm, PeakFinderMan):
