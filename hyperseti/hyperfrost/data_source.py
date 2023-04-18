@@ -24,8 +24,11 @@ class DataArrayReader(object):
         self.hdr['_tensor']['shape'][axis_idx] = gulp_size
     
     def read(self):
-        return next(self.data_iterator)
-
+        try:
+            return next(self.data_iterator)
+        except StopIteration:
+            return [0]
+        
     def __enter__(self):
         return self
 
@@ -60,11 +63,13 @@ class DataArrayBlock(bfp.SourceBlock):
 
     def on_data(self, reader, ospans):
         data_array = reader.read()
-        print("HERE!", data_array)
-        print(data_array.slice_info)
-        indata = data_array.data[:]
-        if indata.shape[2] == self.gulp_size: # idx 2 == frequency
-            ospans[0].data[0] = indata
-            return [1]
+        if isinstance(data_array, DataArray):
+            print(data_array.slice_info)
+            indata = data_array.data[:]
+            if indata.shape[2] == self.gulp_size: # idx 2 == frequency
+                ospans[0].data[0] = indata
+                return [1]
+            else:
+                return [0]
         else:
             return [0]
