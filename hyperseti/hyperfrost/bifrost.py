@@ -61,6 +61,39 @@ def from_bf(bf_array: bf.ndarray, metadata: dict) -> DataArray:
     d = DataArray(data, dims, scales, attrs, units='')
     return d
 
+def gen_bf_metadata(data_array: DataArray) -> dict:
+    """ Generate bifrost metadata dict from DataArray """
+    metadata = deepcopy(data_array.attrs)
+
+    for k, v in metadata.items():
+        if isinstance(v, SkyCoord):
+            metadata[k] = (v.ra.value, v.dec.value)
+    
+    scales, units = [], []
+    for ii, dim_id in enumerate(data_array.dims):
+        ds = data_array.scales[dim_id]
+        scales.append([ds.start.value, ds.step.value])
+        units.append(ds.units.to_string())
+
+        # Bifrost reserves the keyword 'time'
+        if dim_id == 'time':
+            dimlist = list(data_array.dims)
+            dimlist[ii] = 'gulp_time'
+            data_array.dims = tuple(dimlist)
+            ds = data_array.scales.pop(dim_id)
+            data_array.scales['gulp_time'] = ds
+
+    tensor = {
+        'dtype': numpy2string(np.dtype(data_array.data.dtype)),
+        'shape': [-1] + list(data_array.shape),
+        'labels': ['time'] + list(data_array.dims),
+        'units' : ['s'] + list(units),
+        'scales': [[0, 1]] + list(scales)
+    }
+
+    metadata['_tensor'] = tensor
+    return metadata
+
 def to_bf(data_array: DataArray) -> (bf.ndarray, dict):
     """ Convert data array object to bifrost ndarray + metadata 
     
@@ -73,21 +106,6 @@ def to_bf(data_array: DataArray) -> (bf.ndarray, dict):
     """
 
     d_bf = bf.ndarray(data_array.data)
-    metadata = deepcopy(data_array.attrs)
-    
-    scales, units = [], []
-    for dim_id in data_array.dims:
-        ds = data_array.scales[dim_id]
-        scales.append([ds.start.value, ds.step.value])
-        units.append(ds.units.to_string())
+    metadata = gen_bf_metadata(data_array)
 
-    tensor = {
-        'dtype': numpy2string(np.dtype(str(d_bf.dtype))),
-        'shape': d_bf.shape,
-        'labels': data_array.dims,
-        'units' : units,
-        'scales': scales
-    }
-
-    metadata['_tensor'] = tensor
     return d_bf, metadata

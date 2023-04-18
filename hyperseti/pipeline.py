@@ -112,7 +112,6 @@ class GulpPipeline(object):
             'smear_corr': SmearCorrMan()
         }
 
-    @timeme
     def preprocess(self):
         """ Apply preprocessing steps 
         
@@ -155,9 +154,7 @@ class GulpPipeline(object):
         if self.config['preprocess'].get('blank_extrema'):
             logger.info(f"GulpPipeline.preprocess: Blanking extremely bright signals")
             self.data_array = blank_extrema(self.data_array, **self.config['preprocess']['blank_extrema'])
-        
-
-    @timeme        
+    
     def dedoppler(self):
         """ Apply dedoppler transform to gulp """
         # Check if kernel is computing DD + SK
@@ -173,7 +170,6 @@ class GulpPipeline(object):
             self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'], mm=self.kernel_managers['dedoppler'])
             self.dedopp_sk = None
     
-    @timeme
     def hitsearch(self):
         """ Run search for hits above threshold in dedoppler space.
         
@@ -197,7 +193,6 @@ class GulpPipeline(object):
         # RUN HITSEARCH!
         _peaks = hitsearch(self.dedopp, **conf['hitsearch'], mm=self.kernel_managers['peak_find'])
         
-
         self._peaks_last_iter = _peaks   # Keep a copy of most recent peaks
         
         if _peaks is not None:
@@ -212,7 +207,6 @@ class GulpPipeline(object):
             else:
                 self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
 
-    @timeme   
     def run(self) -> pd.DataFrame:
         """ Main pipeline runner 
         
@@ -292,6 +286,7 @@ def find_et(filename: str,
             log_config: bool=False,
             log_output: bool=False,
             gpu_id: int=0, 
+            N_stream: int=4,
             *args, **kwargs) -> pd.DataFrame:
     """ Find ET, serial version
     
@@ -308,6 +303,7 @@ def find_et(filename: str,
         gulp_size (int): Number of channels to process in one 'gulp' ('gulp' can be == 'coarse channel')
         n_overlap (int): Number of channels to overlap when reading data from DataArray
         gpu_id (int): GPU device ID to use.
+        N_stream (int): Number of cuda streams to use. Default 4 (should help with concurrency, but doesn't currently, :sad_face: )
    
     Returns:
         hits (pd.DataFrame): Pandas dataframe of all hits.
@@ -346,43 +342,58 @@ def find_et(filename: str,
         logger.warning(f'find_et: gulp_size ({gulp_size}) > Num fine frequency channels ({ds.data.shape[2]}).  Setting gulp_size = {ds.data.shape[2]}')
         gulp_size = ds.data.shape[2]
 
-    out = []
+    
 
     attach_gpu_device(gpu_id)
     counter = 0
     n_gulps = ds.data.shape[-1] // gulp_size
+
+    stream_pool, out_pool = [], []
+    for ii in range(N_stream):
+        stream_pool.append(cp.cuda.Stream(non_blocking=True))
+        out_pool.append([])
+
     for d_arr in ds.iterate_through_data(dims={'frequency': gulp_size}, 
                                          overlap={'frequency': n_overlap}, 
                                          space='gpu'):
         counter += 1
-        proglog.info(f"Progress {counter}/{n_gulps}")
-        pipeline = GulpPipeline(d_arr, pipeline_config, gpu_id=gpu_id)
-        hits = pipeline.run()
-        
-        # Add some runtime info
-        if len(hits) > 0:
-            hits['gulp_idx']     = counter
-            hits['gulp_size']    = gulp_size
-            hits['hits_in_gulp'] = len(hits)
+        stream_id = counter % N_stream
 
-            if 'preprocess' in d_arr.attrs.keys():
-                for beam_idx in range(d_arr.shape[1]):
-                    hits[f'b{beam_idx}_gulp_mean'] = cp.asnumpy(d_arr.attrs['preprocess']['mean'][beam_idx])
-                    hits[f'b{beam_idx}_gulp_std']  = cp.asnumpy(d_arr.attrs['preprocess']['std'][beam_idx])
-                    hits[f'b{beam_idx}_gulp_flag_frac'] = cp.asnumpy(d_arr.attrs['preprocess'].get('flagged_fraction', 0))
-                
+        with stream_pool[stream_id]:
+            proglog.debug(f"Stream: {cp.cuda.get_current_stream()}")
+            proglog.info(f"Progress {counter}/{n_gulps}")
+            pipeline = GulpPipeline(d_arr, pipeline_config, gpu_id=gpu_id)
+            hits = pipeline.run()
+            
+            # Add some runtime info
+            if len(hits) > 0:
+                hits['gulp_idx']     = counter
+                hits['gulp_size']    = gulp_size
+                hits['hits_in_gulp'] = len(hits)
 
-                if d_arr.attrs['preprocess'].get('n_poly', 0) > 1:
-                    n_poly = d_arr.attrs['preprocess']['n_poly']
-                    hits['n_poly'] = n_poly
-                    for pp in range(int(n_poly + 1)):
-                        hits[f'b{beam_idx}_gulp_poly_c{pp}'] = cp.asnumpy(d_arr.attrs['preprocess']['poly_coeffs'][beam_idx, pp])
+                if 'preprocess' in d_arr.attrs.keys():
+                    for beam_idx in range(d_arr.shape[1]):
+                        hits[f'b{beam_idx}_gulp_mean'] = cp.asnumpy(d_arr.attrs['preprocess']['mean'][beam_idx])
+                        hits[f'b{beam_idx}_gulp_std']  = cp.asnumpy(d_arr.attrs['preprocess']['std'][beam_idx])
+                        hits[f'b{beam_idx}_gulp_flag_frac'] = cp.asnumpy(d_arr.attrs['preprocess'].get('flagged_fraction', 0))
+                    
 
-            out.append(hits)
-    if len(out) == 0:
-        dframe = create_empty_hits_table()
-    else:
-        dframe = pd.concat(out)
+                    if d_arr.attrs['preprocess'].get('n_poly', 0) > 1:
+                        n_poly = d_arr.attrs['preprocess']['n_poly']
+                        hits['n_poly'] = n_poly
+                        for pp in range(int(n_poly + 1)):
+                            hits[f'b{beam_idx}_gulp_poly_c{pp}'] = cp.asnumpy(d_arr.attrs['preprocess']['poly_coeffs'][beam_idx, pp])
+
+                out_pool[stream_id].append(hits)
+
+    for s in stream_pool:
+        s.synchronize()
+    
+    for out in out_pool:
+        if len(out) == 0:
+            dframe = create_empty_hits_table()
+        else:
+            dframe = pd.concat(out)
 
     if sort_hits:
         dframe = dframe.sort_values('snr', ascending=False).reset_index(drop=True)
