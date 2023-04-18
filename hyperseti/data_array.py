@@ -306,6 +306,18 @@ class DataArray(object):
     def __len__(self):
         return len(self.data)
 
+    def __enter__(self):
+        return self
+
+    def close(self):
+        try:
+            # If file handler exists, call its close function
+            self.fh.close()  
+        except AttributeError:
+            pass
+
+    def __exit__(self, type, value, tb):
+        self.close()
 
 def from_metadata(darray: np.ndarray, metadata: dict, dims: tuple=None, units: tuple=None) -> DataArray:
     """ Create a data array from an array + metadata 

@@ -129,7 +129,16 @@ def test_from_metadata():
     d0, m0 = split_metadata(darr)
     d0, m0 = darr.split_metadata()
 
+def test_context_manager():
+    with from_h5(voyager_h5) as darr:
+        print(darr)    
+
+    with from_fil(voyager_fil) as darr:
+        print(darr)       
+
+
 if __name__ == "__main__":
+    test_context_manager()
     test_load_voyager()
     test_overlap()
     test_data_array_basic()
