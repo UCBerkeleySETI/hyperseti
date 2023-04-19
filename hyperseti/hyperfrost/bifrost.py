@@ -76,17 +76,17 @@ def gen_bf_metadata(data_array: DataArray) -> dict:
         units.append(ds.units.to_string())
 
         # Bifrost reserves the keyword 'time'
-        if dim_id == 'time':
-            dimlist = list(data_array.dims)
-            dimlist[ii] = 'gulp_time'
-            data_array.dims = tuple(dimlist)
-            ds = data_array.scales.pop(dim_id)
-            data_array.scales['gulp_time'] = ds
+        #if dim_id == 'time':
+        #    dimlist = list(data_array.dims)
+        #    dimlist[ii] = 'frame_time'
+        #    data_array.dims = tuple(dimlist)
+        #    ds = data_array.scales.pop(dim_id)
+        #    data_array.scales['frame_time'] = ds
 
     tensor = {
         'dtype': numpy2string(np.dtype(data_array.data.dtype)),
         'shape': [-1] + list(data_array.shape),
-        'labels': ['time'] + list(data_array.dims),
+        'labels': ['frame'] + list(data_array.dims),
         'units' : ['s'] + list(units),
         'scales': [[0, 1]] + list(scales)
     }

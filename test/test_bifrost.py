@@ -9,6 +9,9 @@ import numpy as np
 from datetime import datetime
 from pprint import pprint
 
+from hyperseti.log import get_logger
+logger = get_logger('hyperfrost.data_source', 'info')
+
 def test_from_bf():
     d = bf.ndarray(np.zeros((10, 2, 1000)), space='cuda', dtype='f32')
 
@@ -48,16 +51,16 @@ class PrintStuffBlock(bfp.SinkBlock):
 
     def on_data(self, ispan):
         now = datetime.now()
-        if self.n_iter % 100 == 0:
-            print("[%s] %s" % (now, ispan.data))
+        if self.n_iter % 10 == 0:
+            print("[%s] %s" % (now, ispan.data.shape))
         self.n_iter += 1
 
 
 def test_pipeline():
 
-    filenames   = [voyager_fil, ]
+    filenames   = [voyager_h5, voyager_fil]
 
-    b_read      = DataArrayBlock(filenames, 32768, gulp_nframe=1, axis='frequency', overlap=0)
+    b_read      = DataArrayBlock(filenames, 32768, axis='frequency', overlap=0)
     b_print     = PrintStuffBlock(b_read)
 
     # Run pipeline
@@ -65,6 +68,20 @@ def test_pipeline():
     print(pipeline.dot_graph())
     pipeline.run()
 
+def test_pipeline_overlap():
+
+    filenames   = [voyager_h5, voyager_fil]
+
+    b_read      = DataArrayBlock(filenames, 32768, axis='frequency', overlap=1000)
+    b_print     = PrintStuffBlock(b_read)
+
+    # Run pipeline
+    pipeline = bfp.get_default_pipeline()
+    print(pipeline.dot_graph())
+    pipeline.run()
+
+
 if __name__ == "__main__":
-    test_pipeline()
+    #test_pipeline()
+    test_pipeline_overlap()
     # test_from_bf()
