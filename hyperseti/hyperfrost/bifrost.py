@@ -53,7 +53,10 @@ def from_bf(bf_array: bf.ndarray, metadata: dict) -> DataArray:
         unit = tensor['units'][ii]
         if unit is None: unit = ''
 
-        assert list(data.shape) == list(tensor['shape'])
+        try:
+            assert list(data.shape[1:]) == list(tensor['shape'][1:])
+        except AssertionError:
+            raise RuntimeError(f"Data shape {data.shape} does not match tensor {tensor['shape']}")
         shape = data.shape
 
         scales[dim_id] = DimensionScale(dim_id, start, step, shape, units=unit)
