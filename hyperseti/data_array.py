@@ -254,6 +254,9 @@ class DataArray(object):
                 end = start + size
                 if end <= dimsize:
                     slices.append(slice(start, end))
+                else:
+                    slices.append(slice(start, dimsize))
+                    break
             return slices
         dim_slices = []
         for dim in dims:
