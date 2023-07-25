@@ -61,7 +61,7 @@ class GulpPipeline(object):
         ```
     """
 
-    def __init__(self, data_array: DataArray, config: dict, gpu_id: int=None):
+    def __init__(self, data_array: DataArray, config: dict, gpu_id: int=None, kernel_managers=None):
         """ Pipeline class to run on a gulp of data (e.g. a coarse channel)
 
         Args:
@@ -105,12 +105,15 @@ class GulpPipeline(object):
             logger.warning("GulpPipeline: combining dedoppler/apply_smearing_corr and pipeline/n_boxcar > 1 may produce strange results. Or it may not. Not sure yet.")
 
         # Create kernel managers
-        self.kernel_managers = {
-            'dedoppler': DedopplerMan(),
-            'blank_hits': BlankHitsMan(),
-            'peak_find': PeakFinderMan(),
-            'smear_corr': SmearCorrMan()
-        }
+        if kernel_managers is None:
+            self.kernel_managers = {
+                'dedoppler': DedopplerMan(),
+                'blank_hits': BlankHitsMan(),
+                'peak_find': PeakFinderMan(),
+                'smear_corr': SmearCorrMan()
+            }
+        else: 
+            self.kernel_managers = kernel_managers
 
     def preprocess(self):
         """ Apply preprocessing steps 
@@ -280,13 +283,12 @@ def find_et(filename: str,
             pipeline_config: dict, 
             filename_out: str=None, 
             filetype_out: str=None,
-            gulp_size: int=None,
-            n_overlap: int=None, 
+            gulp_size: int=2**20,
+            n_overlap: int=0, 
             sort_hits: bool=True,
             log_config: bool=False,
             log_output: bool=False,
             gpu_id: int=0, 
-            N_stream: int=4,
             *args, **kwargs) -> pd.DataFrame:
     """ Find ET, serial version
     
@@ -303,7 +305,6 @@ def find_et(filename: str,
         gulp_size (int): Number of channels to process in one 'gulp' ('gulp' can be == 'coarse channel')
         n_overlap (int): Number of channels to overlap when reading data from DataArray
         gpu_id (int): GPU device ID to use.
-        N_stream (int): Number of cuda streams to use. Default 4 (should help with concurrency, but doesn't currently, :sad_face: )
    
     Returns:
         hits (pd.DataFrame): Pandas dataframe of all hits.
@@ -324,13 +325,6 @@ def find_et(filename: str,
         config_out = os.path.splitext(filename_out)[0] + '.yaml'
         with open(config_out, 'w') as json_out:
             yaml.dump(pipeline_config, json_out)
-    
-    if gulp_size is None: 
-        gulp_size = pipeline_config['find_et']['gulp_size']
-    if n_overlap is None:
-        n_overlap = pipeline_config.get('find_et', {}).get('n_overlap', 0)
-    if gpu_id is None:
-        gpu_id = pipeline_config.get('find_et', {}).get('gpu_id', 0)
 
     msg = f"find_et: hyperseti version {HYPERSETI_VERSION}"
     proglog.info(msg)
@@ -342,58 +336,43 @@ def find_et(filename: str,
         logger.warning(f'find_et: gulp_size ({gulp_size}) > Num fine frequency channels ({ds.data.shape[2]}).  Setting gulp_size = {ds.data.shape[2]}')
         gulp_size = ds.data.shape[2]
 
-    
+    out = []
 
     attach_gpu_device(gpu_id)
     counter = 0
     n_gulps = ds.data.shape[-1] // gulp_size
-
-    stream_pool, out_pool = [], []
-    for ii in range(N_stream):
-        stream_pool.append(cp.cuda.Stream(non_blocking=True))
-        out_pool.append([])
-
     for d_arr in ds.iterate_through_data(dims={'frequency': gulp_size}, 
                                          overlap={'frequency': n_overlap}, 
                                          space='gpu'):
         counter += 1
-        stream_id = counter % N_stream
+        proglog.info(f"Progress {counter}/{n_gulps}")
+        pipeline = GulpPipeline(d_arr, pipeline_config, gpu_id=gpu_id)
+        hits = pipeline.run()
+        
+        # Add some runtime info
+        if len(hits) > 0:
+            hits['gulp_idx']     = counter
+            hits['gulp_size']    = gulp_size
+            hits['hits_in_gulp'] = len(hits)
 
-        with stream_pool[stream_id]:
-            proglog.debug(f"Stream: {cp.cuda.get_current_stream()}")
-            proglog.info(f"Progress {counter}/{n_gulps}")
-            pipeline = GulpPipeline(d_arr, pipeline_config, gpu_id=gpu_id)
-            hits = pipeline.run()
-            
-            # Add some runtime info
-            if len(hits) > 0:
-                hits['gulp_idx']     = counter
-                hits['gulp_size']    = gulp_size
-                hits['hits_in_gulp'] = len(hits)
+            if 'preprocess' in d_arr.attrs.keys():
+                for beam_idx in range(d_arr.shape[1]):
+                    hits[f'b{beam_idx}_gulp_mean'] = cp.asnumpy(d_arr.attrs['preprocess']['mean'][beam_idx])
+                    hits[f'b{beam_idx}_gulp_std']  = cp.asnumpy(d_arr.attrs['preprocess']['std'][beam_idx])
+                    hits[f'b{beam_idx}_gulp_flag_frac'] = cp.asnumpy(d_arr.attrs['preprocess'].get('flagged_fraction', 0))
+                
 
-                if 'preprocess' in d_arr.attrs.keys():
-                    for beam_idx in range(d_arr.shape[1]):
-                        hits[f'b{beam_idx}_gulp_mean'] = cp.asnumpy(d_arr.attrs['preprocess']['mean'][beam_idx])
-                        hits[f'b{beam_idx}_gulp_std']  = cp.asnumpy(d_arr.attrs['preprocess']['std'][beam_idx])
-                        hits[f'b{beam_idx}_gulp_flag_frac'] = cp.asnumpy(d_arr.attrs['preprocess'].get('flagged_fraction', 0))
-                    
+                if d_arr.attrs['preprocess'].get('n_poly', 0) > 1:
+                    n_poly = d_arr.attrs['preprocess']['n_poly']
+                    hits['n_poly'] = n_poly
+                    for pp in range(int(n_poly + 1)):
+                        hits[f'b{beam_idx}_gulp_poly_c{pp}'] = cp.asnumpy(d_arr.attrs['preprocess']['poly_coeffs'][beam_idx, pp])
 
-                    if d_arr.attrs['preprocess'].get('n_poly', 0) > 1:
-                        n_poly = d_arr.attrs['preprocess']['n_poly']
-                        hits['n_poly'] = n_poly
-                        for pp in range(int(n_poly + 1)):
-                            hits[f'b{beam_idx}_gulp_poly_c{pp}'] = cp.asnumpy(d_arr.attrs['preprocess']['poly_coeffs'][beam_idx, pp])
-
-                out_pool[stream_id].append(hits)
-
-    for s in stream_pool:
-        s.synchronize()
-    
-    for out in out_pool:
-        if len(out) == 0:
-            dframe = create_empty_hits_table()
-        else:
-            dframe = pd.concat(out)
+            out.append(hits)
+    if len(out) == 0:
+        dframe = create_empty_hits_table()
+    else:
+        dframe = pd.concat(out)
 
     if sort_hits:
         dframe = dframe.sort_values('snr', ascending=False).reset_index(drop=True)
@@ -412,10 +391,6 @@ def find_et(filename: str,
 
     if log_output:
         print(f"find_et: Output logged to {logfile_out}")
-
-    #if proglog.level >= logbook.DEBUG:
-    #    for k, mm in pipeline.kernel_managers.items():
-    #        proglog.debug(mm.info())
 
     return HitBrowser(ds, dframe)
     

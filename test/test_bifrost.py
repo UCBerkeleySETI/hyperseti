@@ -12,6 +12,7 @@ from pprint import pprint
 
 from hyperseti.log import get_logger
 logger = get_logger('hyperfrost.data_source', 'info')
+logger = get_logger('hyperfrost.pipeline', 'info')
 
 def test_from_bf():
     d = bf.ndarray(np.zeros((10, 2, 1000)), space='cuda', dtype='f32')
@@ -110,14 +111,16 @@ def test_pipeline_full():
         }
     }
 
-    b_read      = DataArrayBlock(filenames, 32768*4, axis='frequency', overlap=1024)
-    b_hyper     = HyperfrostPipelineBlock(b_read, pipeline_config)
+    b_read      = DataArrayBlock(filenames, 2**20, axis='frequency', overlap=0)
+    b_hyper     = HyperfrostPipelineBlock(b_read, pipeline_config, db='test.hitdb')
 
     # Run pipeline
     pipeline = bfp.get_default_pipeline()
     print(pipeline.dot_graph())
     pipeline.run()
 
+def test_cmd_tool():
+    
 
 if __name__ == "__main__":
     test_pipeline_full()

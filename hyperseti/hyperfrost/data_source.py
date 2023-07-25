@@ -7,6 +7,8 @@ from hyperseti.io import load_data
 from hyperseti.hyperfrost.bifrost import gen_bf_metadata
 from hyperseti.log import get_logger
 
+import os
+
 logger = get_logger('hyperfrost.data_source')
 
 import numpy as np
@@ -35,6 +37,7 @@ class DataArrayReader(object):
         """
 
         self.data_array = load_data(filename)
+        self._filepath = os.path.abspath(filename)
         self.gulp_size = gulp_size
         iter_dict = {axis: gulp_size}
         iter_dict_overlap = {axis: overlap}
@@ -46,6 +49,7 @@ class DataArrayReader(object):
         # Update tensor with gulp size
         axis_idx = self.hdr['_tensor']['labels'].index(axis)
         self.hdr['_tensor']['shape'][axis_idx] = gulp_size
+        self.hdr['filepath'] = self._filepath
         
         # Names across sequences must be unique -- appending counter ensures this
         self.hdr['name'] = f"{counter}_{self.hdr['name']}"
@@ -76,7 +80,7 @@ class DataArrayBlock(bfp.SourceBlock):
         gulp_size (int): Number of elements in a gulp (i.e. sub-array size)
         axis (str): name of axis to take gulps from
     """
-    def __init__(self, filenames, gulp_size,  axis, overlap=0,  *args, **kwargs):
+    def __init__(self, filenames, gulp_size,  axis, overlap=0,  log_level: str=None, *args, **kwargs):
         gulp_nframe = 1
         if 'gulp_nframe' in kwargs: kwargs.pop('gulp_nframe') # Hardcode to 1
         super().__init__(filenames, gulp_nframe, *args, **kwargs)
@@ -84,6 +88,8 @@ class DataArrayBlock(bfp.SourceBlock):
         self.axis = axis
         self.overlap = overlap
         self.counter = 1
+        if log_level is not None:
+            logger.level = log_level
 
     def create_reader(self, filename: str):
         """ Uses hyperseti's DataArray class to load data """
