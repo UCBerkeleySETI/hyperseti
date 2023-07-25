@@ -22,6 +22,7 @@ from .hit_browser import HitBrowser
 from .version import HYPERSETI_VERSION
 from .data_array import DataArray
 from .thirdparty import sigproc
+from .kernels import DedopplerMan, PeakFinderMan, SmearCorrMan, BlankHitsMan
 
 #logging
 from .log import get_logger
@@ -60,7 +61,7 @@ class GulpPipeline(object):
         ```
     """
 
-    def __init__(self, data_array: DataArray, config: dict, gpu_id: int=None):
+    def __init__(self, data_array: DataArray, config: dict, gpu_id: int=None, kernel_managers=None):
         """ Pipeline class to run on a gulp of data (e.g. a coarse channel)
 
         Args:
@@ -103,7 +104,17 @@ class GulpPipeline(object):
         if config['dedoppler']['apply_smearing_corr'] and n_boxcar > 1:
             logger.warning("GulpPipeline: combining dedoppler/apply_smearing_corr and pipeline/n_boxcar > 1 may produce strange results. Or it may not. Not sure yet.")
 
-    @timeme
+        # Create kernel managers
+        if kernel_managers is None:
+            self.kernel_managers = {
+                'dedoppler': DedopplerMan(),
+                'blank_hits': BlankHitsMan(),
+                'peak_find': PeakFinderMan(),
+                'smear_corr': SmearCorrMan()
+            }
+        else: 
+            self.kernel_managers = kernel_managers
+
     def preprocess(self):
         """ Apply preprocessing steps 
         
@@ -146,22 +157,22 @@ class GulpPipeline(object):
         if self.config['preprocess'].get('blank_extrema'):
             logger.info(f"GulpPipeline.preprocess: Blanking extremely bright signals")
             self.data_array = blank_extrema(self.data_array, **self.config['preprocess']['blank_extrema'])
-        
-
-    @timeme        
+    
     def dedoppler(self):
         """ Apply dedoppler transform to gulp """
         # Check if kernel is computing DD + SK
         kernel = self.config['dedoppler'].get('kernel', None)
+
         if kernel == 'ddsk':
             logger.info("GulpPipeline.dedoppler: Running DDSK dedoppler kernel")
-            self.dedopp, self.dedopp_sk = dedoppler(self.data_array, **self.config['dedoppler'])
+            self.dedopp, self.dedopp_sk = dedoppler(self.data_array, **self.config['dedoppler'], 
+                                                    mm=self.kernel_managers['dedoppler'], 
+                                                    mm_sc=self.kernel_managers['smear_corr'])
         else:
             logger.info("GulpPipeline.dedoppler: Running standard dedoppler kernel")
-            self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'])
+            self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'], mm=self.kernel_managers['dedoppler'])
             self.dedopp_sk = None
     
-    @timeme
     def hitsearch(self):
         """ Run search for hits above threshold in dedoppler space.
         
@@ -183,9 +194,8 @@ class GulpPipeline(object):
             conf['hitsearch']['sk_data'] = self.dedopp_sk
 
         # RUN HITSEARCH!
-        _peaks = hitsearch(self.dedopp, **conf['hitsearch'])
+        _peaks = hitsearch(self.dedopp, **conf['hitsearch'], mm=self.kernel_managers['peak_find'])
         
-
         self._peaks_last_iter = _peaks   # Keep a copy of most recent peaks
         
         if _peaks is not None:
@@ -200,7 +210,6 @@ class GulpPipeline(object):
             else:
                 self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
 
-    @timeme   
     def run(self) -> pd.DataFrame:
         """ Main pipeline runner 
         
@@ -252,7 +261,7 @@ class GulpPipeline(object):
                 if n_hits_blanking_iter > 0:
                     logger.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: blanking hits")
                     new_peaks_this_blanking_iter = pd.concat(new_peaks_this_blanking_iter, ignore_index=True) 
-                    self.data_array = blank_hits_gpu(self.data_array, new_peaks_this_blanking_iter, padding=n_padding)
+                    self.data_array = blank_hits_gpu(self.data_array, new_peaks_this_blanking_iter, padding=n_padding, mm=self.kernel_managers['blank_hits'])
                     n_hits_last_iter = n_hits_blanking_iter
                 else:
                     proglog.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: No new hits found, breaking!")

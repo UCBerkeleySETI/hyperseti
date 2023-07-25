@@ -225,40 +225,44 @@ class PeakFinderMan(KernelManager):
         if len(hits) < 1:
             return hits, idx_f, idx_t       # return empty lists
         else:
-            # Final stage: we need to make sure only one maxima within
-            # The minimum spacing. We loop through and assign to groups
-            # Then find the maximum for each group.
-            # TODO: Speed up this code
             df = np.column_stack((np.arange(len(hits)), hits, idx_f, idx_t))
-
-            ## Sort into groups
-            groups = []
-            cur = df[0]
-            g = [cur, ]
-
-            for row in df[1:]:
-                if row[2] - cur[2] < min_spacing:
-                    g.append(row)
-                else:
-                    groups.append(g)
-                    g = [row, ]
-                cur = row
-            groups.append(g)
-
-            df = []
-            for g in groups:
-                if len(g) == 1:
-                    df.append(g[0])
-                else:
-                    mv, mi = g[0][1], 0
-                    for i, h in enumerate(g[1:]):
-                        if mv < h[1]:
-                            mv, mi = h[1], i + 1 
-                    df.append(g[mi])
-            df = np.array(df)        
-
+            df = _group_hits(df, min_spacing)
             return df[:, 1], df[:, 2].astype('int32'), df[:, 3].astype('int32')
 
+def _group_hits(df, min_spacing):
+    """ Helper function to sort list of hits into groups 
+    
+    # Final stage of hitsearch: we need to make sure only one maxima within
+    # The minimum spacing. We loop through and assign to groups
+    # Then find the maximum for each group.
+
+    # TODO: Speed up this code
+    """
+    groups = []
+    cur = df[0]
+    g = [cur, ]
+
+    for row in df[1:]:
+        if row[2] - cur[2] < min_spacing:
+            g.append(row)
+        else:
+            groups.append(g)
+            g = [row, ]
+        cur = row
+    groups.append(g)
+
+    df = []
+    for g in groups:
+        if len(g) == 1:
+            df.append(g[0])
+        else:
+            mv, mi = g[0][1], 0
+            for i, h in enumerate(g[1:]):
+                if mv < h[1]:
+                    mv, mi = h[1], i + 1 
+            df.append(g[mi])
+    df = np.array(df)    
+    return df
 
 def peak_find(dedopp_data: cp.ndarray, threshold: float, min_spacing: float, beam_id: int=0, mm: PeakFinderMan=None):
         """ Find peaks in data above threshold

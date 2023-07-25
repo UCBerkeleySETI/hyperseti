@@ -6,9 +6,10 @@ import sys
 from copy import deepcopy
 
 from astropy import units as u
-from cupyx.scipy.ndimage import uniform_filter1d
 
 from .kernels.dedoppler import DedopplerMan
+from .kernels.smear_corr import SmearCorrMan
+
 from .filter import apply_boxcar
 from .data_array import from_metadata, DataArray
 from .dimension_scale import DimensionScale, ArrayBasedDimensionScale
@@ -164,7 +165,7 @@ def plan_optimal(N_time: int, N_dopp_lower: int, N_dopp_upper: int) -> np.array:
 
 def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None, boxcar_size: int=1, 
               kernel: str='dedoppler', apply_smearing_corr: bool=False, plan: str='stepped',
-              mm: DedopplerMan=None) -> DataArray:
+              mm: DedopplerMan=None, mm_sc: SmearCorrMan=None) -> DataArray:
     """ Apply brute-force dedoppler kernel to data
     
     Args:
@@ -259,7 +260,15 @@ def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None
     if apply_smearing_corr:
         # Note: do not apply smearing corr to DDSK
         logger.debug(f"dedoppler: Applying smearing correction")
-        dedopp_array = apply_boxcar_drift(dedopp_array)
+
+        # Initialize SmearCorrManager
+        if isinstance(mm_sc, SmearCorrMan):
+            scman = mm_sc
+        else:
+            scman = SmearCorrMan()
+        scman.init(*dedopp_array.shape)
+
+        dedopp_array = scman.execute(dedopp_array)
 
     if kernel == 'ddsk':
         dedopp_sk_array = DataArray(dedopp_sk_gpu, output_dims, output_scales, output_attrs, 

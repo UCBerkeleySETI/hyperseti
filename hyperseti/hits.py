@@ -188,7 +188,7 @@ def get_signal_extents(dedopp_array: DataArray, hits: pd.DataFrame, threshold: i
     return edges_l, edges_u  
 
 def hitsearch(dedopp_array: DataArray, threshold: int=10, min_fdistance: int=100, 
-              sk_data: DataArray=None, **kwargs) -> pd.DataFrame:
+              sk_data: DataArray=None, mm: PeakFinderMan=None, **kwargs) -> pd.DataFrame:
     """ Search for hits using custom relative maxima kernel
     
     Args:
@@ -214,7 +214,10 @@ def hitsearch(dedopp_array: DataArray, threshold: int=10, min_fdistance: int=100
     # TODO: Reinstate memory management?
     # Set kernel size to be 2^(N-1)
     K = 2**(int(np.log2(min_fdistance)))
-    pf = PeakFinderMan()
+    if isinstance(mm, PeakFinderMan):
+        pf = mm
+    else:
+        pf = PeakFinderMan()
     pf.init(N_chan=dedopp_array.shape[2], N_time=dedopp_array.shape[0], K=K)  
 
     t0 = time.time()

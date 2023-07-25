@@ -123,6 +123,18 @@ def test_with_voyager():
         db = HitDatabase(tmp_file('test_voyager_hits.hitdb'), mode='w')
         hit_browser.to_db(db, 'voyager')
 
+        # Print memory managers
+        config['dedoppler']['apply_smearing_corr'] = True
+        config['pipeline']['n_boxcar'] = 1
+        logger = get_logger('find_et', 'debug')
+        hit_browser = find_et(voyager_h5, config, 
+                        gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
+                        filename_out=tmp_file('./test_voyager_hits.csv'),
+                        log_output=True,
+                        log_config=True
+                        )    
+        logger.level =  logbook.INFO  
+
     finally:
         for file_ext in ('.log', '.csv', '.yaml', '.hitdb'):
             cleanup=True

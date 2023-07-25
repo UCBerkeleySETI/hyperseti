@@ -1,7 +1,7 @@
+from __future__ import annotations
 import os
 import numpy as np
 from astropy.coordinates import SkyCoord
-import setigen as stg
 
 from hyperseti.dimension_scale import TimeScale, DimensionScale
 from hyperseti.data_array import DataArray

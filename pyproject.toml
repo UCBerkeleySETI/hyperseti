@@ -14,24 +14,25 @@ repository      = "https://github.com/UCBerkeleySETI/hyperseti"
 [tool.poetry.dependencies]
 python      = ">=3.8"
 numpy       = ">=1.21"
-cupy        = ">=11.0"
+cupy        = ">=10.0"
 pandas      = ">=2.0"
 h5py        = ">=3.8"
 pyyaml      = ">=6.0"
-Logbook     = ">=1.5"
-astropy     = ">=5.2"
-setigen     = ">=2.4"
-hdf5plugin  = ">=4.1"
-matplotlib  = ">=3.7"
+Logbook     = ">=1.4"
+astropy     = ">=5.0"
+setigen     = ">=2.0"
+hdf5plugin  = ">=4.0"
+matplotlib  = ">=3.5"
 
-[project.scripts]
+[tool.poetry.scripts]
 findET = "hyperseti.findET:cmd_tool"
 tsdat  = "hyperseti.tsdat:cmd_tool" 
+hyperfrost = "hyperseti.hyperfrost.cmd_tool:cmd_tool"
 
 [tool.poetry.group.test.dependencies]
 pytest           = ">=7.2"
 turbo_seti       = ">=2.3"
-blimpy           = ">=2.1"
+blimpy           = ">=2.0"
 
 [tool.poetry.group.docs.dependencies]
 coverage         = ">=7.2"

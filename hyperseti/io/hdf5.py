@@ -9,6 +9,7 @@ from hyperseti.data_array import DataArray
 import hdf5plugin
 import h5py
 
+
 def from_h5(filename: str) -> DataArray:
     """ Create a DataArray from a HDF5 file 
     
@@ -33,4 +34,5 @@ def from_h5(filename: str) -> DataArray:
     
     d = DataArray(data, dims, scales, attrs, units='counts')
     d._filename = filename
+    d.fh = h5
     return d

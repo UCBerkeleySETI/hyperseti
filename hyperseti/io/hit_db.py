@@ -108,7 +108,13 @@ class HitDatabase(object):
 
     def __del__(self):
         self.h5.close()
+
+    def __enter__(self):
+        return self
     
+    def __exit__(self, type, value, tb):
+        self.close()
+
     def close(self):
         self.__del__()
     
@@ -264,7 +270,6 @@ class HitDatabase(object):
                 raise FileNotFoundError("Cannot find original data. Please use data_arr= argument to manually link.")
         else:
             raise FileNotFoundError("Cannot find original data. Please use data_arr= argument to manually link.")
-
 
 
 
