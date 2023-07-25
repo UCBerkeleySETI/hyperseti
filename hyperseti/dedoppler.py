@@ -6,9 +6,10 @@ import sys
 from copy import deepcopy
 
 from astropy import units as u
-from cupyx.scipy.ndimage import uniform_filter1d
 
-from .kernels.dedoppler import dedoppler_kernel, dedoppler_kurtosis_kernel, dedoppler_with_kurtosis_kernel
+from .kernels.dedoppler import DedopplerMan
+from .kernels.smear_corr import SmearCorrMan
+
 from .filter import apply_boxcar
 from .data_array import from_metadata, DataArray
 from .dimension_scale import DimensionScale, ArrayBasedDimensionScale
@@ -163,7 +164,8 @@ def plan_optimal(N_time: int, N_dopp_lower: int, N_dopp_upper: int) -> np.array:
 
 
 def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None, boxcar_size: int=1, 
-              kernel: str='dedoppler', apply_smearing_corr: bool=False, plan: str='stepped') -> DataArray:
+              kernel: str='dedoppler', apply_smearing_corr: bool=False, plan: str='stepped',
+              mm: DedopplerMan=None, mm_sc: SmearCorrMan=None) -> DataArray:
     """ Apply brute-force dedoppler kernel to data
     
     Args:
@@ -220,75 +222,18 @@ def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None
     dd_shifts_gpu  = cp.asarray(dd_shifts)
     N_dopp = len(dd_shifts)
     
-    # Allocate GPU memory for dedoppler data
-    dedopp_gpu = cp.zeros((N_dopp, N_beam, N_chan), dtype=cp.float32)
+    # Run dedoppler kernel
+    if isinstance(mm, DedopplerMan):
+        ddman = mm
+    else:
+        ddman = DedopplerMan()
+    ddman.init(N_time, N_beam, N_chan, N_dopp, kernel=kernel)
+
     if kernel == 'ddsk':
-        dedopp_sk_gpu = cp.zeros((N_dopp, N_beam, N_chan), dtype=cp.float32)
-    t1 = time.time()
-    logger.debug(f"dedoppler: setup time: {(t1-t0)*1e3:2.2f}ms")
+        dedopp_gpu, dedopp_sk_gpu = ddman.execute(data_array, dd_shifts_gpu, boxcar_size)
+    else:
+        dedopp_gpu = ddman.execute(data_array, dd_shifts_gpu, boxcar_size)
 
-    # TODO: Candidate for parallelization
-    for beam_id in range(N_beam):
-
-        # Select out beam
-        d_gpu = data_array.data[:, beam_id, :] 
-
-        # Launch kernel
-        t0 = time.time()
-
-        # Apply boxcar filter
-        if boxcar_size > 1:
-            d_gpu = apply_boxcar(d_gpu, boxcar_size=boxcar_size, mode='gaussian')
-
-        # Allocate GPU memory for dedoppler data
-        if N_beam > 1:
-            _dedopp_gpu = cp.zeros((N_dopp, N_chan), dtype=cp.float32)
-            if kernel == 'ddsk':
-                _dedopp_sk_gpu = cp.zeros((N_dopp, N_chan), dtype=cp.float32)
-        else:
-            _dedopp_gpu = dedopp_gpu.squeeze()
-            if kernel == 'ddsk':
-                _dedopp_sk_gpu = dedopp_sk_gpu.squeeze()
-        
-        # Setup grid and block dimensions
-        F_block = np.min((N_chan, 1024))
-        F_grid  = N_chan // F_block
-        #print(dd_shifts)
-        logger.debug(f"dedoppler: Kernel shape (grid, block) {(F_grid, N_dopp), (F_block,)}")
-
-        # Calculate number of integrations within each (time-averaged) channel
-        samps_per_sec = np.abs((1.0 / data_array.frequency.step).to('s').value) / 2 # Nyq sample rate for channel
-        N_acc = int(data_array.time.step.to('s').value / samps_per_sec)
-        
-        if kernel == 'dedoppler':
-            logger.debug(f"{type(d_gpu)}, {type(_dedopp_gpu)}, {N_chan}, {N_time}")
-            dedoppler_kernel((F_grid, N_dopp), (F_block,), 
-                            (d_gpu, _dedopp_gpu, dd_shifts_gpu, N_chan, N_time)) # grid, block and arguments
-        elif kernel == 'kurtosis':
-            # output must be scaled by N_acc, which can be figured out from df and dt metadata
-            logger.debug(f'dedoppler kurtosis: rescaling SK by {N_acc}')
-            logger.debug(f"dedoppler kurtosis: driftrates: {dd_shifts}")
-            dedoppler_kurtosis_kernel((F_grid, N_dopp), (F_block,), 
-                            (d_gpu, _dedopp_gpu, dd_shifts_gpu, N_chan, N_time, N_acc)) # grid, block and arguments 
-        elif kernel == 'ddsk':
-            # output must be scaled by N_acc, which can be figured out from df and dt metadata
-            logger.debug(f'dedoppler ddsk: rescaling SK by {N_acc}')
-            logger.debug(f"dedoppler ddsk: driftrates: {dd_shifts}")
-            dedoppler_with_kurtosis_kernel((F_grid, N_dopp), (F_block,), 
-                            (d_gpu, _dedopp_gpu, _dedopp_sk_gpu, dd_shifts_gpu, N_chan, N_time, N_acc)) 
-                            # grid, block and arguments
-        else:
-            logger.critical("dedoppler: Unknown kernel={} !!".format(kernel))
-            sys.exit(86)
-    
-        t1 = time.time()
-        logger.debug("dedoppler: kernel ({}) time {:2.2f}ms".format(kernel, (t1-t0)*1e3))
-
-        if N_beam == 1:
-            dedopp_gpu = cp.expand_dims(_dedopp_gpu, axis=1)
-        else:
-            dedopp_gpu[:, beam_id] = _dedopp_gpu
-    
     # Create output DataArray
     output_dims = ('drift_rate', 'beam_id', 'frequency')
     output_units = data_array.units
@@ -315,7 +260,15 @@ def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None
     if apply_smearing_corr:
         # Note: do not apply smearing corr to DDSK
         logger.debug(f"dedoppler: Applying smearing correction")
-        dedopp_array = apply_boxcar_drift(dedopp_array)
+
+        # Initialize SmearCorrManager
+        if isinstance(mm_sc, SmearCorrMan):
+            scman = mm_sc
+        else:
+            scman = SmearCorrMan()
+        scman.init(*dedopp_array.shape)
+
+        dedopp_array = scman.execute(dedopp_array)
 
     if kernel == 'ddsk':
         dedopp_sk_array = DataArray(dedopp_sk_gpu, output_dims, output_scales, output_attrs, 
@@ -323,3 +276,26 @@ def dedoppler(data_array: DataArray, max_dd: u.Quantity, min_dd: u.Quantity=None
         return dedopp_array, dedopp_sk_array
     else:
         return dedopp_array
+
+
+def dedoppler_simple(data_array: DataArray, drift_rate: u.Quantity):
+    """ Simple dedoppler algorithm for removing a given drift rate
+    
+    Args:
+        data_array (DataArray): Data with (time, beam, frequency) axes
+        drift_rate (Quantity | float): Drift rate to compensate for
+    
+    Returns:
+        data_array (DataArray): Dedoppler'd data array
+    """
+
+
+    n_drift = calc_ndrift(data_array, drift_rate)
+    n_t     = data_array.data.shape[0]
+    
+    for bb in range(data_array.data.shape[1]):
+        for ii in range(1, n_t):
+            n_roll = int((ii / n_t) * n_drift)
+            data_array.data[ii, bb] = np.roll(data_array.data[ii, bb], n_roll - n_drift // 2)
+
+    return data_array

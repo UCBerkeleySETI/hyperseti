@@ -7,7 +7,7 @@ import os
 
 from astropy import units as u
 
-from .kernels.peak_finder import peak_find
+from .kernels.peak_finder import peak_find, PeakFinderMan
 
 from .data_array import DataArray
 from .blanking import blank_hit, blank_hits
@@ -188,7 +188,7 @@ def get_signal_extents(dedopp_array: DataArray, hits: pd.DataFrame, threshold: i
     return edges_l, edges_u  
 
 def hitsearch(dedopp_array: DataArray, threshold: int=10, min_fdistance: int=100, 
-              sk_data: DataArray=None, **kwargs) -> pd.DataFrame:
+              sk_data: DataArray=None, mm: PeakFinderMan=None, **kwargs) -> pd.DataFrame:
     """ Search for hits using custom relative maxima kernel
     
     Args:
@@ -213,9 +213,12 @@ def hitsearch(dedopp_array: DataArray, threshold: int=10, min_fdistance: int=100
 
     # TODO: Reinstate memory management?
     # Set kernel size to be 2^(N-1)
-    #K = 2**(int(np.log2(min_fdistance)))
-    #pf = PeakFinder()
-    #pf.init(N_chan=dedopp_array.shape[2], N_time=dedopp_array.shape[0], K=K)  
+    K = 2**(int(np.log2(min_fdistance)))
+    if isinstance(mm, PeakFinderMan):
+        pf = mm
+    else:
+        pf = PeakFinderMan()
+    pf.init(N_chan=dedopp_array.shape[2], N_time=dedopp_array.shape[0], K=K)  
 
     t0 = time.time()
     dfs = []
@@ -228,8 +231,8 @@ def hitsearch(dedopp_array: DataArray, threshold: int=10, min_fdistance: int=100
             imgdata = dedopp_data.squeeze()
 
         # Run peak find
-        ##intensity, fcoords, dcoords = pf.hitsearch(dedopp_data, beam_id=beam_idx, threshold=threshold, min_spacing=min_fdistance)
-        intensity, fcoords, dcoords = peak_find(imgdata, threshold=threshold, min_spacing=min_fdistance)
+        intensity, fcoords, dcoords = pf.hitsearch(dedopp_data, beam_id=beam_idx, threshold=threshold, min_spacing=min_fdistance)
+        #intensity, fcoords, dcoords = peak_find(imgdata, threshold=threshold, min_spacing=min_fdistance)
         #print(intensity, fcoords, dcoords)
 
         t1 = time.time()
@@ -283,6 +286,7 @@ def hitsearch(dedopp_array: DataArray, threshold: int=10, min_fdistance: int=100
             edges_l, edges_u = get_signal_extents(dedopp_array, results, threshold=threshold_ex) 
             results['extent_lower'] = edges_l
             results['extent_upper'] = edges_u
+            results['signal_extent']  = (np.abs(edges_l) + np.abs(edges_u)) * np.abs(dedopp_array.frequency.step.to('Hz').value)
 
             dfs.append(results)
         

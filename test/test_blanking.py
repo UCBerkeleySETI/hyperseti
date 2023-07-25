@@ -1,4 +1,5 @@
 from hyperseti.blanking import blank_edges, blank_extrema, blank_hits, blank_hits_gpu
+from hyperseti.kernels.blank_hits import BlankHitsMan
 from hyperseti.io import from_setigen
 from hyperseti.pipeline import GulpPipeline
 
@@ -124,10 +125,21 @@ def test_blank_hits():
 
     db = blank_hits_gpu(d, df)
 
-
     for idx in start_idxs:
         assert db.data[0,0, idx] == 0
     print("Hits blanked!")
+
+    # Test with kernel manager
+    bm = BlankHitsMan()
+    d = generate_data_array_multihits()
+    d = d.sel({'frequency': slice(0, 2**12)}, space='gpu')
+    pipeline = GulpPipeline(d, config)
+    df = pipeline.run()
+
+    db = blank_hits_gpu(d, df, mm=bm)
+    print(bm.info())
+
+
 
 def test_voyager_blanking():
     """ Test blanking on main DC spike """

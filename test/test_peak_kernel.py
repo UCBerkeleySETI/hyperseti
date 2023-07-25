@@ -1,6 +1,6 @@
 import numpy as np
 import cupy as cp
-from hyperseti.kernels.peak_finder import PeakFinder
+from hyperseti.kernels.peak_finder import PeakFinderMan, peak_find
 from hyperseti.normalize import normalize
 from hyperseti.io import from_h5
 
@@ -65,8 +65,9 @@ def test_peak_kernel():
     assert np.allclose(maxidx_t_gpu, (1,0,1,0))
 
     # Test peak_kernel
-    pf = PeakFinder()
+    pf = PeakFinderMan()
     pf.init(N_chan=16, N_time=2, K=4)
+    print(pf.info())
     maxval_gpu, maxidx_f_gpu, maxidx_t_gpu = pf.find_peaks(a_gpu)
 
     print(maxval_gpu, maxidx_f_gpu, maxidx_t_gpu)
@@ -82,8 +83,9 @@ def test_peak_kernel():
     b_gpu = cp.asarray(b)
 
     K = 4
-    pf = PeakFinder()
+    pf = PeakFinderMan()
     pf.init(N_chan=b.shape[1], N_time=b.shape[0], K=K)
+    print(pf.info())
     maxval_gpu, maxidx_f_gpu, maxidx_t_gpu = pf.find_peaks(b_gpu, return_space='cpu')
 
     maxval_cpu, maxidx_f_cpu, maxidx_t_cpu = find_max_np(b, K)
@@ -121,7 +123,7 @@ def test_resize():
                 #print(b.shape)
                 b_gpu = cp.asarray(b)
                 K = 64
-                pf = PeakFinder()
+                pf = PeakFinderMan()
                 pf.init(N_chan=b_gpu.shape[2], N_time=b_gpu.shape[0], K=K)
                 maxval_gpu, maxidx_f_gpu, maxidx_t_gpu = pf.hitsearch(b_gpu, threshold=10, min_spacing=100, return_space='cpu')
                 maxval_cpu, maxidx_f_cpu, maxidx_t_cpu = cp.asnumpy(maxval_gpu),  cp.asnumpy(maxidx_f_gpu), cp.asnumpy(maxidx_t_gpu)
@@ -133,12 +135,19 @@ def test_hitsearch():
     vs.data = cp.asarray(vs.data)
     vs = normalize(vs, poly_fit=5)
 
-    pf = PeakFinder()
+    pf = PeakFinderMan()
     pf.init(N_chan=vs.frequency.n_step, N_time=vs.time.n_step, K=32)
     mv, f_idx, t_idx = pf.hitsearch(vs.data, threshold=3, min_spacing=100)
     print(mv, f_idx, t_idx)
 
+    # Test manual peak_find
+    peak_find(vs.data, threshold=3, min_spacing=100, mm=pf)
+    peak_find(vs.data, threshold=3, min_spacing=100)
+    print(pf.info())
+
+
+
 if __name__ == "__main__":
      #test_peak_kernel()
-     #test_hitsearch()
-     test_resize()
+     test_hitsearch()
+     #test_resize()

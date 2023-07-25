@@ -22,6 +22,7 @@ from .hit_browser import HitBrowser
 from .version import HYPERSETI_VERSION
 from .data_array import DataArray
 from .thirdparty import sigproc
+from .kernels import DedopplerMan, PeakFinderMan, SmearCorrMan, BlankHitsMan
 
 #logging
 from .log import get_logger
@@ -60,7 +61,7 @@ class GulpPipeline(object):
         ```
     """
 
-    def __init__(self, data_array: DataArray, config: dict, gpu_id: int=None):
+    def __init__(self, data_array: DataArray, config: dict, gpu_id: int=None, kernel_managers=None):
         """ Pipeline class to run on a gulp of data (e.g. a coarse channel)
 
         Args:
@@ -103,7 +104,17 @@ class GulpPipeline(object):
         if config['dedoppler']['apply_smearing_corr'] and n_boxcar > 1:
             logger.warning("GulpPipeline: combining dedoppler/apply_smearing_corr and pipeline/n_boxcar > 1 may produce strange results. Or it may not. Not sure yet.")
 
-    @timeme
+        # Create kernel managers
+        if kernel_managers is None:
+            self.kernel_managers = {
+                'dedoppler': DedopplerMan(),
+                'blank_hits': BlankHitsMan(),
+                'peak_find': PeakFinderMan(),
+                'smear_corr': SmearCorrMan()
+            }
+        else: 
+            self.kernel_managers = kernel_managers
+
     def preprocess(self):
         """ Apply preprocessing steps 
         
@@ -118,9 +129,13 @@ class GulpPipeline(object):
         if self.config['preprocess'].get('normalize', False):
             poly_fit = self.config['preprocess'].get('poly_fit', 0)
             if self.config['preprocess'].get('sk_flag', False):
-                logger.info(f"GulpPipeline.preprocess: Applying sk_flag before normalization")
-                sk_flag_opts = self.config.get('sk_flag', {})
-                mask = sk_flag(self.data_array, **sk_flag_opts)
+                if self.data_array.data.shape[0] < 2:
+                    mask = None
+                    logger.warning("GulpPipeline.preprocess: Not enough timesteps in file to SK flag!")
+                else:
+                    logger.info(f"GulpPipeline.preprocess: Applying sk_flag before normalization")
+                    sk_flag_opts = self.config.get('sk_flag', {})
+                    mask = sk_flag(self.data_array, **sk_flag_opts)
             else:
                 mask = None
 
@@ -142,22 +157,22 @@ class GulpPipeline(object):
         if self.config['preprocess'].get('blank_extrema'):
             logger.info(f"GulpPipeline.preprocess: Blanking extremely bright signals")
             self.data_array = blank_extrema(self.data_array, **self.config['preprocess']['blank_extrema'])
-        
-
-    @timeme        
+    
     def dedoppler(self):
         """ Apply dedoppler transform to gulp """
         # Check if kernel is computing DD + SK
         kernel = self.config['dedoppler'].get('kernel', None)
+
         if kernel == 'ddsk':
             logger.info("GulpPipeline.dedoppler: Running DDSK dedoppler kernel")
-            self.dedopp, self.dedopp_sk = dedoppler(self.data_array, **self.config['dedoppler'])
+            self.dedopp, self.dedopp_sk = dedoppler(self.data_array, **self.config['dedoppler'], 
+                                                    mm=self.kernel_managers['dedoppler'], 
+                                                    mm_sc=self.kernel_managers['smear_corr'])
         else:
             logger.info("GulpPipeline.dedoppler: Running standard dedoppler kernel")
-            self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'])
+            self.dedopp = dedoppler(self.data_array,  **self.config['dedoppler'], mm=self.kernel_managers['dedoppler'])
             self.dedopp_sk = None
     
-    @timeme
     def hitsearch(self):
         """ Run search for hits above threshold in dedoppler space.
         
@@ -179,9 +194,8 @@ class GulpPipeline(object):
             conf['hitsearch']['sk_data'] = self.dedopp_sk
 
         # RUN HITSEARCH!
-        _peaks = hitsearch(self.dedopp, **conf['hitsearch'])
+        _peaks = hitsearch(self.dedopp, **conf['hitsearch'], mm=self.kernel_managers['peak_find'])
         
-
         self._peaks_last_iter = _peaks   # Keep a copy of most recent peaks
         
         if _peaks is not None:
@@ -196,7 +210,6 @@ class GulpPipeline(object):
             else:
                 self.peaks = pd.concat((self.peaks, _peaks), ignore_index=True)   
 
-    @timeme   
     def run(self) -> pd.DataFrame:
         """ Main pipeline runner 
         
@@ -248,7 +261,7 @@ class GulpPipeline(object):
                 if n_hits_blanking_iter > 0:
                     logger.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: blanking hits")
                     new_peaks_this_blanking_iter = pd.concat(new_peaks_this_blanking_iter, ignore_index=True) 
-                    self.data_array = blank_hits_gpu(self.data_array, new_peaks_this_blanking_iter, padding=n_padding)
+                    self.data_array = blank_hits_gpu(self.data_array, new_peaks_this_blanking_iter, padding=n_padding, mm=self.kernel_managers['blank_hits'])
                     n_hits_last_iter = n_hits_blanking_iter
                 else:
                     proglog.info(f"(iteration {blank_count + 1} / {n_blank}) GulpPipeline.run: No new hits found, breaking!")
@@ -270,7 +283,8 @@ def find_et(filename: str,
             pipeline_config: dict, 
             filename_out: str=None, 
             filetype_out: str=None,
-            gulp_size: int=2**20, 
+            gulp_size: int=2**20,
+            n_overlap: int=0, 
             sort_hits: bool=True,
             log_config: bool=False,
             log_output: bool=False,
@@ -289,6 +303,7 @@ def find_et(filename: str,
         log_config (bool): If set, will log pipeline configuration to YAML file.
         sort_hits (bool): Sort hits by SNR after hitsearch is complete.
         gulp_size (int): Number of channels to process in one 'gulp' ('gulp' can be == 'coarse channel')
+        n_overlap (int): Number of channels to overlap when reading data from DataArray
         gpu_id (int): GPU device ID to use.
    
     Returns:
@@ -326,7 +341,9 @@ def find_et(filename: str,
     attach_gpu_device(gpu_id)
     counter = 0
     n_gulps = ds.data.shape[-1] // gulp_size
-    for d_arr in ds.iterate_through_data({'frequency': gulp_size}, space='gpu'):
+    for d_arr in ds.iterate_through_data(dims={'frequency': gulp_size}, 
+                                         overlap={'frequency': n_overlap}, 
+                                         space='gpu'):
         counter += 1
         proglog.info(f"Progress {counter}/{n_gulps}")
         pipeline = GulpPipeline(d_arr, pipeline_config, gpu_id=gpu_id)
