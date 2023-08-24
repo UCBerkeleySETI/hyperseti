@@ -36,6 +36,7 @@ config = {
         'normalize': True,                      # Normalize data
         'blank_edges': {'n_chan': 32},          # Blank edges channels
         'blank_extrema': {'threshold': 10000}   # Blank ridiculously bright signals before search
+        'poly_fit': 3                           # Subtract a 3-order polynomial bandpass 
     },
     'dedoppler': {
         'kernel': 'ddsk',                       # Doppler + kurtosis doppler (ddsk)
@@ -48,6 +49,12 @@ config = {
     },
     'pipeline': {
         'merge_boxcar_trials': True             # Merge hits at same frequency that are found in multiple boxcars
+        'blank_hits':
+            {
+            'n_blank': 4,                        # Do 4 rounds of iterative blanking
+            'padding': 16                        # Blank signal + 16 neighboring bins
+            }                     
+
     }
 }
 

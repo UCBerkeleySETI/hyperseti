@@ -56,22 +56,13 @@ An example of iterative blanking is show below; in the example, the highest S/N 
 
 ![Iterative-blanking](https://user-images.githubusercontent.com/713251/227689177-42e81c48-53cc-4eb9-a8f9-4cea8ce37f2e.png)
 
-Iterative blanking can be enabled by setting `config['pipeline']['n_blank']` to 1 or greater, where `n_blank` is the 
-number of iterations to apply. Note that if no new hits are found after blanking, the process will stop. 
+Iterative blanking can be enabled by setting `config['pipeline']['n_blank']` to 1 or greater, where `n_blank` is the number of iterations to apply. Note that if no new hits are found after blanking, the process will stop.
 
-### Browsing hits
-
-Results from `find_et` are returned as a `HitBrowser`, which has a `view_hits()` method for viewing this, and an `extract_hits()` method for extracting hits. 
-
-A Pandas DataFrame of all hits found is attached as `hit_brower.hit_table`, and the data are accessible via `hit_browser.data_array`. 
-
-```python
-hit_browser = find_et(voyager_h5, config, gulp_size=2**20)
-display(hit_browser.hit_table)
-
-hit_browser.view_hit(0, padding=128, plot='dual')
+```  python
+config['pipeline']['blank_hits'] = {
+            'n_blank': 4,                        # Do 4 rounds of iterative blanking
+            'padding': 16                        # Blank signal + 16 neighboring bins
+            }   
 ```
-
-![image](https://user-images.githubusercontent.com/713251/227728999-1bec6e2f-bfca-4ab7-ae59-d08010ad8a8d.png)
 
 
