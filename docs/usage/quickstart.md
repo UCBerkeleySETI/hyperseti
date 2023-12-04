@@ -40,14 +40,13 @@ config = {
         'normalize': True,                      # Normalize data
         'blank_edges': {'n_chan': 32},          # Blank edges channels
         'blank_extrema': {'threshold': 10000}   # Blank ridiculously bright signals before search
-        'poly_fit': 5                     
+        'poly_fit': 5                           # Subtract a 5-order polynomial bandpass
     },
     'dedoppler': {
         'kernel': 'ddsk',                       # Doppler + kurtosis doppler (ddsk)
-        'max_dd': 10.0,                          # Maximum dedoppler delay, 5 Hz/s
-        'min_dd': None,                         # 
+        'max_dd': 10.0,                         # Maximum dedoppler delay, 10 Hz/s
+        'min_dd': None,                         # If None, uses max_dd * -1
         'apply_smearing_corr': True ,           # Correct  for smearing within dedoppler kernel 
-                                                # Note: set to False if using multiple boxcars 
         'plan': 'stepped'                       # Dedoppler trial spacing plan (stepped = less memory)
     },
     'hitsearch': {
@@ -55,8 +54,11 @@ config = {
         'min_fdistance': None                   # Automatic calculation of min. channel spacing between hits
     },
     'pipeline': {
-        'n_boxcar': 10,                         # Number of boxcar trials to apply (10 stages, 2^10 channels)
-                                                # Boxcar is a moving average to compensate for smearing / broadband
+        'blank_hits':
+            {
+            'n_blank': 4,                        # Do 4 rounds of iterative blanking
+            'padding': 16                        # Blank signal + 16 neighboring bins
+            }   
         'merge_boxcar_trials': True             # Merge hits at same frequency that are found in multiple boxcars
     }
 }
