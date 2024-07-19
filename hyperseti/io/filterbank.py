@@ -6,11 +6,12 @@ from hyperseti.thirdparty import sigproc
 from hyperseti.dimension_scale import TimeScale, DimensionScale
 from hyperseti.data_array import DataArray
 
-def from_fil(filename: str) -> DataArray:
+def from_fil(filename: str, mode: str='r') -> DataArray:
     """ Create a DataArray from a sigproc filterbank file
     
     Args:
         filename (str): Path to filterbank file.
+        mode (str): File read mode. Default 'r' (readonly).
     
     Returns a DataArray object with mem-mapped filterbank data.
     """
@@ -18,7 +19,7 @@ def from_fil(filename: str) -> DataArray:
     hdrlen = sigproc.len_header(filename)
     n_int  = sigproc.calc_n_ints_in_file(filename)
     shape  = (n_int,  hdr['nbeams'], hdr['nchans'])
-    data   = np.memmap(filename=filename, dtype='float32', offset=hdrlen, shape=shape)
+    data   = np.memmap(filename=filename, dtype='float32', mode=mode, offset=hdrlen, shape=shape)
     
     attrs = {'name': os.path.basename(filename),
              'source': hdr['source_name'],
