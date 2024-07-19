@@ -1,0 +1,24 @@
+preprocess:
+  blank_edges:
+    n_chan: 1024                  # Blanks 1024 channels at edge of gulp
+  normalize: true                 # Normalize data
+  sk_flag:
+    n_sigma: 10                   # SK flagging - only applied during normalization to compute noise statistics
+  blank_extrema:
+    threshold: 10000              # Any hit brighter than this will be flagged as RFI
+  poly_fit: 3                     # Remove bandpass shape by fitting low-order polynomial
+dedoppler:
+  apply_smearing_corr: true       # Apply moving mean to reclaim SNR lost to doppler smearing.  
+  kernel: ddsk                    # Use dedoppler + DDSK kernel
+  max_dd: 10.0                    # Maximum drift rate 10 Hz/s
+  min_dd: null                 
+  plan: stepped                   # Use stepped plan to reduce number of DM trials at high drift rates
+hitsearch:
+  min_fdistance: null             # Compute minimum fdistance automatically
+  threshold: 20                   # 20-sigma minimum SNR
+pipeline:
+  merge_boxcar_trials: true       # Unusued for apply_smearing_corr approach
+  n_boxcar: null                  # Unusued for apply_smearing_corr approach
+  blank_hits:
+    n_blank: 8                    # Do 8 rounds of iterative blanking
+    padding: 16                   # Apply 16 channels of extra padding around each hit
