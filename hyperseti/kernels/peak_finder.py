@@ -9,7 +9,7 @@ extern "C" __global__
     __global__ void maxKernel
         (const float *data, float *maxval, int *maxidx, int F, int T)
         /* Each thread computes a different dedoppler sum for a given channel
-        
+
          F: N_frequency channels
          T: N_timesteps
 
@@ -17,24 +17,24 @@ extern "C" __global__
          * maxidx:  Peak T index array
         */
         {
-        
+
         // Setup thread index
         const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        
+
         int idx = 0;
         maxval[tid] = 0;
         maxidx[tid] = 0;
 
         for (int t = 0; t < T; t++) {
             idx = tid + F * t;
-            
-            // Make sure we're not out of bounds 
+
+            // Make sure we're not out of bounds
             if (idx < F * T) {
                 // Check if we have a new maxima
                 if (data[idx] > maxval[tid]) {
                     //printf("data > curmax, tid %d idx %d", tid, idx);
                     maxval[tid]   = data[idx];
-                    maxidx[tid] = t; 
+                    maxidx[tid] = t;
                 }
             }
         }
@@ -48,7 +48,7 @@ extern "C" __global__
     __global__ void maxReduceKernel
         (const float *maxval_in, int *maxidx_in, float *maxval_k, int *maxidx_f, int *maxidx_t, int F, int K)
         /* Each thread finds maxidx and maxval within kernel search footprint
-        
+
          F: N_frequency channels
          K: search kernel size
 
@@ -57,17 +57,17 @@ extern "C" __global__
          * maxidx_t:  Peak T index array
         */
         {
-        
+
         // Setup thread index
         const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        
+
         int idx = 0;
         if (K * tid < F) {
             maxval_k[tid] = maxval_in[K * tid];  // Set max to 0th entry within search box
             maxidx_f[tid] = K * tid;             // Assume 0th entry within search box is max
-            maxidx_t[tid] = maxidx_in[K * tid];  // Grab the corresponding time index    
+            maxidx_t[tid] = maxidx_in[K * tid];  // Grab the corresponding time index
         }
-               
+
         for (int k = 0; k < K; k++) {
             idx = K * tid + k;
 
@@ -75,22 +75,67 @@ extern "C" __global__
             if (idx < F) {
                 if (maxval_in[idx] > maxval_k[tid]) {
                     maxval_k[tid] = maxval_in[idx];
-                    maxidx_t[tid] = maxidx_in[idx]; 
+                    maxidx_t[tid] = maxidx_in[idx];
                     maxidx_f[tid] = idx;
                 }
-            }           
+            }
 
         }
-    __syncthreads();
+    __syncthreads()
     }
 ''', 'maxReduceKernel')
+
+# Two-pass kernel to filter adjacent block maxima
+# Pass 1: Mark hits weaker than previous hit
+filter_adjacent_pass1_kernel = cp.RawKernel(r'''
+extern "C" __global__
+    __global__ void filterAdjacentPass1Kernel
+        (const float *maxval_k, const int *maxidx_f,
+         bool *remove_mask, int N, float min_spacing)
+        {
+        const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+        if (tid < N) {
+            remove_mask[tid] = false;
+
+            if (tid > 0) {
+                float spacing = (float)(maxidx_f[tid] - maxidx_f[tid - 1]);
+                if (spacing < min_spacing && maxval_k[tid] <= maxval_k[tid - 1]) {
+                    remove_mask[tid] = true;
+                }
+            }
+        }
+    }
+''', 'filterAdjacentPass1Kernel')
+
+# Pass 2: Mark hits weaker than next hit
+filter_adjacent_pass2_kernel = cp.RawKernel(r'''
+extern "C" __global__
+    __global__ void filterAdjacentPass2Kernel
+        (const float *maxval_k, const int *maxidx_f,
+         const bool *remove_mask_pass1, bool *remove_mask_final, int N, float min_spacing)
+        {
+        const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+        if (tid < N) {
+            remove_mask_final[tid] = remove_mask_pass1[tid];
+
+            if (!remove_mask_pass1[tid] && tid < N - 1) {
+                float spacing = (float)(maxidx_f[tid + 1] - maxidx_f[tid]);
+                if (spacing < min_spacing && maxval_k[tid] < maxval_k[tid + 1]) {
+                    remove_mask_final[tid] = true;
+                }
+            }
+        }
+    }
+''', 'filterAdjacentPass2Kernel')
 
 
 def find_max_1D(d_gpu: cp.ndarray, maxval_gpu: cp.ndarray, maxidx_gpu: cp.ndarray):
     """ Run maxKernel -- finds maximum along slow-varying (outer) axis of 2D array
 
     Used by PeakFinder class, along with find_max_reduce second-stage search.
-    
+
     Args:
         d_gpu (cp.ndarray): 2D array to run peak search on, e.g. (time, frequency)
         maxval_gpu (cp.ndarray): Max values found along slow-varying axis (e.g. time axis)
@@ -104,15 +149,15 @@ def find_max_1D(d_gpu: cp.ndarray, maxval_gpu: cp.ndarray, maxidx_gpu: cp.ndarra
     max_kernel((F_grid,), (F_block,), (d_gpu, maxval_gpu, maxidx_gpu, N_chan, N_time))
 
 
-def find_max_reduce(maxval_gpu: cp.ndarray, maxidx_gpu: cp.ndarray, maxval_k_gpu: cp.ndarray, 
+def find_max_reduce(maxval_gpu: cp.ndarray, maxidx_gpu: cp.ndarray, maxval_k_gpu: cp.ndarray,
                     maxidx_f_gpu: cp.ndarray, maxidx_t_gpu: cp.ndarray, K: int):
     """ Run maxReduceKernel -- finds maximum for 1D array within blocked search kernel of size K
-    
+
     Designed to process output of find_max_1D to do secondary search within blocks of size (N_time, K)
 
     Args:
         maxval_gpu (cp.ndarray): Max values output from find_max_1D
-        maxidx_gpu (cp.ndarray): Max indexes output from find_max_1D 
+        maxidx_gpu (cp.ndarray): Max indexes output from find_max_1D
         maxval_k_gpu (cp.ndarray): Array with N_chan // K elements, local maxima within block
         maxidx_f_gpu (cp.ndarray): Array with N_chan // K elements, max value falling within search block (e.g. frequency)
         maxidx_t_gpu (cp.ndarray): Array with N_chan // K elements, index of slowly-varying axis (e.g. time)
@@ -121,19 +166,63 @@ def find_max_reduce(maxval_gpu: cp.ndarray, maxidx_gpu: cp.ndarray, maxval_k_gpu
     F_block = np.min((N_chan, 1024))
     F_grid = np.max((N_chan // F_block // K, 1))
     #print(f"Kernel shape (grid, block) {(F_grid,), (F_block,)}")
-    max_reduce_kernel((F_grid,), (F_block,), 
+    max_reduce_kernel((F_grid,), (F_block,),
                       (maxval_gpu, maxidx_gpu, maxval_k_gpu, maxidx_f_gpu, maxidx_t_gpu, N_chan, K))
 
 
-class PeakFinderMan(KernelManager):
-    """ Finds peaks in 2D arrays 
+def filter_adjacent_hits(maxval_k_gpu: cp.ndarray, maxidx_f_gpu: cp.ndarray,
+                        maxidx_t_gpu: cp.ndarray, min_spacing: float):
+    """ Filter adjacent hits that violate min_spacing requirement using GPU
 
-    Divides array up along fast-varying axis into blocks of size K, 
+    Uses a two-pass approach to avoid race conditions:
+    - Pass 1: Mark hits weaker than their previous neighbor
+    - Pass 2: Mark hits weaker than their next neighbor
+    This ensures the strongest hit in any closely-spaced group survives.
+
+    Args:
+        maxval_k_gpu (cp.ndarray): Peak values from find_max_reduce
+        maxidx_f_gpu (cp.ndarray): Frequency indices (sorted)
+        maxidx_t_gpu (cp.ndarray): Time indices
+        min_spacing (float): Minimum spacing between hits
+
+    Returns:
+        tuple: Filtered (maxval, maxidx_f, maxidx_t) arrays on GPU
+    """
+    N = len(maxval_k_gpu)
+    if N == 0:
+        return maxval_k_gpu, maxidx_f_gpu, maxidx_t_gpu
+
+    # Allocate masks
+    remove_mask_pass1 = cp.zeros(N, dtype=cp.bool_)
+    remove_mask_final = cp.zeros(N, dtype=cp.bool_)
+
+    block_size = 256
+    grid_size = (N + block_size - 1) // block_size
+
+    # Pass 1: Check against previous hit
+    filter_adjacent_pass1_kernel((grid_size,), (block_size,),
+                                 (maxval_k_gpu, maxidx_f_gpu,
+                                  remove_mask_pass1, N, min_spacing))
+
+    # Pass 2: Check against next hit
+    filter_adjacent_pass2_kernel((grid_size,), (block_size,),
+                                 (maxval_k_gpu, maxidx_f_gpu,
+                                  remove_mask_pass1, remove_mask_final, N, min_spacing))
+
+    # Keep hits that are not marked for removal
+    keep_mask = ~remove_mask_final
+    return maxval_k_gpu[keep_mask], maxidx_f_gpu[keep_mask], maxidx_t_gpu[keep_mask]
+
+
+class PeakFinderMan(KernelManager):
+    """ Finds peaks in 2D arrays
+
+    Divides array up along fast-varying axis into blocks of size K,
     then searches each block for the maximum value within the block.
     The search is done in two stages:
         1. Find maximum along the slow-varying axis (reduction by N_time)
-        2. Find maximum in reduced array within search block of size K 
-    
+        2. Find maximum in reduced array within search block of size K
+
     The output is a list of maximum values and corresponding indexes, which
     is sorted by increasing frequency channel.
 
@@ -147,51 +236,51 @@ class PeakFinderMan(KernelManager):
     """
     def __init__(self):
         super().__init__('PeakFinder')
-    
+
     def init(self, N_chan: int, N_time: int, K: int):
-        """ Initialize peak finder (allocate memory) 
-        
+        """ Initialize peak finder (allocate memory)
+
         Args:
             N_chan (int): Number of channels in data array
             N_time (int): Number of time integrations
-            K (int): Kernel search size 
+            K (int): Kernel search size
         """
-        
+
         # Initialize empty arrays
         maxval = np.zeros(N_chan, dtype='float32')
         maxidx = np.zeros(N_chan, dtype='int32')
         maxval_k = np.zeros(N_chan // K, dtype='float32')
         maxidx_f = np.zeros(N_chan // K, dtype='int32')
         maxidx_t = np.zeros(N_chan // K, dtype='int32')
-        
+
         self.K = K
         self.N_chan = N_chan
         self.N_time = N_time
-        
+
         # Allocate on GPU
         self.workspace['maxval_gpu'] = cp.asarray(maxval)
         self.workspace['maxidx_gpu'] = cp.asarray(maxidx)
         self.workspace['maxval_k_gpu'] = cp.asarray(maxval_k)
         self.workspace['maxidx_f_gpu'] = cp.asarray(maxidx_f)
         self.workspace['maxidx_t_gpu'] = cp.asarray(maxidx_t)
-    
+
     def execute(self, d_gpu: cp.ndarray):
         """ Execute peak finder """
         try:
             assert d_gpu.shape == (self.N_time, self.N_chan)
         except AssertionError:
             raise RuntimeError(f"Array dimensions {d_gpu.shape} do not match those passed during init() ({self.N_time}, {self.N_chan})")
-        
+
         ws = self.workspace
         find_max_1D(d_gpu, ws['maxval_gpu'], ws['maxidx_gpu'])
-        find_max_reduce(ws['maxval_gpu'], ws['maxidx_gpu'], ws['maxval_k_gpu'], 
+        find_max_reduce(ws['maxval_gpu'], ws['maxidx_gpu'], ws['maxval_k_gpu'],
                         ws['maxidx_f_gpu'], ws['maxidx_t_gpu'], self.K)
 
         return ws['maxval_k_gpu'], ws['maxidx_f_gpu'], ws['maxidx_t_gpu']
-    
+
     def find_peaks(self, d_gpu: cp.ndarray, return_space: str='cpu'):
-        """ Find peaks in data 
-        
+        """ Find peaks in data
+
         Args:
             d_gpu (cp.ndarray): 2D data array to search
         """
@@ -206,7 +295,7 @@ class PeakFinderMan(KernelManager):
         """ Find peaks in data above threshold
 
         Also applies a third-stage filter to ensure hits have a minimum spacing
-        
+
         Args:
             d_gpu (cp.ndarray): (time, beam, freq) data array to search
         """
@@ -218,20 +307,29 @@ class PeakFinderMan(KernelManager):
         self.execute(d_gpu)
 
         mask  = self.workspace['maxval_k_gpu'] > threshold
-        hits  = cp.asnumpy(self.workspace['maxval_k_gpu'][mask])
-        idx_f = cp.asnumpy(self.workspace['maxidx_f_gpu'][mask])
-        idx_t = cp.asnumpy(self.workspace['maxidx_t_gpu'][mask])
+        maxval_k_filtered = self.workspace['maxval_k_gpu'][mask]
+        maxidx_f_filtered = self.workspace['maxidx_f_gpu'][mask]
+        maxidx_t_filtered = self.workspace['maxidx_t_gpu'][mask]
 
-        if len(hits) < 1:
-            return hits, idx_f, idx_t       # return empty lists
+        if len(maxval_k_filtered) < 1:
+            if return_space == 'cpu':
+                return cp.asnumpy(maxval_k_filtered), cp.asnumpy(maxidx_f_filtered), cp.asnumpy(maxidx_t_filtered)
+            else:
+                return maxval_k_filtered, maxidx_f_filtered, maxidx_t_filtered
         else:
-            df = np.column_stack((np.arange(len(hits)), hits, idx_f, idx_t))
-            df = _group_hits(df, min_spacing)
-            return df[:, 1], df[:, 2].astype('int32'), df[:, 3].astype('int32')
+            # Apply GPU-based adjacent hit filtering
+            hits_gpu, idx_f_gpu, idx_t_gpu = filter_adjacent_hits(
+                maxval_k_filtered, maxidx_f_filtered, maxidx_t_filtered, min_spacing
+            )
+
+            if return_space == 'cpu':
+                return cp.asnumpy(hits_gpu), cp.asnumpy(idx_f_gpu), cp.asnumpy(idx_t_gpu)
+            else:
+                return hits_gpu, idx_f_gpu, idx_t_gpu
 
 def _group_hits(df, min_spacing):
-    """ Helper function to sort list of hits into groups 
-    
+    """ Helper function to sort list of hits into groups
+
     # Final stage of hitsearch: we need to make sure only one maxima within
     # The minimum spacing. We loop through and assign to groups
     # Then find the maximum for each group.
@@ -259,24 +357,23 @@ def _group_hits(df, min_spacing):
             mv, mi = g[0][1], 0
             for i, h in enumerate(g[1:]):
                 if mv < h[1]:
-                    mv, mi = h[1], i + 1 
+                    mv, mi = h[1], i + 1
             df.append(g[mi])
-    df = np.array(df)    
+    df = np.array(df)
     return df
 
 def peak_find(dedopp_data: cp.ndarray, threshold: float, min_spacing: float, beam_id: int=0, mm: PeakFinderMan=None):
         """ Find peaks in data above threshold
 
         Also applies a third-stage filter to ensure hits have a minimum spacing
-        
+
         Args:
             dedopp_data (cp.ndarray): (dedopp, beam, freq) data array to search
         """
         K = 2**(int(np.log2(min_spacing)))
-        N_chan=dedopp_data.shape[2]
-        N_beam=dedopp_data.shape[1]
-        N_time=dedopp_data.shape[0]    
-        
+        N_chan = dedopp_data.shape[2]
+        N_time = dedopp_data.shape[0]
+
         if isinstance(mm, PeakFinderMan):
             pf = mm
         else:
