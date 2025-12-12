@@ -81,7 +81,7 @@ extern "C" __global__
             }
 
         }
-    __syncthreads()
+    __syncthreads();
     }
 ''', 'maxReduceKernel')
 
