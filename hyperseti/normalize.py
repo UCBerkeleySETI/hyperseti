@@ -12,29 +12,29 @@ logger = get_logger('hyperseti.normalize')
 
 def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
     """ Apply normalization on GPU
-    
+
     Applies normalisation (data - mean) / stdev
-    
-    Args: 
+
+    Args:
         data (DataArray): Data to preprocess (time, beam_id, frequency)
         mask (cp.array): 1D Channel mask for RFI flagging
         poly_fit (int): Fit polynomial of degree N, 0 = no fit.
-        
+
     Returns: d_gpu (cp.array): Normalized data
     """
     # Normalise
     logger.debug(f"Poly fit = {poly_fit}")
     t0 = time.time()
-    
+
     # Get rid of NaNs - TODO: figure out why there are NaNs ...
     data_array.data = cp.nan_to_num(data_array.data)
-    
+
     d_flag = cp.copy(data_array.data)
 
     n_int, n_ifs, n_chan = data_array.data.shape
 
     # Setup 1D channel mask -- used for polynomial fitting
-    if mask is None: 
+    if mask is None:
         mask = cp.zeros(n_chan, dtype='bool')
 
     # Do polynomial fit and compute stats (with masking)
@@ -44,7 +44,7 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
 
     N_masked = mask.sum()
     N_flagged = N_masked * n_ifs * n_int
-    N_tot     = np.product(data_array.data.shape)
+    N_tot     = np.prod(data_array.data.shape)
     N_unflagged = (N_tot - N_flagged)
 
     flag_fraction =  N_flagged / N_tot
@@ -54,16 +54,16 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
         logger.warning(f"High flagged fraction: {flag_fraction:2.3f}")
     if flag_fraction > 0.98:
         logger.critical(f"Too much data flagged: {flag_fraction:2.3f}")
-        
+
         # Ignore mask and ignore this data channel
         # TODO: How to make user notice if in a batch run?
         mask = cp.zeros(n_chan, dtype='bool')
         data_array.data = cp.ones_like(data_array.data)
 
     t0p = time.time()
-    
+
     for ii in range(n_ifs):
-        x    = cp.arange(n_chan, dtype='float64') 
+        x    = cp.arange(n_chan, dtype='float64')
         xc   = cp.compress(~mask, x)
         dfit = cp.compress(~mask, data_array.data[:, ii].mean(axis=0))
 
@@ -76,13 +76,13 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
                 dfit  -=  p(xc)
                 data_array.data[:, ii] = data_array.data[:, ii] - fit
             except TypeError:
-                # WAR for TypeError: expected non-empty vector for x 
+                # WAR for TypeError: expected non-empty vector for x
                 logger.critical(f"Error encountered in poly fitting!")
                 poly_coeffs = np.zeros(poly_fit)
                 dfit = cp.compress(~mask, data_array.data[:, ii].mean(axis=0))
-            
+
             d_poly_ifs[ii] = poly_coeffs
-        
+
 
         # compute mean and stdev
         dmean = cp.nanmean(dfit)
@@ -97,11 +97,11 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
 
 
     # Add means and STDEV as attributes to data array
-    pp_dict = { 'mean': d_mean_ifs, 
+    pp_dict = { 'mean': d_mean_ifs,
                 'std': d_std_ifs,
                 'flagged_fraction': flag_fraction,
                 }
-                
+
     if poly_fit > 0:
         pp_dict['n_poly'] = poly_fit
         pp_dict['poly_coeffs'] = d_poly_ifs
@@ -112,8 +112,8 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
     #  Apply to original data
     for ii in range(n_ifs):
         data_array.data[:, ii] = ((data_array.data[:, ii] - d_mean_ifs[ii]) / d_std_ifs[ii])
-    
+
     t1 = time.time()
     logger.debug(f"Normalisation time: {(t1-t0)*1e3:2.2f}ms")
-    
+
     return data_array

@@ -2,13 +2,13 @@
 Try to get results that are similar to those of turbo_seti with our standard Voyager 1 .h5 file.
 
 # ----------------------------------------------------
-# File ID: xx.h5 
+# File ID: xx.h5
 # ----------------------------------------------------
 # Source:Voyager1
 # MJD: 57650.782094907408       RA: 17h10m03.984s       DEC: 12d10m58.8s
 # DELTAT:  18.253611    DELTAF(Hz):  -2.793968  max_drift_rate:   4.000000      obs_length: 292.057776
 # --------------------------
-# Top_Hit_#     Drift_Rate      SNR     Uncorrected_Frequency   Corrected_Frequency     Index   freq_start      freq_end        SEFD    SEFD_freq       Coarse_Channel_Number   Full_number_of_hits 
+# Top_Hit_#     Drift_Rate      SNR     Uncorrected_Frequency   Corrected_Frequency     Index   freq_start      freq_end        SEFD    SEFD_freq       Coarse_Channel_Number   Full_number_of_hits
 # --------------------------
 001      -0.392226      156.379913         8419.319368     8419.319368  64651      8419.321003     8419.317740  0.0           0.000000  0       77634
 002      -0.373093      1258.281250        8419.297028     8419.297028  72647      8419.298662     8419.295399  0.0           0.000000  0       77634
@@ -16,9 +16,9 @@ Try to get results that are similar to those of turbo_seti with our standard Voy
 
 DCP NOTE:
     With manual processing, I find a mean noise level of 1.10575503e+10, std of 1.1497335e+09
-    After normalization, in first time step (time-frequency space), max = 259.43027, std = 1.0 
+    After normalization, in first time step (time-frequency space), max = 259.43027, std = 1.0
     If noise integrates down as sqrt(N_timesteps), we expect S/N to increase by sqrt(16) = 4x
-    So should see an SNR of 1000 
+    So should see an SNR of 1000
 """
 
 import os
@@ -70,15 +70,15 @@ def test_with_voyager():
             }
         }
 
-        hit_browser = find_et(voyager_h5, config, 
+        hit_browser = find_et(voyager_h5, config,
                         gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
                         filename_out=tmp_file('./test_voyager_hits.csv'),
                         log_output=True,
                         log_config=True
                         )
-                        
+
         dframe = hit_browser.hit_table
-    
+
         # dframe column names: drift_rate  f_start  snr  driftrate_idx  channel_idx  boxcar_size  beam_idx  n_integration
         print("Returned dataframe:\n", dframe)
         print(dframe.dtypes)
@@ -89,7 +89,7 @@ def test_with_voyager():
         assert os.path.exists(tmp_file('test_voyager_hits.log'))
 
         # This is a quick test to check if smaller gulps are taking the channel offset into account
-        assert np.alltrue(dframe['channel_idx'] > 739000)
+        assert np.all(dframe['channel_idx'] > 739000)
 
         for drate in list_drate:
             print("Observed drift rate = {}, should be negative.".format(drate))
@@ -98,25 +98,25 @@ def test_with_voyager():
         # Second iteration -- use blank_hits dict
         config['pipeline']['blank_hits'] = {'n_blank': 2, 'padding': 10}
 
-        hit_browser = find_et(voyager_h5, config, 
+        hit_browser = find_et(voyager_h5, config,
                         gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
                         filename_out=tmp_file('./test_voyager_hits.csv'),
                         log_output=True,
                         log_config=True
                         )
-                        
+
         dframe = hit_browser.hit_table
         print(dframe[['f_start', 'snr', 'channel_idx', 'gulp_channel_idx', 'drift_rate', 'extent_lower', 'extent_upper']])
 
         # Third time -- add in poly fit
         config['preprocess']['poly_fit'] = 5
-        hit_browser = find_et(voyager_h5, config, 
+        hit_browser = find_et(voyager_h5, config,
                         gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
                         filename_out=tmp_file('./test_voyager_hits.csv'),
                         log_output=True,
                         log_config=True
                         )
-                        
+
         dframe = hit_browser.hit_table
         print(dframe.dtypes)
 
@@ -127,13 +127,13 @@ def test_with_voyager():
         config['dedoppler']['apply_smearing_corr'] = True
         config['pipeline']['n_boxcar'] = 1
         logger = get_logger('find_et', 'debug')
-        hit_browser = find_et(voyager_h5, config, 
+        hit_browser = find_et(voyager_h5, config,
                         gulp_size=2**18,  # Note: intentionally smaller than 2**20 to test slice offset
                         filename_out=tmp_file('./test_voyager_hits.csv'),
                         log_output=True,
                         log_config=True
-                        )    
-        logger.level =  logbook.INFO  
+                        )
+        logger.level =  logbook.INFO
 
     finally:
         for file_ext in ('.log', '.csv', '.yaml', '.hitdb'):
