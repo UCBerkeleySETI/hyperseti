@@ -45,7 +45,7 @@ myst-parser      = ">=1.0"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "--verbose --cov=hyperseti test/"
+addopts = "--verbose --cov=hyperseti"
 
 [build-system]
 requires        = ["poetry-core"]
