@@ -1,6 +1,6 @@
 [tool.poetry]
 name            = "hyperseti"
-version         = "1.1.0"
+version         = "1.2.0"
 description     = "GPU-accelerated code for searching radio astronomy spectral datasets for narrowband technosignatures (SETI)"
 authors         = ["Danny C. Price"]
 license         = "MIT"
@@ -26,7 +26,7 @@ matplotlib  = ">=3.5"
 
 [tool.poetry.scripts]
 findET = "hyperseti.findET:cmd_tool"
-tsdat  = "hyperseti.tsdat:cmd_tool" 
+tsdat  = "hyperseti.tsdat:cmd_tool"
 hyperfrost = "hyperseti.hyperfrost.cmd_tool:cmd_tool"
 
 [tool.poetry.group.test.dependencies]

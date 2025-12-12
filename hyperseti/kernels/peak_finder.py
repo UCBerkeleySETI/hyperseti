@@ -239,15 +239,21 @@ def _group_hits(df, min_spacing):
     if len(df) == 0:
         return df
 
-    # Create group IDs based on frequency spacing
+    # Group by frequency spacing
     group_ids = (np.diff(df[:, 2], prepend=df[0, 2] - min_spacing) >= min_spacing).cumsum()
 
-    # Find index of max value in each group
-    unique_groups = np.unique(group_ids)
-    result_indices = np.array([
-        np.where(group_ids == g)[0][np.argmax(df[group_ids == g, 1])]
-        for g in unique_groups
-    ])
+    # Sort by group ID and value (descending) to get max first in each group
+    sort_order = np.lexsort((-df[:, 1], group_ids))
+    sorted_groups = group_ids[sort_order]
+
+    # Find first occurrence of each group (which is the max due to sorting)
+    _, first_indices = np.unique(sorted_groups, return_index=True)
+
+    # Map back to original indices
+    result_indices = sort_order[first_indices]
+
+    # Sort results by original frequency order
+    result_indices = result_indices[np.argsort(df[result_indices, 2])]
 
     return df[result_indices]
 
