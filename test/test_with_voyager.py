@@ -89,7 +89,7 @@ def test_with_voyager():
         assert os.path.exists(tmp_file('test_voyager_hits.log'))
 
         # This is a quick test to check if smaller gulps are taking the channel offset into account
-        assert np.alltrue(dframe['channel_idx'] > 739000)
+        assert np.all(dframe['channel_idx'] > 739000)
 
         for drate in list_drate:
             print("Observed drift rate = {}, should be negative.".format(drate))

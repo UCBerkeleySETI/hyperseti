@@ -44,7 +44,7 @@ def normalize(data_array: DataArray,  mask: cp.ndarray=None, poly_fit: int=0):
 
     N_masked = mask.sum()
     N_flagged = N_masked * n_ifs * n_int
-    N_tot     = np.product(data_array.data.shape)
+    N_tot     = np.prod(data_array.data.shape)
     N_unflagged = (N_tot - N_flagged)
 
     flag_fraction =  N_flagged / N_tot
