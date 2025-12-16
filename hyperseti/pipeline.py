@@ -73,6 +73,7 @@ class GulpPipeline(object):
         self.data_array = data_array
         self.config = deepcopy(config)
         self._called_count = 0
+        self._blank_count  = 0
 
         if not isinstance(self.data_array.data, cp.ndarray):
             logger.warning(f"GulpPipeline init: Data not in cupy.ndarray, attempting to copy data to GPU")
@@ -184,7 +185,7 @@ class GulpPipeline(object):
         # sqrt(N_timesteps) is taken into account within dedoppler kernel
         conf = deepcopy(self.config)        # This deepcopy avoids overwriting original threshold value
         boxcar_size = conf['dedoppler'].get('boxcar_size', 1)
-        blank_count = conf['pipeline'].get('blank_count', 1)
+        blank_count = self._blank_count
 
         _threshold0 = conf['hitsearch']['threshold']
         #conf['hitsearch']['threshold'] = _threshold0 * np.sqrt(boxcar_size)
@@ -239,6 +240,7 @@ class GulpPipeline(object):
         n_hits_last_iter = 0
         
         for blank_count in range(n_blank):
+            self._blank_count = blank_count
             new_peaks_this_blanking_iter = []
             n_hits_blanking_iter = 0
             for boxcar_idx, boxcar_size in enumerate(boxcar_trials):
@@ -274,7 +276,8 @@ class GulpPipeline(object):
         else:
             logger.info(f"GulpPipeline.run #{self._called_count}: Elapsed time: {(t1-t0):2.2f}s; {len(self.peaks)} hits found")
         
-        self.peaks['n_blank']   = n_blank
+        self.peaks['n_blank']     = n_blank
+
 
         return self.peaks
 
